@@ -5,10 +5,12 @@ import sys
 import click
 
 from droidbridge.core.adb import AdbClient, AdbError
+from droidbridge.core.platform.linux import SleepInhibitor
 from droidbridge.modules import device as device_module
 from droidbridge.modules import files as files_module
 from droidbridge.modules import search as search_module
-from droidbridge.utils.format import format_bytes, format_size_kb, parse_size
+from droidbridge.modules import transfer as transfer_module
+from droidbridge.utils.format import format_bytes, format_duration, format_size_kb, parse_size
 
 
 def _build_client():
@@ -289,6 +291,150 @@ def files_search(path, serial, name, extensions, min_size, max_size, after, befo
 
     for result in results:
         click.echo(_format_result_line(result))
+
+
+@cli.group("transfer")
+def transfer_cmd():
+    """Transfer files between this computer and the device."""
+
+
+def _print_plan_summary(plan):
+    if plan.already_present:
+        click.echo(f"Skipping {len(plan.already_present)} file(s) already present (resume).")
+    if plan.conflicts_skipped:
+        click.echo(
+            f"Skipping {len(plan.conflicts_skipped)} file(s) due to conflicts "
+            "(use --conflict overwrite or --conflict rename to transfer them)."
+        )
+
+
+def _format_progress_line(progress):
+    return (
+        f"\r  {progress.done_files}/{progress.total_files} files | "
+        f"{format_bytes(progress.done_bytes)} / {format_bytes(progress.total_bytes)} | "
+        f"{format_bytes(progress.speed_bps)}/s | ETA {format_duration(progress.eta_seconds)}"
+    )
+
+
+def _report_verification(result):
+    if result.ok:
+        click.echo(f"Verified: {result.actual_files} file(s), {format_bytes(result.actual_bytes)}.")
+        return True
+
+    click.echo(
+        f"Verification FAILED: expected {result.expected_files} file(s) "
+        f"({format_bytes(result.expected_bytes)}), found {result.actual_files} file(s) "
+        f"({format_bytes(result.actual_bytes)}).",
+        err=True,
+    )
+    return False
+
+
+_CONFLICT_OPTION = click.option(
+    "--conflict",
+    type=click.Choice(transfer_module.CONFLICT_MODES),
+    default=transfer_module.CONFLICT_SKIP,
+    help="How to handle files that already exist with different content (default: skip).",
+)
+_NO_VERIFY_OPTION = click.option(
+    "--no-verify", is_flag=True, help="Skip post-transfer verification."
+)
+_SERIAL_OPTION = click.option(
+    "--serial",
+    "-s",
+    default=None,
+    help="Device serial number (required if multiple devices are connected).",
+)
+
+
+@transfer_cmd.command("pull")
+@click.argument("remote_path")
+@click.argument("local_dir", default=".")
+@_SERIAL_OPTION
+@_CONFLICT_OPTION
+@_NO_VERIFY_OPTION
+def transfer_pull(remote_path, local_dir, serial, conflict, no_verify):
+    """Pull REMOTE_PATH (a file or folder) from the device into LOCAL_DIR (default: current directory)."""
+    try:
+        client = _build_client()
+    except AdbError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+
+    serial = _resolve_serial(client, serial)
+
+    try:
+        plan = transfer_module.plan_pull(client, serial, remote_path, local_dir, conflict=conflict)
+    except AdbError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+
+    _print_plan_summary(plan)
+
+    if not plan.to_transfer:
+        click.echo("Nothing to transfer.")
+        return
+
+    file_word = "file" if plan.total_files == 1 else "files"
+    click.echo(f"Pulling {plan.total_files} {file_word}, {format_bytes(plan.total_bytes)}...")
+
+    def on_progress(progress):
+        click.echo(_format_progress_line(progress), nl=False)
+
+    with SleepInhibitor("DroidBridge file transfer"):
+        transfer_module.execute_plan(client, serial, plan, progress_callback=on_progress)
+    click.echo()
+
+    if no_verify:
+        return
+
+    if not _report_verification(transfer_module.verify_pull(plan)):
+        sys.exit(1)
+
+
+@transfer_cmd.command("push")
+@click.argument("local_path", type=click.Path(exists=True))
+@click.argument("remote_dir")
+@_SERIAL_OPTION
+@_CONFLICT_OPTION
+@_NO_VERIFY_OPTION
+def transfer_push(local_path, remote_dir, serial, conflict, no_verify):
+    """Push LOCAL_PATH (a file or folder) to REMOTE_DIR on the device."""
+    try:
+        client = _build_client()
+    except AdbError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+
+    serial = _resolve_serial(client, serial)
+
+    try:
+        plan = transfer_module.plan_push(client, serial, local_path, remote_dir, conflict=conflict)
+    except AdbError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+
+    _print_plan_summary(plan)
+
+    if not plan.to_transfer:
+        click.echo("Nothing to transfer.")
+        return
+
+    file_word = "file" if plan.total_files == 1 else "files"
+    click.echo(f"Pushing {plan.total_files} {file_word}, {format_bytes(plan.total_bytes)}...")
+
+    def on_progress(progress):
+        click.echo(_format_progress_line(progress), nl=False)
+
+    with SleepInhibitor("DroidBridge file transfer"):
+        transfer_module.execute_plan(client, serial, plan, progress_callback=on_progress)
+    click.echo()
+
+    if no_verify:
+        return
+
+    if not _report_verification(transfer_module.verify_push(client, serial, plan, remote_dir)):
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 
 import pytest
 
-from droidbridge.utils.format import format_bytes, format_size_kb, parse_size
+from droidbridge.utils.format import format_bytes, format_duration, format_size_kb, parse_size
 
 
 class TestFormatBytes:
@@ -56,3 +56,25 @@ class TestParseSize:
     def test_unknown_unit_raises_value_error(self):
         with pytest.raises(ValueError):
             parse_size("10XB")
+
+
+class TestFormatDuration:
+    @pytest.mark.parametrize(
+        "seconds, expected",
+        [
+            (0, "0s"),
+            (5, "5s"),
+            (59, "59s"),
+            (60, "1m 0s"),
+            (90, "1m 30s"),
+            (3599, "59m 59s"),
+            (3600, "1h 0m 0s"),
+            (3661, "1h 1m 1s"),
+            (7325, "2h 2m 5s"),
+        ],
+    )
+    def test_formats_expected(self, seconds, expected):
+        assert format_duration(seconds) == expected
+
+    def test_none_returns_placeholder(self):
+        assert format_duration(None) == "?"

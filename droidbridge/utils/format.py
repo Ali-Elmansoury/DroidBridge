@@ -36,6 +36,22 @@ def format_size_kb(size_kb):
     return format_bytes(size_kb * 1024)
 
 
+def format_duration(seconds):
+    """Return a human-readable duration (e.g. '1h 2m 3s'), or '?' if seconds is None."""
+    if seconds is None:
+        return "?"
+
+    seconds = int(seconds)
+    hours, remainder = divmod(seconds, 3600)
+    minutes, secs = divmod(remainder, 60)
+
+    if hours:
+        return f"{hours}h {minutes}m {secs}s"
+    if minutes:
+        return f"{minutes}m {secs}s"
+    return f"{secs}s"
+
+
 def parse_size(value):
     """Parse a human-readable size string (e.g. '10MB', '1.5KB', '100') into bytes."""
     match = _SIZE_RE.match(value.strip())
