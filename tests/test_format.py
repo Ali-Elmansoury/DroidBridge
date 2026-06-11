@@ -2,7 +2,7 @@
 
 import pytest
 
-from droidbridge.utils.format import format_bytes, format_size_kb
+from droidbridge.utils.format import format_bytes, format_size_kb, parse_size
 
 
 class TestFormatBytes:
@@ -28,3 +28,31 @@ class TestFormatSizeKb:
 
     def test_one_gb_in_kb(self):
         assert format_size_kb(1024 * 1024) == "1.0 GB"
+
+
+class TestParseSize:
+    @pytest.mark.parametrize(
+        "value, expected",
+        [
+            ("100", 100),
+            ("100B", 100),
+            ("1K", 1024),
+            ("1KB", 1024),
+            ("1.5KB", 1536),
+            ("10MB", 10 * 1024 ** 2),
+            ("50 MB", 50 * 1024 ** 2),
+            ("2GB", 2 * 1024 ** 3),
+            ("1TB", 1024 ** 4),
+            ("1mb", 1024 ** 2),
+        ],
+    )
+    def test_parses_human_readable_sizes(self, value, expected):
+        assert parse_size(value) == expected
+
+    def test_invalid_size_raises_value_error(self):
+        with pytest.raises(ValueError):
+            parse_size("not-a-size")
+
+    def test_unknown_unit_raises_value_error(self):
+        with pytest.raises(ValueError):
+            parse_size("10XB")
