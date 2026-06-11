@@ -10,6 +10,7 @@ from droidbridge.modules import device as device_module
 from droidbridge.modules import files as files_module
 from droidbridge.modules import search as search_module
 from droidbridge.modules import transfer as transfer_module
+from droidbridge.modules import whatsapp as whatsapp_module
 from droidbridge.utils.format import format_bytes, format_duration, format_size_kb, parse_size
 
 
@@ -434,6 +435,123 @@ def transfer_push(local_path, remote_dir, serial, conflict, no_verify):
         return
 
     if not _report_verification(transfer_module.verify_push(client, serial, plan, remote_dir)):
+        sys.exit(1)
+
+
+@cli.group("whatsapp")
+def whatsapp_cmd():
+    """WhatsApp / WhatsApp Business media analysis, backup, and cleanup."""
+
+
+_APP_OPTION = click.option(
+    "--app",
+    type=click.Choice(("whatsapp", "business", "all")),
+    default="all",
+    help="Which app to scan: whatsapp, business, or all (default: all).",
+)
+
+
+def _select_installs(installs, app):
+    if app == "all":
+        return installs
+    package = "com.whatsapp" if app == "whatsapp" else "com.whatsapp.w4b"
+    return [install for install in installs if install.package == package]
+
+
+@whatsapp_cmd.command("scan")
+@_SERIAL_OPTION
+@_APP_OPTION
+def whatsapp_scan(serial, app):
+    """Scan WhatsApp media folders and report file counts/sizes by folder and section."""
+    try:
+        client = _build_client()
+    except AdbError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+
+    serial = _resolve_serial(client, serial)
+
+    installs = whatsapp_module.detect_installs(client, serial)
+    installs = _select_installs(installs, app)
+
+    if not installs:
+        click.echo("No WhatsApp or WhatsApp Business installation found on this device.", err=True)
+        sys.exit(1)
+
+    for install in installs:
+        click.echo(f"{install.label} ({install.package}) -- {install.media_path}")
+
+        media_files = whatsapp_module.scan_media(client, serial, install)
+        if not media_files:
+            click.echo("  (no media found)")
+            click.echo()
+            continue
+
+        summary = whatsapp_module.summarize_by_folder(media_files)
+        for group in summary:
+            click.echo(
+                f"  {group.folder_type:<28} {group.section:<10} "
+                f"{group.file_count:>6} files  {format_bytes(group.total_size):>10}"
+            )
+
+        total_files = sum(group.file_count for group in summary)
+        total_size = sum(group.total_size for group in summary)
+        click.echo(
+            f"  {'TOTAL':<28} {'':<10} {total_files:>6} files  {format_bytes(total_size):>10}"
+        )
+        click.echo()
+
+
+@whatsapp_cmd.command("save-status")
+@click.option(
+    "--dest",
+    required=True,
+    type=click.Path(file_okay=False),
+    help="Destination folder to save current status images/videos into.",
+)
+@_SERIAL_OPTION
+@_APP_OPTION
+@_CONFLICT_OPTION
+@_NO_VERIFY_OPTION
+def whatsapp_save_status(dest, serial, app, conflict, no_verify):
+    """Save current WhatsApp / WhatsApp Business status images and videos to DEST."""
+    try:
+        client = _build_client()
+    except AdbError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+
+    serial = _resolve_serial(client, serial)
+
+    installs = whatsapp_module.detect_installs(client, serial)
+    installs = _select_installs(installs, app)
+
+    if not installs:
+        click.echo("No WhatsApp or WhatsApp Business installation found on this device.", err=True)
+        sys.exit(1)
+
+    plan = whatsapp_module.plan_save_statuses(client, serial, installs, dest, conflict=conflict)
+
+    _print_plan_summary(plan)
+
+    if not plan.to_transfer:
+        click.echo("Nothing to transfer.")
+        return
+
+    file_word = "file" if plan.total_files == 1 else "files"
+    click.echo(f"Pulling {plan.total_files} {file_word}, {format_bytes(plan.total_bytes)}...")
+
+    def on_progress(progress):
+        click.echo(_format_progress_line(progress), nl=False)
+
+    with SleepInhibitor("DroidBridge file transfer"):
+        transfer_module.execute_plan(client, serial, plan, progress_callback=on_progress)
+    click.echo()
+
+    if no_verify:
+        return
+
+    if not _report_verification(transfer_module.verify_pull(plan)):
         sys.exit(1)
 
 

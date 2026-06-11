@@ -363,6 +363,32 @@ WhatsApp_Documents_Organized/
 - Warn user that msgstore.db contains active chats — critical to preserve
 - Note encryption status of database files
 
+### 4.9 Restore (Media)
+
+- Push a previously made WhatsApp media backup (raw or organized) back onto
+  the phone's WhatsApp / WhatsApp Business media path
+- Uses Module 3 transfer engine in push mode — same conflict resolution
+  (skip/overwrite/rename) and post-transfer verification as backup
+- Media-only: `Databases/`/`Backups/`/`accounts/` restore is out of scope here
+  — see §6.5 for whole-phone restore and the database-restore caveat in §4.8's
+  Phase 3.5 follow-up
+
+### 4.10 Status Saver
+
+- Save WhatsApp's currently-active Status images/videos (24h-ephemeral) before
+  they're cleared, for both WhatsApp and WhatsApp Business
+- Source: `<base_path>/Media/.Statuses/` — the hidden folder excluded from
+  `scan_media` (§4.1) as internal cache, repurposed here as the status source
+- Filters to image/video files only (skips `.nomedia` and other marker files)
+- Uses Module 3 transfer engine in pull mode — same conflict resolution and
+  post-transfer verification as backup
+- Destination layout: one subfolder per app — `<dest>/WhatsApp/Statuses/` and
+  `<dest>/WhatsApp Business/Statuses/` — avoids filename collisions between
+  the two apps
+- GUI (Phase 6): thumbnail grid of current statuses per app (image preview /
+  video thumbnail per §2.3) with checkbox selection, so the user can choose
+  which statuses to save individually rather than saving everything
+
 ---
 
 ## 8. Module 5 — Storage Analyzer 📊
@@ -603,6 +629,7 @@ droidbridge <module> <command> [options]
 | `droidbridge whatsapp analyze --cutoff 2024-09-01` | Pre/post cutoff analysis |
 | `droidbridge whatsapp backup --dest /media/drive/` | Full WhatsApp backup |
 | `droidbridge whatsapp backup --type voice_notes,images` | Selective backup |
+| `droidbridge whatsapp save-status --dest /media/drive/` | Save current status images/videos (both apps, per-app subfolders) |
 | `droidbridge whatsapp organize --src /backup/ --type images` | Organize backup |
 | `droidbridge whatsapp delete --before 2024-09-01 --keep images,audio` | Delete with preview |
 | `droidbridge whatsapp fix-extensions --path /backup/docs/` | Fix missing extensions |
@@ -737,6 +764,14 @@ The project is broken into 6 phases, each independently usable and testable. Eac
 - Post-backup verification (count + size match)
 - Backup report + session log generation
 - CLI: `droidbridge whatsapp backup --dest --type`
+- Restore (media-only): push a backup folder back onto the phone's WhatsApp
+  media path using the Phase 2 transfer engine (push mode), with the same
+  conflict resolution and post-restore verification (see §4.9). Database/
+  account restore is deferred — see 3.5.
+- CLI: `droidbridge whatsapp restore --src --dest-path`
+- Status Saver: pull currently-active `.Statuses` media (images/videos) for
+  WhatsApp and WhatsApp Business into separate per-app subfolders (see §4.10)
+- CLI: `droidbridge whatsapp save-status --dest`
 
 #### 3.3 Organization Sub-Phase (Optional Step)
 
@@ -762,6 +797,11 @@ The project is broken into 6 phases, each independently usable and testable. Eac
 
 - Backup `Databases/`, `Backups/`, `accounts/` folders
 - CLI: `droidbridge whatsapp backup-db --dest`
+- Database restore is intentionally out of scope for the CLI toolkit: WhatsApp
+  only picks up a restored `msgstore.db.crypt*` during a fresh install/login
+  (not while already set up), and `Android/data/com.whatsapp` is restricted on
+  Android 11+. Document this caveat rather than implementing an automated
+  restore-db command.
 
 **Exit Criteria:**
 
@@ -821,6 +861,8 @@ The project is broken into 6 phases, each independently usable and testable. Eac
 - PyQt6 GUI with sidebar navigation matching the 9 modules
 - GUI calls into the same `core/` and `modules/` logic as the CLI (no duplicated logic)
 - Progress dialogs, confirmation dialogs, dark/light mode
+- Status Saver panel: thumbnail grid of current `.Statuses` media per app
+  (§4.10), with checkbox selection for individual save
 - PyInstaller builds for Windows, Linux, macOS
 - README, user guide, and CLI help text finalized
 
