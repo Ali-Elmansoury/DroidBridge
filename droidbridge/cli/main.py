@@ -1,5 +1,6 @@
 """Click-based CLI entry point for DroidBridge."""
 
+import importlib.util
 import os
 import sys
 import time
@@ -1902,6 +1903,21 @@ def report_generate(serial, app, report_type, report_format, output_path, top_n,
     if report_format == "txt":
         click.echo(content)
     click.echo(f"Report written to {out}")
+
+
+@cli.command("gui")
+def gui_cmd():
+    """Launch the DroidBridge desktop GUI (requires the optional PyQt6 dependency)."""
+    if importlib.util.find_spec("PyQt6") is None:
+        click.echo(
+            'Error: GUI dependencies not installed. Install with: pip install -e ".[gui]"',
+            err=True,
+        )
+        sys.exit(1)
+
+    from droidbridge.gui.app import main as gui_main
+
+    sys.exit(gui_main(sys.argv[:1]))
 
 
 if __name__ == "__main__":
