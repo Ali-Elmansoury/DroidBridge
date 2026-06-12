@@ -52,6 +52,7 @@ class TestMainWindow:
     def test_log_panel_toggle_action_hides_and_shows_panel(self, qtbot):
         window = MainWindow()
         qtbot.addWidget(window)
+        window.show()
 
         window.log_panel_action.setChecked(False)
         assert window.log_panel.isVisible() is False
@@ -62,6 +63,7 @@ class TestMainWindow:
     def test_busy_changed_shows_and_hides_progress_bar(self, qtbot):
         window = MainWindow()
         qtbot.addWidget(window)
+        window.show()
 
         window.device_viewmodel.busyChanged.emit(True)
         assert window.busy_bar.isVisible() is True

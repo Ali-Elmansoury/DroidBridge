@@ -109,11 +109,6 @@ class MainWindow(QMainWindow):
             self.context.is_connected, self.context.serial or "", self.context.model or ""
         )
 
-        # Show the window so child-widget visibility (busy bar, log panel) is reflected
-        # accurately by QWidget.isVisible(), which depends on the whole ancestor chain
-        # being shown.
-        self.show()
-
     def _on_connection_changed(self, connected, serial, model):
         color = "green" if connected else "red"
         self.status_dot.setStyleSheet(f"background-color: {color}; border-radius: 6px;")
