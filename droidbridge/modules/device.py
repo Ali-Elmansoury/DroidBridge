@@ -30,6 +30,11 @@ CONNECTION_GUIDANCE = {
 }
 
 
+class DeviceSelectionError(Exception):
+    """Raised by resolve_ready_device when no device, multiple devices with no serial
+    given, or an unknown/not-ready serial is selected."""
+
+
 @dataclass
 class StorageInfo:
     """Storage breakdown for a mount point, in KB."""
@@ -68,6 +73,31 @@ def list_devices(client):
 def get_ready_devices(client):
     """Return only devices in the 'device' (ready) state."""
     return [d for d in client.devices() if d.is_ready]
+
+
+def resolve_ready_device(client, serial=None):
+    """Return the serial of the device to use.
+
+    Raises DeviceSelectionError (with a human-readable guidance message) if there are no
+    ready devices, if `serial` is None and multiple devices are ready, or if `serial` does
+    not match a ready device.
+    """
+    ready = get_ready_devices(client)
+    if not ready:
+        raise DeviceSelectionError(connection_guidance("no device"))
+
+    ready_serials = [d.serial for d in ready]
+    if serial is None:
+        if len(ready) > 1:
+            lines = ["Multiple devices connected. Specify one with --serial:"]
+            lines.extend(f"  {d.serial}  ({d.model})" for d in ready)
+            raise DeviceSelectionError("\n".join(lines))
+        return ready_serials[0]
+
+    if serial not in ready_serials:
+        raise DeviceSelectionError(f"Error: device '{serial}' not found or not ready.")
+
+    return serial
 
 
 def connection_guidance(state):

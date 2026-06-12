@@ -194,3 +194,54 @@ class TestRestartAdbServer:
         device.ensure_adb_server_running(client)
 
         client.start_server.assert_called_once()
+
+
+class TestResolveReadyDevice:
+    def test_no_ready_devices_raises_with_no_device_guidance(self):
+        client = MagicMock()
+        client.devices.return_value = []
+
+        with pytest.raises(device.DeviceSelectionError) as exc_info:
+            device.resolve_ready_device(client)
+
+        assert "usb debugging" in str(exc_info.value).lower()
+
+    def test_single_ready_device_serial_none_returns_its_serial(self):
+        client = MagicMock()
+        client.devices.return_value = [Device(serial="A", state="device", model="Pixel 7")]
+
+        assert device.resolve_ready_device(client) == "A"
+
+    def test_multiple_ready_devices_serial_none_lists_candidates(self):
+        client = MagicMock()
+        client.devices.return_value = [
+            Device(serial="A", state="device", model="Pixel 7"),
+            Device(serial="B", state="device", model="Pixel 8"),
+        ]
+
+        with pytest.raises(device.DeviceSelectionError) as exc_info:
+            device.resolve_ready_device(client)
+
+        message = str(exc_info.value)
+        assert "Multiple devices connected" in message
+        assert "A  (Pixel 7)" in message
+        assert "B  (Pixel 8)" in message
+
+    def test_explicit_serial_matching_ready_device_is_returned(self):
+        client = MagicMock()
+        client.devices.return_value = [
+            Device(serial="A", state="device", model="Pixel 7"),
+            Device(serial="B", state="device", model="Pixel 8"),
+        ]
+
+        assert device.resolve_ready_device(client, serial="B") == "B"
+
+    def test_explicit_serial_not_ready_raises(self):
+        client = MagicMock()
+        client.devices.return_value = [Device(serial="A", state="device", model="Pixel 7")]
+
+        with pytest.raises(device.DeviceSelectionError) as exc_info:
+            device.resolve_ready_device(client, serial="Z")
+
+        assert "Z" in str(exc_info.value)
+        assert "not found or not ready" in str(exc_info.value)
