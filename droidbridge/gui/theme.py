@@ -31,13 +31,30 @@ def _dark_palette():
     return palette
 
 
+def _light_palette():
+    palette = QPalette()
+    palette.setColor(QPalette.ColorRole.Window, QColor(239, 239, 239))
+    palette.setColor(QPalette.ColorRole.WindowText, QColor(0, 0, 0))
+    palette.setColor(QPalette.ColorRole.Base, QColor(255, 255, 255))
+    palette.setColor(QPalette.ColorRole.AlternateBase, QColor(247, 247, 247))
+    palette.setColor(QPalette.ColorRole.ToolTipBase, QColor(255, 255, 255))
+    palette.setColor(QPalette.ColorRole.ToolTipText, QColor(0, 0, 0))
+    palette.setColor(QPalette.ColorRole.Text, QColor(0, 0, 0))
+    palette.setColor(QPalette.ColorRole.Button, QColor(239, 239, 239))
+    palette.setColor(QPalette.ColorRole.ButtonText, QColor(0, 0, 0))
+    palette.setColor(QPalette.ColorRole.BrightText, QColor(255, 0, 0))
+    palette.setColor(QPalette.ColorRole.Highlight, QColor(42, 130, 218))
+    palette.setColor(QPalette.ColorRole.HighlightedText, QColor(255, 255, 255))
+    return palette
+
+
 def apply_theme(app, mode):
     """Apply the Fusion style with a dark or light QPalette to `app`."""
     app.setStyle(QStyleFactory.create("Fusion"))
     if mode == DARK:
         app.setPalette(_dark_palette())
     else:
-        app.setPalette(app.style().standardPalette())
+        app.setPalette(_light_palette())
 
 
 def load_theme_pref(path=None):

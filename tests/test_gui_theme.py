@@ -1,6 +1,6 @@
 """Tests for droidbridge.gui.theme (Phase 6.1)."""
 
-from PyQt6.QtGui import QPalette
+from PyQt6.QtGui import QColor, QPalette
 
 from droidbridge.gui import theme
 
@@ -20,6 +20,17 @@ class TestApplyTheme:
         color = qapp.palette().color(QPalette.ColorRole.Window)
 
         assert color.lightness() > 128
+
+    def test_light_palette_uses_explicit_light_colors(self):
+        """The light palette must be hand-rolled (not app.style().standardPalette()),
+        which on some desktops returns the host's dark color scheme even for Fusion.
+        """
+        palette = theme._light_palette()
+
+        assert palette.color(QPalette.ColorRole.Window) == QColor(239, 239, 239)
+        assert palette.color(QPalette.ColorRole.WindowText) == QColor(0, 0, 0)
+        assert palette.color(QPalette.ColorRole.Base) == QColor(255, 255, 255)
+        assert palette.color(QPalette.ColorRole.Text) == QColor(0, 0, 0)
 
 
 class TestThemePreference:

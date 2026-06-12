@@ -103,6 +103,9 @@ class MainWindow(QMainWindow):
         self.context.connectionChanged.connect(self._on_connection_changed)
         self.device_viewmodel.statusChanged.connect(self.statusBar().showMessage)
         self.device_viewmodel.busyChanged.connect(self.busy_bar.setVisible)
+        self.device_viewmodel.busyChanged.connect(
+            lambda busy: self.connect_button.setEnabled(not busy)
+        )
         self.device_viewmodel.logMessage.connect(self._on_log_message)
 
         self._on_connection_changed(

@@ -71,6 +71,16 @@ class TestMainWindow:
         window.device_viewmodel.busyChanged.emit(False)
         assert window.busy_bar.isVisible() is False
 
+    def test_busy_changed_disables_connect_button(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        window.device_viewmodel.busyChanged.emit(True)
+        assert window.connect_button.isEnabled() is False
+
+        window.device_viewmodel.busyChanged.emit(False)
+        assert window.connect_button.isEnabled() is True
+
     def test_dark_theme_toggle_applies_and_saves_pref(self, qtbot, monkeypatch):
         applied = []
         saved = []
