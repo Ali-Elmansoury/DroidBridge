@@ -24,6 +24,7 @@ class DeviceViewModel(QObject):
         super().__init__()
         self.context = context
         self._worker_factory = worker_factory
+        self._workers = []
 
     def connect_device(self):
         """Build a client, ensure the adb server is running, and pick a device."""
@@ -39,11 +40,25 @@ class DeviceViewModel(QObject):
     def _run(self, fn, on_finished):
         self.busyChanged.emit(True)
         worker = self._worker_factory(fn)
-        worker.finished.connect(on_finished)
-        worker.finished.connect(lambda _result: self.busyChanged.emit(False))
-        worker.error.connect(self._on_error)
-        worker.error.connect(lambda _exc: self.busyChanged.emit(False))
+        self._workers.append(worker)
+        worker.finished.connect(lambda result: self._finish(worker, on_finished, result))
+        worker.error.connect(lambda exc: self._finish(worker, self._on_error, exc))
         worker.start()
+
+    def _finish(self, worker, callback, payload):
+        """Run `callback(payload)`, then release `worker` once its thread has exited.
+
+        Keeping `worker` referenced in `self._workers` until its thread fully exits
+        (via `worker.wait()`) prevents Python's garbage collector from destroying the
+        underlying QThread while it's still running. `busyChanged(False)` is only
+        emitted once no workers remain, so a chained `_run()` started by `callback`
+        (e.g. connect_device()'s call to refresh()) keeps the busy state active.
+        """
+        worker.wait()
+        self._workers.remove(worker)
+        callback(payload)
+        if not self._workers:
+            self.busyChanged.emit(False)
 
     def _on_connect_finished(self, result):
         client, serial, model, messages = result

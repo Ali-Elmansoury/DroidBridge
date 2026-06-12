@@ -35,6 +35,9 @@ class FakeWorker(QObject):
         else:
             self.finished.emit(result)
 
+    def wait(self):
+        pass
+
 
 SAMPLE_INFO = DeviceInfo(
     serial="SERIAL123",
@@ -133,3 +136,45 @@ class TestRefresh:
         vm.refresh()
 
         assert statuses == ["adb shell failed"]
+
+
+class TestWorkerLifecycle:
+    """Regression tests for the real Worker/QThread path (FakeWorker is synchronous and
+    has no QThread, so it can't catch worker-lifetime bugs).
+    """
+
+    def test_real_worker_completes_and_is_released(self, qtbot, monkeypatch):
+        context = DeviceContext()
+        context.set_connected(MagicMock(), "SERIAL123", "Pixel 7")
+        vm = DeviceViewModel(context)  # real Worker (default factory)
+        monkeypatch.setattr(device_ops, "refresh_info", lambda client, serial: SAMPLE_INFO)
+
+        info_events = []
+        vm.infoChanged.connect(info_events.append)
+
+        with qtbot.waitSignal(vm.infoChanged, timeout=2000):
+            vm.refresh()
+
+        assert info_events[0]["manufacturer"] == "Google"
+        assert vm._workers == []
+
+    def test_busy_stays_true_until_chained_refresh_completes(self, qtbot, monkeypatch):
+        context = DeviceContext()
+        vm = DeviceViewModel(context)  # real Worker (default factory)
+        fake_client = MagicMock()
+        monkeypatch.setattr(
+            device_ops, "connect",
+            lambda: (fake_client, "SERIAL123", "Pixel 7", []),
+        )
+        monkeypatch.setattr(device_ops, "refresh_info", lambda client, serial: SAMPLE_INFO)
+
+        info_events = []
+        vm.infoChanged.connect(info_events.append)
+
+        with qtbot.waitSignal(
+            vm.busyChanged, timeout=2000, check_params_cb=lambda busy: busy is False
+        ):
+            vm.connect_device()
+
+        assert info_events, "infoChanged must fire before busyChanged(False)"
+        assert vm._workers == []
