@@ -48,7 +48,7 @@ class TestTransferPull:
 
         client.pull.side_effect = fake_pull
         monkeypatch.setattr(main, "_build_client", lambda: client)
-        monkeypatch.setattr(main, "SleepInhibitor", _noop_inhibitor)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
 
         result = CliRunner().invoke(main.cli, ["transfer", "pull", "/sdcard/photo.jpg", str(tmp_path)])
 
@@ -67,7 +67,7 @@ class TestTransferPull:
 
         client.pull.side_effect = fake_pull
         monkeypatch.setattr(main, "_build_client", lambda: client)
-        monkeypatch.setattr(main, "SleepInhibitor", _noop_inhibitor)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
 
         result = CliRunner().invoke(main.cli, ["transfer", "pull", "/sdcard/Camera", str(tmp_path)])
 
@@ -81,7 +81,7 @@ class TestTransferPull:
         (tmp_path / "photo.jpg").write_bytes(b"x" * 1000)
         client = make_fake_client(READY_DEVICE, shell_side_effect=["1000"])
         monkeypatch.setattr(main, "_build_client", lambda: client)
-        monkeypatch.setattr(main, "SleepInhibitor", _noop_inhibitor)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
 
         result = CliRunner().invoke(main.cli, ["transfer", "pull", "/sdcard/photo.jpg", str(tmp_path)])
 
@@ -94,7 +94,7 @@ class TestTransferPull:
         client = make_fake_client(READY_DEVICE, shell_side_effect=["1000"])
         # client.pull does nothing, so the destination file never appears.
         monkeypatch.setattr(main, "_build_client", lambda: client)
-        monkeypatch.setattr(main, "SleepInhibitor", _noop_inhibitor)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
 
         result = CliRunner().invoke(main.cli, ["transfer", "pull", "/sdcard/photo.jpg", str(tmp_path)])
 
@@ -104,7 +104,7 @@ class TestTransferPull:
     def test_no_verify_flag_skips_verification(self, monkeypatch, tmp_path):
         client = make_fake_client(READY_DEVICE, shell_side_effect=["1000"])
         monkeypatch.setattr(main, "_build_client", lambda: client)
-        monkeypatch.setattr(main, "SleepInhibitor", _noop_inhibitor)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
 
         result = CliRunner().invoke(
             main.cli, ["transfer", "pull", "/sdcard/photo.jpg", str(tmp_path), "--no-verify"]
@@ -145,7 +145,7 @@ class TestTransferPush:
             shell_side_effect=["NO\n", "", "DIR\n", existing_after_push],
         )
         monkeypatch.setattr(main, "_build_client", lambda: client)
-        monkeypatch.setattr(main, "SleepInhibitor", _noop_inhibitor)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
 
         result = CliRunner().invoke(main.cli, ["transfer", "push", str(local_file), "/sdcard/Download"])
 
@@ -161,7 +161,7 @@ class TestTransferPush:
         existing_output = "/sdcard/Download/report.pdf\t100\t1700000000.0\n"
         client = make_fake_client(READY_DEVICE, shell_side_effect=["DIR\n", existing_output])
         monkeypatch.setattr(main, "_build_client", lambda: client)
-        monkeypatch.setattr(main, "SleepInhibitor", _noop_inhibitor)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
 
         result = CliRunner().invoke(main.cli, ["transfer", "push", str(local_file), "/sdcard/Download"])
 
@@ -177,7 +177,7 @@ class TestTransferPush:
         existing_output = "/sdcard/Download/report.pdf\t50\t1700000000.0\n"
         client = make_fake_client(READY_DEVICE, shell_side_effect=["DIR\n", existing_output])
         monkeypatch.setattr(main, "_build_client", lambda: client)
-        monkeypatch.setattr(main, "SleepInhibitor", _noop_inhibitor)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
 
         result = CliRunner().invoke(main.cli, ["transfer", "push", str(local_file), "/sdcard/Download"])
 

@@ -233,7 +233,12 @@ A comprehensive toolkit for WhatsApp media management built from real-world expe
   - File type / extension
   - File count and actual size per group
 - Pre vs post user-defined cutoff date comparison
-- Identify orphaned media: files with no linked chat in database
+- Identify orphaned media: files with no linked chat in database — **out of
+  scope on non-rooted devices** (caveat, not a command): `Databases/msgstore.db*`
+  is always `.crypt14`-encrypted, and its decryption key lives in
+  `/data/data/com.whatsapp/files/key`, inside app-private storage that `adb`
+  cannot read without root. Document this caveat rather than implementing
+  orphaned-media detection.
 - Detect files with missing or incorrect extensions using MIME type detection
 - Detect files with malformed dates (student IDs, serial numbers mistaken as dates)
 - Save analysis reports to disk (TXT and HTML formats)
@@ -562,7 +567,8 @@ Generate rich, detailed reports for all analysis and operations. Save session hi
 - Pre vs post cutoff comparison report
 - File type breakdown report (extension, count, total size, sorted by size)
 - Sent vs Received vs Private breakdown
-- Orphaned media report (files with no linked chat)
+- Orphaned media report (files with no linked chat) — out of scope on
+  non-rooted devices, see §4.1 caveat
 - Documents categorization report (PDFs, Archives, Images, Videos, Code, Engineering, etc.)
 - Before/after cleanup comparison
 
@@ -754,7 +760,8 @@ The project is broken into 6 phases, each independently usable and testable. Eac
 - Full scan of all 14 media folder types
 - Report by folder/section (Received/Sent/Private)/year/month/extension
 - Pre/post cutoff date comparison report
-- Orphaned media detection
+- Orphaned media detection — out of scope on non-rooted devices (see §4.1
+  caveat)
 - CLI: `droidbridge whatsapp scan`, `droidbridge whatsapp analyze --cutoff`
 
 #### 3.2 Backup Sub-Phase
@@ -876,7 +883,64 @@ The project is broken into 6 phases, each independently usable and testable. Eac
 
 ---
 
-## 17. Claude Code Prompt
+## 17. Future Ideas / Research Backlog 🔮
+
+Ideas raised during development that are **out of scope for the current
+6-phase plan** but worth documenting for later research. Nothing here is
+scheduled — revisit only after Phase 6 is complete, and only with explicit
+user sign-off.
+
+### 17.1 WhatsApp Cross-Device "Cloner" (like paid transfer tools)
+
+Raised during the Phase 3.5 wrap-up: could DroidBridge clone WhatsApp chat
+history between phones the way paid tools (MobileTrans, dr.fone, iCareFone,
+etc.) do — Android→Android and Android→iOS?
+
+**Android → Android (same account):**
+- Closest to in-scope — builds on `whatsapp backup-db` (Databases/Backups/
+  accounts) and `whatsapp backup` (Media).
+- **Blocker**: `msgstore.db.crypt14`/`.crypt15` is encrypted with a key in
+  `/data/data/com.whatsapp/files/key` — app-private storage, root-only on
+  Android 11+ (same restriction already documented in §4.8/§4.9 for database
+  restore). Without that key, WhatsApp on the target device can't decrypt a
+  restored database.
+- WhatsApp's own **"Chat Transfer"** feature (Wi-Fi Direct/QR, both phones
+  running WhatsApp, same network) already solves this via its own
+  device-to-device protocol — not something an external ADB tool can drive
+  without root or the app's cooperation.
+
+**Android → iOS:**
+- This is what the paid tools actually do: reverse-engineer WhatsApp iOS's
+  `ChatStorage.sqlite` (Core Data) schema, convert the Android `msgstore.db`
+  (SQLite) + media into it, package the result as an iTunes/Finder-style
+  backup, and restore it to the iPhone via `libimobiledevice`/
+  `pymobiledevice3` (requires USB pairing trust with the iPhone).
+- This is a **separate iOS-communication subsystem** — not ADB, not Android.
+  The iOS schema changes with every WhatsApp release, which is why these
+  tools are paid/subscription products with constant maintenance, and
+  building/distributing one carries real reverse-engineering/ToS exposure.
+
+**Conclusion**: out of scope for DroidBridge as designed (ADB-only, fully
+offline, MIT, Android-focused CLI/GUI). If ever pursued, it would be a
+**separate companion project**, not a DroidBridge module — DroidBridge's
+existing `backup`/`backup-db`/`restore` commands already cover the
+Android-side data extraction such a project would need as input.
+
+**Open research questions for later** (not scheduled):
+1. Does WhatsApp's local-backup restore flow accept a `Databases/`+`Media/`
+   drop-in for a *fresh install, same phone number* without the original
+   key — or does local (non-Drive) restore require key continuity
+   regardless? (Needs real-device testing; unconfirmed either way.)
+2. On a **rooted** source and target, is copying
+   `/data/data/com.whatsapp/files/key` alongside `msgstore.db.crypt14`
+   sufficient for cross-device restore? (Android→Android only.)
+3. iOS side: survey `pymobiledevice3`'s backup create/restore support without
+   iTunes/Finder, and document a current WhatsApp-iOS `ChatStorage.sqlite`
+   schema as a starting point, if a separate project is ever started.
+
+---
+
+## 18. Claude Code Prompt
 
 Use the following prompt when initiating the DroidBridge project with Claude Code CLI. It instructs Claude Code to follow the phased plan above, starting with Phase 1.
 
@@ -923,7 +987,8 @@ PHASE 3 — WhatsApp Toolkit (highest priority, largest phase):
 Implement Module 4 in 5 sub-steps:
   (a) Analysis: auto-detect WhatsApp/WhatsApp Business media paths, scan all
       14 media folder types, report by folder/section/year/month/extension,
-      pre/post cutoff comparison, orphaned media detection.
+      pre/post cutoff comparison. (Orphaned media detection: out of scope on
+      non-rooted devices, see §4.1 caveat.)
   (b) Backup: full/selective backup using Phase 2 transfer engine,
       direct-to-external-drive, post-backup verification, session logs.
   (c) Organization (OPTIONAL step, not automatic): organize-by-date for

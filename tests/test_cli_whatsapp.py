@@ -104,6 +104,85 @@ class TestWhatsAppScan:
         assert result.exit_code == 0
         assert "no media found" in result.output.lower()
 
+    def test_by_year_groups_by_year_month(self, monkeypatch):
+        client = make_fake_client(READY_DEVICE, shell_side_effect=[DETECT_WA_ONLY, SCAN_OUTPUT])
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(main.cli, ["whatsapp", "scan", "--by", "year"])
+
+        assert result.exit_code == 0
+        assert "2023-01" in result.output
+        assert "2 files" in result.output
+
+    def test_by_extension_groups_by_file_extension(self, monkeypatch):
+        client = make_fake_client(READY_DEVICE, shell_side_effect=[DETECT_WA_ONLY, SCAN_OUTPUT])
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(main.cli, ["whatsapp", "scan", "--by", "extension"])
+
+        assert result.exit_code == 0
+        assert "jpg" in result.output
+        assert "2 files" in result.output
+
+
+class TestWhatsAppAnalyze:
+    def test_no_device_shows_guidance_and_exits_nonzero(self, monkeypatch):
+        monkeypatch.setattr(main, "_build_client", lambda: make_fake_client([]))
+
+        result = CliRunner().invoke(main.cli, ["whatsapp", "analyze"])
+
+        assert result.exit_code == 1
+        assert "usb debugging" in result.output.lower()
+
+    def test_no_whatsapp_installed_exits_nonzero(self, monkeypatch):
+        client = make_fake_client(READY_DEVICE, shell_side_effect=[DETECT_NONE])
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(main.cli, ["whatsapp", "analyze"])
+
+        assert result.exit_code == 1
+        assert "no whatsapp" in result.output.lower()
+
+    def test_default_cutoff_splits_pre_and_post(self, monkeypatch):
+        client = make_fake_client(READY_DEVICE, shell_side_effect=[DETECT_WA_ONLY, SCAN_OUTPUT])
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(main.cli, ["whatsapp", "analyze"])
+
+        assert result.exit_code == 0
+        assert "Cutoff date: 2024-09-01" in result.output
+        assert "Pre-cutoff" in result.output
+        assert "Post-cutoff" in result.output
+        assert "2 files" in result.output  # both SCAN_OUTPUT files are pre-2024-09-01
+        assert "Deletable" in result.output
+
+    def test_custom_cutoff_moves_files_to_post(self, monkeypatch):
+        client = make_fake_client(READY_DEVICE, shell_side_effect=[DETECT_WA_ONLY, SCAN_OUTPUT])
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(main.cli, ["whatsapp", "analyze", "--cutoff", "2020-01-01"])
+
+        assert result.exit_code == 0
+        assert "Cutoff date: 2020-01-01" in result.output
+        assert "Deletable (pre-cutoff): 0 files" in result.output
+
+    def test_no_media_found_message(self, monkeypatch):
+        client = make_fake_client(READY_DEVICE, shell_side_effect=[DETECT_WA_ONLY, ""])
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(main.cli, ["whatsapp", "analyze"])
+
+        assert result.exit_code == 0
+        assert "no media found" in result.output.lower()
+
+    def test_invalid_cutoff_format_exits_nonzero(self, monkeypatch):
+        client = make_fake_client(READY_DEVICE)
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(main.cli, ["whatsapp", "analyze", "--cutoff", "not-a-date"])
+
+        assert result.exit_code != 0
+
 
 WA_STATUSES = f"{WA_MEDIA}/.Statuses"
 W4B_STATUSES = f"{W4B_MEDIA}/.Statuses"
@@ -144,7 +223,7 @@ class TestWhatsAppSaveStatus:
 
         client.pull.side_effect = fake_pull
         monkeypatch.setattr(main, "_build_client", lambda: client)
-        monkeypatch.setattr(main, "SleepInhibitor", _noop_inhibitor)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
 
         result = CliRunner().invoke(main.cli, ["whatsapp", "save-status", "--dest", str(tmp_path)])
 
@@ -164,7 +243,7 @@ class TestWhatsAppSaveStatus:
 
         client.pull.side_effect = fake_pull
         monkeypatch.setattr(main, "_build_client", lambda: client)
-        monkeypatch.setattr(main, "SleepInhibitor", _noop_inhibitor)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
 
         result = CliRunner().invoke(
             main.cli, ["whatsapp", "save-status", "--dest", str(tmp_path), "--app", "business"]
@@ -178,9 +257,458 @@ class TestWhatsAppSaveStatus:
         shell_outputs = [DETECT_WA_ONLY, "0\n"]
         client = make_fake_client(READY_DEVICE, shell_side_effect=shell_outputs)
         monkeypatch.setattr(main, "_build_client", lambda: client)
-        monkeypatch.setattr(main, "SleepInhibitor", _noop_inhibitor)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
 
         result = CliRunner().invoke(main.cli, ["whatsapp", "save-status", "--dest", str(tmp_path)])
 
         assert result.exit_code == 0
         assert "nothing to transfer" in result.output.lower()
+
+
+BACKUP_SCAN_OUTPUT = (
+    f"{WA_MEDIA}/WhatsApp Images/IMG-20230101-WA0001.jpg\t1000\t1672531200.0\n"
+    f"{WA_MEDIA}/WhatsApp Voice Notes/PTT-20230102-WA0001.opus\t2000\t1672531200.0\n"
+)
+
+
+class TestWhatsAppBackup:
+    def test_no_device_shows_guidance_and_exits_nonzero(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(main, "_build_client", lambda: make_fake_client([]))
+
+        result = CliRunner().invoke(main.cli, ["whatsapp", "backup", "--dest", str(tmp_path)])
+
+        assert result.exit_code == 1
+        assert "usb debugging" in result.output.lower()
+
+    def test_no_whatsapp_installed_exits_nonzero(self, monkeypatch, tmp_path):
+        client = make_fake_client(READY_DEVICE, shell_side_effect=[DETECT_NONE])
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(main.cli, ["whatsapp", "backup", "--dest", str(tmp_path)])
+
+        assert result.exit_code == 1
+        assert "no whatsapp" in result.output.lower()
+
+    def test_full_backup_pulls_all_media(self, monkeypatch, tmp_path):
+        shell_outputs = [DETECT_WA_ONLY, SCAN_OUTPUT]
+        client = make_fake_client(READY_DEVICE, shell_side_effect=shell_outputs)
+
+        def fake_pull(serial, remote, local):
+            size = 1000 if remote.endswith("WA0001.jpg") else 2000
+            Path(local).parent.mkdir(parents=True, exist_ok=True)
+            Path(local).write_bytes(b"x" * size)
+
+        client.pull.side_effect = fake_pull
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
+
+        result = CliRunner().invoke(main.cli, ["whatsapp", "backup", "--dest", str(tmp_path)])
+
+        assert result.exit_code == 0
+        assert "Pulling 2 files" in result.output
+        assert "Verified: 2 file" in result.output
+        assert (tmp_path / "WhatsApp" / "Media" / "WhatsApp Images" / "IMG-20230101-WA0001.jpg").exists()
+        assert (
+            tmp_path / "WhatsApp" / "Media" / "WhatsApp Images" / "Sent" / "IMG-20230102-WA0002.jpg"
+        ).exists()
+
+    def test_selective_backup_by_type(self, monkeypatch, tmp_path):
+        shell_outputs = [DETECT_WA_ONLY, BACKUP_SCAN_OUTPUT]
+        client = make_fake_client(READY_DEVICE, shell_side_effect=shell_outputs)
+
+        def fake_pull(serial, remote, local):
+            Path(local).parent.mkdir(parents=True, exist_ok=True)
+            Path(local).write_bytes(b"x" * 1000)
+
+        client.pull.side_effect = fake_pull
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
+
+        result = CliRunner().invoke(
+            main.cli, ["whatsapp", "backup", "--dest", str(tmp_path), "--type", "images"]
+        )
+
+        assert result.exit_code == 0
+        assert "Pulling 1 file" in result.output
+        assert (tmp_path / "WhatsApp" / "Media" / "WhatsApp Images" / "IMG-20230101-WA0001.jpg").exists()
+        assert not (tmp_path / "WhatsApp" / "Media" / "WhatsApp Voice Notes").exists()
+
+    def test_invalid_type_exits_nonzero(self, monkeypatch, tmp_path):
+        client = make_fake_client(READY_DEVICE)
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(
+            main.cli, ["whatsapp", "backup", "--dest", str(tmp_path), "--type", "not-a-type"]
+        )
+
+        assert result.exit_code != 0
+        assert "invalid --type" in result.output.lower()
+
+    def test_no_media_found_message(self, monkeypatch, tmp_path):
+        shell_outputs = [DETECT_WA_ONLY, ""]
+        client = make_fake_client(READY_DEVICE, shell_side_effect=shell_outputs)
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
+
+        result = CliRunner().invoke(main.cli, ["whatsapp", "backup", "--dest", str(tmp_path)])
+
+        assert result.exit_code == 0
+        assert "nothing to transfer" in result.output.lower()
+
+
+class TestWhatsAppRestore:
+    def test_no_device_shows_guidance_and_exits_nonzero(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(main, "_build_client", lambda: make_fake_client([]))
+
+        result = CliRunner().invoke(main.cli, ["whatsapp", "restore", "--src", str(tmp_path)])
+
+        assert result.exit_code == 1
+        assert "usb debugging" in result.output.lower()
+
+    def test_no_whatsapp_installed_exits_nonzero(self, monkeypatch, tmp_path):
+        client = make_fake_client(READY_DEVICE, shell_side_effect=[DETECT_NONE])
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(main.cli, ["whatsapp", "restore", "--src", str(tmp_path)])
+
+        assert result.exit_code == 1
+        assert "no whatsapp" in result.output.lower()
+
+    def test_restores_backup_folder_to_media_path(self, monkeypatch, tmp_path):
+        media_dir = tmp_path / "WhatsApp" / "Media" / "WhatsApp Images"
+        media_dir.mkdir(parents=True)
+        (media_dir / "IMG-20230101-WA0001.jpg").write_bytes(b"x" * 1000)
+
+        shell_outputs = [
+            DETECT_WA_ONLY,
+            "NO\n",  # plan_push: _remote_manifest -> _remote_dir_exists (media path doesn't exist yet)
+            "",  # execute_plan: mkdir -p remote_dir
+            "DIR\n",  # verify_push: _remote_manifest -> _remote_dir_exists
+            f"{WA_MEDIA}/WhatsApp Images/IMG-20230101-WA0001.jpg\t1000\t1672531200.0\n",  # verify_push: search_files
+        ]
+        client = make_fake_client(READY_DEVICE, shell_side_effect=shell_outputs)
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
+
+        result = CliRunner().invoke(main.cli, ["whatsapp", "restore", "--src", str(tmp_path)])
+
+        assert result.exit_code == 0
+        assert "Pushing 1 file" in result.output
+        assert "Verified: 1 file" in result.output
+        client.push.assert_called_once_with(
+            "SERIAL123",
+            str(media_dir / "IMG-20230101-WA0001.jpg"),
+            f"{WA_MEDIA}/WhatsApp Images/IMG-20230101-WA0001.jpg",
+        )
+
+    def test_no_backup_found_for_app_message(self, monkeypatch, tmp_path):
+        shell_outputs = [DETECT_WA_ONLY]
+        client = make_fake_client(READY_DEVICE, shell_side_effect=shell_outputs)
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
+
+        result = CliRunner().invoke(main.cli, ["whatsapp", "restore", "--src", str(tmp_path)])
+
+        assert result.exit_code == 0
+        assert "no backup found" in result.output.lower()
+
+
+class TestWhatsAppOrganize:
+    def test_organizes_voice_notes_by_date_unsectioned(self, tmp_path):
+        src = tmp_path / "WhatsApp Voice Notes"
+        src.mkdir()
+        (src / "PTT-20230115-WA0001.opus").write_bytes(b"x")
+
+        result = CliRunner().invoke(
+            main.cli, ["whatsapp", "organize", "--src", str(src), "--type", "voice_notes"]
+        )
+
+        assert result.exit_code == 0
+        assert "Organizing 1 file" in result.output
+        organized = tmp_path / "WhatsApp_Voice_Notes_Organized"
+        assert (organized / "2023" / "01-Jan" / "PTT-20230115-WA0001.opus").exists()
+
+    def test_organizes_images_by_section_then_date(self, tmp_path):
+        src = tmp_path / "WhatsApp Images"
+        sent = src / "Sent"
+        sent.mkdir(parents=True)
+        (src / "IMG-20230101-WA0001.jpg").write_bytes(b"x")
+        (sent / "IMG-20230102-WA0002.jpg").write_bytes(b"y")
+
+        result = CliRunner().invoke(
+            main.cli, ["whatsapp", "organize", "--src", str(src), "--type", "images"]
+        )
+
+        assert result.exit_code == 0
+        organized = tmp_path / "WhatsApp_Images_Organized"
+        assert (organized / "Received" / "2023" / "01-Jan" / "IMG-20230101-WA0001.jpg").exists()
+        assert (organized / "Sent" / "2023" / "01-Jan" / "IMG-20230102-WA0002.jpg").exists()
+
+    def test_organizes_documents_by_category_then_date(self, tmp_path):
+        src = tmp_path / "WhatsApp Documents"
+        src.mkdir()
+        (src / "DOC-20230101-WA0001.pdf").write_bytes(b"x")
+
+        result = CliRunner().invoke(
+            main.cli, ["whatsapp", "organize", "--src", str(src), "--type", "documents"]
+        )
+
+        assert result.exit_code == 0
+        organized = tmp_path / "WhatsApp_Documents_Organized"
+        assert (organized / "Received" / "PDFs" / "2023" / "01-Jan" / "DOC-20230101-WA0001.pdf").exists()
+
+    def test_fixes_filenames_before_organizing(self, tmp_path):
+        src = tmp_path / "WhatsApp Voice Notes"
+        src.mkdir()
+        (src / "PTT-20230115-WA0001..opus").write_bytes(b"x")
+
+        result = CliRunner().invoke(
+            main.cli, ["whatsapp", "organize", "--src", str(src), "--type", "voice_notes"]
+        )
+
+        assert result.exit_code == 0
+        assert "Fixed 1 filename" in result.output
+        organized = tmp_path / "WhatsApp_Voice_Notes_Organized"
+        assert (organized / "2023" / "01-Jan" / "PTT-20230115-WA0001.opus").exists()
+
+    def test_invalid_type_exits_nonzero(self, tmp_path):
+        result = CliRunner().invoke(
+            main.cli, ["whatsapp", "organize", "--src", str(tmp_path), "--type", "bogus"]
+        )
+
+        assert result.exit_code != 0
+
+    def test_empty_src_reports_nothing_to_organize(self, tmp_path):
+        src = tmp_path / "WhatsApp Voice Notes"
+        src.mkdir()
+
+        result = CliRunner().invoke(
+            main.cli, ["whatsapp", "organize", "--src", str(src), "--type", "voice_notes"]
+        )
+
+        assert result.exit_code == 0
+        assert "nothing to organize" in result.output.lower()
+
+
+# IMG-20230101 (pre-cutoff) and IMG-20250101 (post-cutoff).
+DELETE_SCAN_OUTPUT = (
+    f"{WA_MEDIA}/WhatsApp Images/IMG-20230101-WA0001.jpg\t1000\t1672531200.0\n"
+    f"{WA_MEDIA}/WhatsApp Images/IMG-20250101-WA0002.jpg\t2000\t1735689600.0\n"
+)
+
+# Same as DELETE_SCAN_OUTPUT plus a pre-cutoff Document, for --keep tests.
+DELETE_SCAN_OUTPUT_WITH_DOC = DELETE_SCAN_OUTPUT + (
+    f"{WA_MEDIA}/WhatsApp Documents/DOC-20230101-WA0001.pdf\t3000\t1672531200.0\n"
+)
+
+# After deleting IMG-20230101-WA0001.jpg, only the post-cutoff file remains.
+DELETE_RESCAN_OUTPUT = f"{WA_MEDIA}/WhatsApp Images/IMG-20250101-WA0002.jpg\t2000\t1735689600.0\n"
+
+
+def _write_backup_file(backup_dir, rel_path, size):
+    path = backup_dir / "WhatsApp" / "Media" / rel_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"x" * size)
+
+
+class TestWhatsAppDelete:
+    def test_no_device_shows_guidance_and_exits_nonzero(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(main, "_build_client", lambda: make_fake_client([]))
+
+        result = CliRunner().invoke(
+            main.cli, ["whatsapp", "delete", "--before", "2024-09-01", "--backup-dir", str(tmp_path)]
+        )
+
+        assert result.exit_code == 1
+        assert "usb debugging" in result.output.lower()
+
+    def test_no_whatsapp_installed_exits_nonzero(self, monkeypatch, tmp_path):
+        client = make_fake_client(READY_DEVICE, shell_side_effect=[DETECT_NONE])
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(
+            main.cli, ["whatsapp", "delete", "--before", "2024-09-01", "--backup-dir", str(tmp_path)]
+        )
+
+        assert result.exit_code == 1
+        assert "no whatsapp" in result.output.lower()
+
+    def test_invalid_before_date_exits_nonzero(self, monkeypatch, tmp_path):
+        client = make_fake_client(READY_DEVICE)
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(
+            main.cli, ["whatsapp", "delete", "--before", "not-a-date", "--backup-dir", str(tmp_path)]
+        )
+
+        assert result.exit_code != 0
+        assert "invalid --before" in result.output.lower()
+
+    def test_invalid_keep_type_exits_nonzero(self, monkeypatch, tmp_path):
+        client = make_fake_client(READY_DEVICE)
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(
+            main.cli,
+            [
+                "whatsapp", "delete",
+                "--before", "2024-09-01",
+                "--keep", "not-a-type",
+                "--backup-dir", str(tmp_path),
+            ],
+        )
+
+        assert result.exit_code != 0
+        assert "invalid --keep" in result.output.lower()
+
+    def test_nothing_to_delete_message(self, monkeypatch, tmp_path):
+        shell_outputs = [DETECT_WA_ONLY, DELETE_RESCAN_OUTPUT]  # both files post-cutoff
+        client = make_fake_client(READY_DEVICE, shell_side_effect=shell_outputs)
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(
+            main.cli, ["whatsapp", "delete", "--before", "2024-09-01", "--backup-dir", str(tmp_path)]
+        )
+
+        assert result.exit_code == 0
+        assert "nothing to delete" in result.output.lower()
+
+    def test_blocks_when_backup_missing(self, monkeypatch, tmp_path):
+        shell_outputs = [DETECT_WA_ONLY, DELETE_SCAN_OUTPUT]
+        client = make_fake_client(READY_DEVICE, shell_side_effect=shell_outputs)
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(
+            main.cli, ["whatsapp", "delete", "--before", "2024-09-01", "--backup-dir", str(tmp_path)]
+        )
+
+        assert result.exit_code == 1
+        assert "not backed up" in result.output.lower()
+        assert client.shell.call_count == 2
+
+    def test_aborts_without_yes_delete_confirmation(self, monkeypatch, tmp_path):
+        _write_backup_file(tmp_path, "WhatsApp Images/IMG-20230101-WA0001.jpg", 1000)
+        shell_outputs = [DETECT_WA_ONLY, DELETE_SCAN_OUTPUT]
+        client = make_fake_client(READY_DEVICE, shell_side_effect=shell_outputs)
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(
+            main.cli,
+            ["whatsapp", "delete", "--before", "2024-09-01", "--backup-dir", str(tmp_path)],
+            input="no\n",
+        )
+
+        assert result.exit_code == 0
+        assert "aborted" in result.output.lower()
+        assert client.shell.call_count == 2
+
+    def test_full_flow_deletes_and_reports(self, monkeypatch, tmp_path):
+        _write_backup_file(tmp_path, "WhatsApp Images/IMG-20230101-WA0001.jpg", 1000)
+        shell_outputs = [DETECT_WA_ONLY, DELETE_SCAN_OUTPUT, "", DELETE_RESCAN_OUTPUT]
+        client = make_fake_client(READY_DEVICE, shell_side_effect=shell_outputs)
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(
+            main.cli,
+            ["whatsapp", "delete", "--before", "2024-09-01", "--backup-dir", str(tmp_path)],
+            input="YES DELETE\n",
+        )
+
+        assert result.exit_code == 0
+        assert "Total to delete: 1 file" in result.output
+        assert "deleted 1 file" in result.output.lower()
+        assert client.shell.call_count == 4
+
+        rm_serial, rm_command = client.shell.call_args_list[2][0]
+        assert rm_serial == "SERIAL123"
+        assert rm_command.startswith("rm -f ")
+        assert f"{WA_MEDIA}/WhatsApp Images/IMG-20230101-WA0001.jpg" in rm_command
+        assert "IMG-20250101-WA0002.jpg" not in rm_command
+
+    def test_keep_excludes_type_from_deletion(self, monkeypatch, tmp_path):
+        _write_backup_file(tmp_path, "WhatsApp Images/IMG-20230101-WA0001.jpg", 1000)
+        shell_outputs = [DETECT_WA_ONLY, DELETE_SCAN_OUTPUT_WITH_DOC, "", DELETE_RESCAN_OUTPUT]
+        client = make_fake_client(READY_DEVICE, shell_side_effect=shell_outputs)
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(
+            main.cli,
+            [
+                "whatsapp", "delete",
+                "--before", "2024-09-01",
+                "--keep", "documents",
+                "--backup-dir", str(tmp_path),
+            ],
+            input="YES DELETE\n",
+        )
+
+        assert result.exit_code == 0
+        assert "Total to delete: 1 file" in result.output
+
+        rm_serial, rm_command = client.shell.call_args_list[2][0]
+        assert "DOC-20230101-WA0001.pdf" not in rm_command
+
+
+WA_BASE = "/sdcard/Android/media/com.whatsapp/WhatsApp"
+DB_PATH = f"{WA_BASE}/Databases"
+BACKUPS_PATH = f"{WA_BASE}/Backups"
+
+DB_SEARCH_OUTPUT = f"{DB_PATH}/msgstore.db.crypt14\t1000\t1672531200.0\n"
+BACKUPS_SEARCH_OUTPUT = f"{BACKUPS_PATH}/wa.db.crypt14\t2000\t1672531200.0\n"
+
+
+class TestWhatsAppBackupDb:
+    def test_no_device_shows_guidance_and_exits_nonzero(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(main, "_build_client", lambda: make_fake_client([]))
+
+        result = CliRunner().invoke(main.cli, ["whatsapp", "backup-db", "--dest", str(tmp_path)])
+
+        assert result.exit_code == 1
+        assert "usb debugging" in result.output.lower()
+
+    def test_no_whatsapp_installed_exits_nonzero(self, monkeypatch, tmp_path):
+        client = make_fake_client(READY_DEVICE, shell_side_effect=[DETECT_NONE])
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(main.cli, ["whatsapp", "backup-db", "--dest", str(tmp_path)])
+
+        assert result.exit_code == 1
+        assert "no whatsapp" in result.output.lower()
+
+    def test_nothing_to_back_up_message(self, monkeypatch, tmp_path):
+        shell_outputs = [DETECT_WA_ONLY, "0\n", "0\n", "0\n"]
+        client = make_fake_client(READY_DEVICE, shell_side_effect=shell_outputs)
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(main.cli, ["whatsapp", "backup-db", "--dest", str(tmp_path)])
+
+        assert result.exit_code == 0
+        assert "nothing to transfer" in result.output.lower()
+
+    def test_full_backup_pulls_databases_and_backups_reports_encryption(self, monkeypatch, tmp_path):
+        shell_outputs = [
+            DETECT_WA_ONLY,
+            "1\n", DB_SEARCH_OUTPUT,
+            "1\n", BACKUPS_SEARCH_OUTPUT,
+            "0\n",
+        ]
+        client = make_fake_client(READY_DEVICE, shell_side_effect=shell_outputs)
+
+        def fake_pull(serial, remote, local):
+            size = 1000 if remote.endswith("msgstore.db.crypt14") else 2000
+            Path(local).parent.mkdir(parents=True, exist_ok=True)
+            Path(local).write_bytes(b"x" * size)
+
+        client.pull.side_effect = fake_pull
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
+
+        result = CliRunner().invoke(main.cli, ["whatsapp", "backup-db", "--dest", str(tmp_path)])
+
+        assert result.exit_code == 0
+        assert "Pulling 2 files" in result.output
+        assert "Verified: 2 file" in result.output
+        assert "2/2" in result.output
+        assert "msgstore.db.crypt*" in result.output
+        assert (tmp_path / "WhatsApp" / "Databases" / "msgstore.db.crypt14").exists()
+        assert (tmp_path / "WhatsApp" / "Backups" / "wa.db.crypt14").exists()

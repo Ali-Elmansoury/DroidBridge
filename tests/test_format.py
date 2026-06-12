@@ -2,7 +2,7 @@
 
 import pytest
 
-from droidbridge.utils.format import format_bytes, format_duration, format_size_kb, parse_size
+from droidbridge.utils.format import format_bar, format_bytes, format_duration, format_size_kb, parse_size
 
 
 class TestFormatBytes:
@@ -78,3 +78,17 @@ class TestFormatDuration:
 
     def test_none_returns_placeholder(self):
         assert format_duration(None) == "?"
+
+
+class TestFormatBar:
+    def test_half_full(self):
+        assert format_bar(50, 100, width=10) == "[#####.....] 50%"
+
+    def test_empty(self):
+        assert format_bar(0, 100, width=10) == "[..........] 0%"
+
+    def test_full(self):
+        assert format_bar(100, 100, width=10) == "[##########] 100%"
+
+    def test_zero_total_is_empty(self):
+        assert format_bar(0, 0, width=10) == "[..........] 0%"

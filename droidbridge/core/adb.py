@@ -117,7 +117,7 @@ class AdbClient:
         run_timeout = self.default_timeout if timeout is _UNSET else timeout
         try:
             result = subprocess.run(
-                cmd, capture_output=True, text=True, timeout=run_timeout
+                cmd, capture_output=True, text=True, timeout=run_timeout, stdin=subprocess.DEVNULL
             )
         except FileNotFoundError as exc:
             raise AdbNotFoundError(f"adb binary not found: {self.adb_path}") from exc

@@ -1,0 +1,104 @@
+"""Generic report model and TXT/HTML/CSV/JSON generators (spec §9.5)."""
+
+import csv
+import io
+import json
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
+from html import escape
+
+
+def _now_iso():
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+@dataclass
+class ReportSection:
+    """One section of a report: a heading plus optional free text and/or a table."""
+
+    title: str
+    text: str = ""
+    headers: list = field(default_factory=list)
+    rows: list = field(default_factory=list)
+
+
+@dataclass
+class Report:
+    """A report made up of a title and an ordered list of sections."""
+
+    title: str
+    sections: list = field(default_factory=list)
+    generated_at: str = field(default_factory=_now_iso)
+
+
+def to_json(report):
+    """Serialize `report` to a JSON string."""
+    return json.dumps(asdict(report), indent=2)
+
+
+def to_txt(report):
+    """Render `report` as plain text."""
+    lines = [report.title, f"Generated: {report.generated_at}"]
+    for section in report.sections:
+        lines.append("")
+        lines.append(f"== {section.title} ==")
+        if section.text:
+            lines.append(section.text)
+        if section.headers:
+            lines.append("\t".join(section.headers))
+            for row in section.rows:
+                lines.append("\t".join(str(cell) for cell in row))
+    return "\n".join(lines) + "\n"
+
+
+def to_csv(report):
+    """Render `report` as CSV text (one block per section)."""
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow([report.title])
+    writer.writerow(["Generated", report.generated_at])
+    for section in report.sections:
+        writer.writerow([])
+        writer.writerow([section.title])
+        if section.text:
+            writer.writerow([section.text])
+        if section.headers:
+            writer.writerow(section.headers)
+            for row in section.rows:
+                writer.writerow(row)
+    return buf.getvalue()
+
+
+def to_html(report):
+    """Render `report` as a self-contained HTML document (no external dependencies)."""
+    parts = [
+        "<!DOCTYPE html>",
+        "<html lang='en'>",
+        "<head>",
+        "<meta charset='utf-8'>",
+        f"<title>{escape(report.title)}</title>",
+        "<style>",
+        "body { font-family: sans-serif; margin: 2em; }",
+        "table { border-collapse: collapse; margin-bottom: 1em; }",
+        "th, td { border: 1px solid #ccc; padding: 0.3em 0.6em; text-align: left; }",
+        "th { background: #f0f0f0; }",
+        "</style>",
+        "</head>",
+        "<body>",
+        f"<h1>{escape(report.title)}</h1>",
+        f"<p>Generated: {escape(report.generated_at)}</p>",
+    ]
+    for section in report.sections:
+        parts.append(f"<h2>{escape(section.title)}</h2>")
+        if section.text:
+            parts.append(f"<p>{escape(section.text)}</p>")
+        if section.headers:
+            parts.append("<table>")
+            header_cells = "".join(f"<th>{escape(h)}</th>" for h in section.headers)
+            parts.append(f"<tr>{header_cells}</tr>")
+            for row in section.rows:
+                row_cells = "".join(f"<td>{escape(str(cell))}</td>" for cell in row)
+                parts.append(f"<tr>{row_cells}</tr>")
+            parts.append("</table>")
+    parts += ["</body>", "</html>"]
+    return "\n".join(parts) + "\n"

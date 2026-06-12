@@ -52,6 +52,14 @@ def format_duration(seconds):
     return f"{secs}s"
 
 
+def format_bar(used, total, width=30):
+    """Return an ASCII progress bar like '[#####.....] 50%' for `used`/`total`."""
+    percent = 0 if total <= 0 else round(used / total * 100)
+    filled = 0 if total <= 0 else round(used / total * width)
+    bar = "#" * filled + "." * (width - filled)
+    return f"[{bar}] {percent}%"
+
+
 def parse_size(value):
     """Parse a human-readable size string (e.g. '10MB', '1.5KB', '100') into bytes."""
     match = _SIZE_RE.match(value.strip())

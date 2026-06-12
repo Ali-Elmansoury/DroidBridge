@@ -163,6 +163,19 @@ class TestRunErrorHandling:
             with pytest.raises(adb.AdbNotFoundError):
                 client.shell("SERIAL", "echo hi")
 
+    def test_run_does_not_forward_stdin_to_adb(self):
+        """`adb shell` forwards inherited stdin to the device by default, which would
+        eat input meant for an interactive CLI prompt (e.g. `whatsapp delete`'s
+        'YES DELETE' confirmation). Pass stdin=DEVNULL so adb never consumes it."""
+        client = adb.AdbClient(adb_path="/fake/adb")
+        with patch.object(adb.subprocess, "run") as mock_run:
+            mock_run.return_value = _completed()
+
+            client.shell("SERIAL", "echo hi")
+
+        args, kwargs = mock_run.call_args
+        assert kwargs["stdin"] == subprocess.DEVNULL
+
 
 class TestServerManagement:
     def test_start_server(self):
