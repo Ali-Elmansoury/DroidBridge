@@ -30,25 +30,11 @@ def _build_client():
 
 def _resolve_serial(client, serial):
     """Resolve a device serial, exiting with guidance if missing/ambiguous/unknown."""
-    ready = device_module.get_ready_devices(client)
-    if not ready:
-        click.echo(device_module.connection_guidance("no device"), err=True)
+    try:
+        return device_module.resolve_ready_device(client, serial)
+    except device_module.DeviceSelectionError as exc:
+        click.echo(str(exc), err=True)
         sys.exit(1)
-
-    ready_serials = [d.serial for d in ready]
-    if serial is None:
-        if len(ready) > 1:
-            click.echo("Multiple devices connected. Specify one with --serial:", err=True)
-            for d in ready:
-                click.echo(f"  {d.serial}  ({d.model})", err=True)
-            sys.exit(1)
-        return ready_serials[0]
-
-    if serial not in ready_serials:
-        click.echo(f"Error: device '{serial}' not found or not ready.", err=True)
-        sys.exit(1)
-
-    return serial
 
 
 @click.group()
