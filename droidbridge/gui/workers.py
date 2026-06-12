@@ -38,5 +38,11 @@ class Worker(QObject):
         self._thread.start()
 
     def wait(self):
-        """Wait for the thread to fully finish. For testing."""
+        """Block until this worker's QThread has fully exited.
+
+        `finished`/`error` trigger `QThread.quit()`, which is asynchronous - the thread
+        may still be shutting down when the signal is received. Call `wait()` after
+        receiving `finished`/`error` (or in teardown) before dropping the last reference
+        to this Worker, otherwise Qt may destroy the QThread while it's still running.
+        """
         self._thread.wait()
