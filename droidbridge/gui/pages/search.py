@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
     QFileDialog,
     QFormLayout,
     QHBoxLayout,
+    QLabel,
     QLineEdit,
     QPushButton,
     QTableWidget,
@@ -39,7 +40,12 @@ class SearchPage(QWidget):
 
         self.root_edit = QLineEdit(search_module.DEFAULT_ROOT)
         self._root_browse_path = search_module.DEFAULT_ROOT
+        self.root_browse_label = QLabel("Browse:")
         self.root_browse_combo = QComboBox()
+        self.root_browse_combo.setToolTip(
+            "Browse subfolders of the root path: pick one to search inside it, "
+            "or '..' to go up a level."
+        )
         self.name_edit = QLineEdit()
         self.extensions_edit = QLineEdit()
         self.extensions_edit.setPlaceholderText("Extensions (comma-separated)")
@@ -70,6 +76,7 @@ class SearchPage(QWidget):
         form = QFormLayout()
         root_row = QHBoxLayout()
         root_row.addWidget(self.root_edit, 1)
+        root_row.addWidget(self.root_browse_label)
         root_row.addWidget(self.root_browse_combo)
         form.addRow("Root path:", root_row)
         form.addRow("Name pattern:", self.name_edit)

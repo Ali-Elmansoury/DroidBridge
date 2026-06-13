@@ -26,7 +26,10 @@ from droidbridge.gui.viewmodels.device import DeviceViewModel
 from droidbridge.gui.viewmodels.files import FilesViewModel
 from droidbridge.gui.viewmodels.search import SearchViewModel
 from droidbridge.gui.viewmodels.transfer import TransferViewModel
+from droidbridge.gui.widgets.elided_label import ElidedLabel
 from droidbridge.gui.widgets.log_panel import LogPanel
+
+BUSY_BAR_WIDTH = 120
 
 MODULES = [
     "Device",
@@ -99,9 +102,16 @@ class MainWindow(QMainWindow):
         central_layout.addWidget(right)
         self.setCentralWidget(central)
 
+        # Two dedicated areas in the status bar: a flexible status label on the
+        # left (elides instead of growing) and a fixed-width progress bar on
+        # the right, so neither can ever overlap the other.
+        self.status_label = ElidedLabel("Ready")
+        self.statusBar().addWidget(self.status_label, 1)
+
         self.busy_bar = QProgressBar()
         self.busy_bar.setRange(0, 0)
         self.busy_bar.setVisible(False)
+        self.busy_bar.setFixedWidth(BUSY_BAR_WIDTH)
         self.statusBar().addPermanentWidget(self.busy_bar)
 
         view_menu = self.menuBar().addMenu("View")
@@ -119,7 +129,7 @@ class MainWindow(QMainWindow):
         self._busy_viewmodels = set()
 
         self.context.connectionChanged.connect(self._on_connection_changed)
-        self.device_viewmodel.statusChanged.connect(self.statusBar().showMessage)
+        self.device_viewmodel.statusChanged.connect(self._on_status_changed)
         self.device_viewmodel.busyChanged.connect(
             lambda busy: self._on_busy_changed(self.device_viewmodel, busy)
         )
@@ -132,13 +142,16 @@ class MainWindow(QMainWindow):
         self.search_page.pullRequested.connect(self._on_pull_requested)
 
         for vm in (self.files_viewmodel, self.transfer_viewmodel, self.search_viewmodel):
-            vm.statusChanged.connect(self.statusBar().showMessage)
+            vm.statusChanged.connect(self._on_status_changed)
             vm.busyChanged.connect(lambda busy, vm=vm: self._on_busy_changed(vm, busy))
             vm.logMessage.connect(self._on_log_message)
 
         self._on_connection_changed(
             self.context.is_connected, self.context.serial or "", self.context.model or ""
         )
+
+    def _on_status_changed(self, message):
+        self.status_label.setFullText(message or "Ready")
 
     def _on_connection_changed(self, connected, serial, model):
         color = "green" if connected else "red"

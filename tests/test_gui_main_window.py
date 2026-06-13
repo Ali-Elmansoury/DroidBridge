@@ -197,4 +197,34 @@ class TestNewViewModelWiring:
 
         window.search_viewmodel.statusChanged.emit("search error")
 
-        assert window.statusBar().currentMessage() == "search error"
+        assert window.status_label.fullText() == "search error"
+
+
+class TestStatusBarLayout:
+    """The status bar has two dedicated areas - a flexible status label on the
+    left and a fixed-width progress bar on the right - so a long status
+    message can never overlap the progress bar (it elides instead).
+    """
+
+    def test_status_label_shows_ready_when_idle(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        assert window.status_label.fullText() == "Ready"
+
+    def test_status_changed_clears_back_to_ready(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        window.device_viewmodel.statusChanged.emit("device not found")
+        assert window.status_label.fullText() == "device not found"
+
+        window.device_viewmodel.statusChanged.emit("")
+        assert window.status_label.fullText() == "Ready"
+
+    def test_busy_bar_has_a_fixed_width_separate_from_status_label(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        assert window.busy_bar.minimumWidth() == window.busy_bar.maximumWidth()
+        assert window.busy_bar.maximumWidth() < 16777215  # not Qt's "unbounded" default

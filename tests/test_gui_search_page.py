@@ -199,6 +199,13 @@ def _file_entry(name):
 
 
 class TestRootBrowseCombo:
+    def test_combo_has_label_and_tooltip(self, qtbot):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        assert page.root_browse_label.text() == "Browse:"
+        assert page.root_browse_combo.toolTip() != ""
+
     def test_combo_populates_with_subdirs_on_init_without_parent_entry(self, qtbot, monkeypatch):
         entries = [_dir_entry("DCIM"), _file_entry("notes.txt"), _dir_entry("Download")]
         monkeypatch.setattr(files_ops, "list_path", lambda client, serial, path, **kw: entries)
