@@ -42,6 +42,17 @@ class TestModeToggle:
         assert page.push_group.isVisible() is True
 
 
+class TestConflictComboTooltip:
+    def test_conflict_combo_explains_resume_precedence(self, qtbot):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        tooltip = page.conflict_combo.toolTip()
+        assert tooltip != ""
+        assert "same size" in tooltip
+        assert "resume" in tooltip.lower()
+
+
 class TestStartTransfer:
     def test_pull_calls_start_pull_with_form_fields(self, qtbot, monkeypatch):
         page, vm, _context = _make_page()

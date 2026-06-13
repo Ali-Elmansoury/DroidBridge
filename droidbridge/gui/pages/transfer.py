@@ -90,6 +90,18 @@ class TransferPage(QWidget):
 
         self.conflict_combo = QComboBox()
         self.conflict_combo.addItems(transfer_module.CONFLICT_MODES)
+        self.conflict_combo.setToolTip(
+            "How to handle a destination file that already has the same name "
+            "as a source file:\n"
+            "Skip: leave the existing file alone.\n"
+            "Overwrite: replace it with the source file.\n"
+            "Rename: save the source file alongside it with a numeric suffix "
+            "(e.g. _1).\n\n"
+            "This only applies when the existing file is a different size "
+            "than the source (a genuine conflict). If it's already the same "
+            "size, it's treated as already transferred (resume) and left "
+            "alone regardless of this setting."
+        )
         self.verify_checkbox = QCheckBox("Verify after transfer")
         self.verify_checkbox.setChecked(True)
 
