@@ -212,7 +212,10 @@ ADB-powered file transfer that is 3–5x faster than standard MTP, with resume s
 > between two different files. If a destination file already exists with the
 > **same name and the same size** as the source, it's treated as
 > "already transferred" (resume support, §3.3) and is left alone regardless
-> of the selected conflict mode.
+> of the selected conflict mode. This applies symmetrically to both transfer
+> directions — pull (destination on the laptop) and push (destination on the
+> device) — and has been verified on a real device for all three conflict
+> modes in both directions.
 
 ### 3.5 Post-Transfer Verification
 
