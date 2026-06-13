@@ -416,3 +416,60 @@ class TestVerifyPush:
         assert not result.ok
         assert result.expected_files == 2
         assert result.actual_files == 1
+
+
+class TestExecutePlanCancellation:
+    def test_should_cancel_stops_after_first_item(self, tmp_path):
+        items = [
+            transfer.TransferItem(
+                source="/sdcard/a.jpg", dest=str(tmp_path / "a.jpg"), size=100, action=transfer.ACTION_COPY
+            ),
+            transfer.TransferItem(
+                source="/sdcard/b.jpg", dest=str(tmp_path / "b.jpg"), size=100, action=transfer.ACTION_COPY
+            ),
+            transfer.TransferItem(
+                source="/sdcard/c.jpg", dest=str(tmp_path / "c.jpg"), size=100, action=transfer.ACTION_COPY
+            ),
+        ]
+        plan = transfer.TransferPlan(direction="pull", items=items)
+        client = MagicMock()
+
+        pulled = []
+
+        def fake_pull(serial, source, dest):
+            pulled.append(source)
+            with open(dest, "wb") as f:
+                f.write(b"x" * 100)
+
+        client.pull.side_effect = fake_pull
+
+        calls = []
+
+        def should_cancel():
+            calls.append(True)
+            return len(calls) > 1
+
+        progress = transfer.execute_plan(client, "SERIAL", plan, should_cancel=should_cancel)
+
+        assert pulled == ["/sdcard/a.jpg"]
+        assert progress.done_files == 1
+        assert progress.done_bytes == 100
+
+    def test_should_cancel_none_preserves_existing_behavior(self, tmp_path):
+        items = [
+            transfer.TransferItem(
+                source="/sdcard/a.jpg", dest=str(tmp_path / "a.jpg"), size=100, action=transfer.ACTION_COPY
+            ),
+        ]
+        plan = transfer.TransferPlan(direction="pull", items=items)
+        client = MagicMock()
+
+        def fake_pull(serial, source, dest):
+            with open(dest, "wb") as f:
+                f.write(b"x" * 100)
+
+        client.pull.side_effect = fake_pull
+
+        progress = transfer.execute_plan(client, "SERIAL", plan)
+
+        assert progress.done_files == 1

@@ -234,11 +234,15 @@ def _classify_remote(source, dest, size, conflict, existing):
     return TransferItem(source=source, dest=dest, size=size, action=ACTION_COPY)
 
 
-def execute_plan(client, serial, plan, progress_callback=None):
+def execute_plan(client, serial, plan, progress_callback=None, should_cancel=None):
     """Execute `plan`, pulling/pushing each transferable item.
 
-    Calls `progress_callback(progress)` after each file (if given). Returns
-    the final TransferProgress.
+    Calls `progress_callback(progress)` after each file (if given). If
+    `should_cancel` is given, it's called with no arguments before each item;
+    if it returns a truthy value, the loop stops without transferring that
+    item (items already transferred remain on disk/device, and `progress`
+    reflects what completed). `should_cancel=None` (the default) preserves
+    the previous behavior exactly. Returns the final TransferProgress.
     """
     to_transfer = plan.to_transfer
     progress = TransferProgress(
@@ -247,6 +251,9 @@ def execute_plan(client, serial, plan, progress_callback=None):
     )
 
     for item in to_transfer:
+        if should_cancel is not None and should_cancel():
+            break
+
         if plan.direction == "pull":
             local_dir = os.path.dirname(item.dest)
             if local_dir:
