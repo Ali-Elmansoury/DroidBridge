@@ -6,12 +6,14 @@ from PyQt6.QtWidgets import (
     QDialogButtonBox,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
 )
 
+from droidbridge.core.adb import AdbError
 from droidbridge.gui import files_ops
 
 _COLUMNS = ("Name", "Type")
@@ -62,7 +64,11 @@ class RemoteBrowseDialog(QDialog):
         self._load(start_path)
 
     def _load(self, path):
-        entries = files_ops.list_path(self._client, self._serial, path, show_hidden=False)
+        try:
+            entries = files_ops.list_path(self._client, self._serial, path, show_hidden=False)
+        except AdbError as exc:
+            QMessageBox.warning(self, "Browse Device", str(exc))
+            return
         self._current_path = path
         self._entries = entries
         self._selected_path = None

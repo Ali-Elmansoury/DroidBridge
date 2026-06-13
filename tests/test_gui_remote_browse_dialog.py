@@ -4,8 +4,9 @@ from datetime import datetime
 from unittest.mock import MagicMock
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QDialog
+from PyQt6.QtWidgets import QDialog, QMessageBox
 
+from droidbridge.core.adb import AdbCommandError
 from droidbridge.gui import files_ops
 from droidbridge.gui.widgets.remote_browse_dialog import RemoteBrowseDialog
 from droidbridge.modules.files import FileEntry
@@ -120,3 +121,25 @@ class TestGetRemotePath:
         path = RemoteBrowseDialog.get_remote_path(None, MagicMock(), "SERIAL123", "/sdcard")
 
         assert path is None
+
+
+class TestLoadError:
+    def test_navigation_error_shows_warning_and_preserves_state(self, qtbot, monkeypatch):
+        def failing_list_path(client, serial, path, **kw):
+            if path == "/sdcard":
+                return ROOT_ENTRIES
+            raise AdbCommandError(["adb", "-s", "SERIAL123", "shell", "ls", "-la", path], 1, "", "Permission denied")
+
+        monkeypatch.setattr(files_ops, "list_path", failing_list_path)
+        warnings = []
+        monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: warnings.append(a))
+
+        dialog = RemoteBrowseDialog(MagicMock(), "SERIAL123", "/sdcard")
+        qtbot.addWidget(dialog)
+
+        dialog.table.itemDoubleClicked.emit(dialog.table.item(0, 0))  # DCIM -> raises
+
+        assert len(warnings) == 1
+        assert dialog.path_label.text() == "/sdcard"
+        assert dialog.table.rowCount() == 2
+        assert dialog.table.item(0, 0).text() == "DCIM"
