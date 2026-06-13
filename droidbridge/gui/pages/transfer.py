@@ -10,8 +10,10 @@ from PyQt6.QtWidgets import (
     QFileDialog,
     QFormLayout,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QProgressBar,
     QPushButton,
     QRadioButton,
@@ -21,6 +23,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from droidbridge.core.adb import AdbError
 from droidbridge.gui import files_ops
 from droidbridge.gui.widgets.remote_browse_dialog import RemoteBrowseDialog
 from droidbridge.modules import transfer as transfer_module
@@ -71,6 +74,7 @@ class TransferPage(QWidget):
         self.local_folder_browse_button = QPushButton("Browse Folder...")
         self.remote_dir_edit = QLineEdit()
         self.remote_dir_browse_button = QPushButton("Browse...")
+        self.remote_dir_new_folder_button = QPushButton("New Folder...")
 
         local_path_row = QHBoxLayout()
         local_path_row.addWidget(self.local_path_edit)
@@ -80,6 +84,7 @@ class TransferPage(QWidget):
         remote_dir_row = QHBoxLayout()
         remote_dir_row.addWidget(self.remote_dir_edit)
         remote_dir_row.addWidget(self.remote_dir_browse_button)
+        remote_dir_row.addWidget(self.remote_dir_new_folder_button)
 
         self.push_group = QWidget()
         push_layout = QFormLayout(self.push_group)
@@ -155,6 +160,7 @@ class TransferPage(QWidget):
         self.local_folder_browse_button.clicked.connect(self._on_browse_local_folder)
         self.remote_path_browse_button.clicked.connect(self._on_browse_remote_path)
         self.remote_dir_browse_button.clicked.connect(self._on_browse_remote_dir)
+        self.remote_dir_new_folder_button.clicked.connect(self._on_new_remote_folder)
         self.start_button.clicked.connect(self._on_start_clicked)
         self.cancel_button.clicked.connect(self.viewmodel.cancel_transfer)
         self.clear_history_button.clicked.connect(self._on_clear_history)
@@ -193,6 +199,30 @@ class TransferPage(QWidget):
         path = RemoteBrowseDialog.get_remote_path(self, client, serial, start_path, mode=mode)
         if path:
             line_edit.setText(path)
+
+    def _on_new_remote_folder(self):
+        client, serial = self.viewmodel.context.client, self.viewmodel.context.serial
+        current = self.remote_dir_edit.text().strip()
+        start_path = current if current.startswith("/") else files_ops.QUICK_JUMP_PATHS["Root"]
+        parent = RemoteBrowseDialog.get_remote_path(self, client, serial, start_path, mode="directory")
+        if not parent:
+            return
+
+        name, ok = QInputDialog.getText(self, "New Folder", "Folder name:")
+        name = name.strip()
+        if not ok or not name:
+            return
+        if "/" in name:
+            QMessageBox.warning(self, "New Folder", "Folder name cannot contain '/'.")
+            return
+
+        new_path = files_ops.join_path(parent, name)
+        try:
+            files_ops.make_directory(client, serial, new_path)
+        except AdbError as exc:
+            QMessageBox.warning(self, "New Folder", str(exc))
+            return
+        self.remote_dir_edit.setText(new_path)
 
     def _on_start_clicked(self):
         conflict = self.conflict_combo.currentText()

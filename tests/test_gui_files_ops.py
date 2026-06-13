@@ -61,6 +61,23 @@ class TestParentPath:
         assert files_ops.parent_path("/") == "/"
 
 
+class TestJoinPath:
+    def test_joins_dir_and_name(self):
+        assert files_ops.join_path("/sdcard", "New Folder") == "/sdcard/New Folder"
+
+    def test_root_dir_does_not_double_slash(self):
+        assert files_ops.join_path("/", "New Folder") == "/New Folder"
+
+
+class TestMakeDirectory:
+    def test_delegates_to_files_module(self):
+        client = make_fake_client("")
+
+        files_ops.make_directory(client, "SERIAL", "/sdcard/New Folder")
+
+        client.shell.assert_called_once_with("SERIAL", "mkdir -p '/sdcard/New Folder'")
+
+
 class TestQuickJumpPaths:
     def test_contains_expected_entries(self):
         assert files_ops.QUICK_JUMP_PATHS == {

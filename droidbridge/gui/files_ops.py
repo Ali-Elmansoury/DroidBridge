@@ -30,3 +30,15 @@ def parent_path(path):
     if path == "/":
         return "/"
     return str(PurePosixPath(path).parent)
+
+
+def join_path(dir_path, name):
+    """Join `dir_path` and `name` ('/sdcard', 'New Folder') -> '/sdcard/New Folder'."""
+    if dir_path == "/":
+        return f"/{name}"
+    return f"{dir_path.rstrip('/')}/{name}"
+
+
+def make_directory(client, serial, path):
+    """Create `path` (and any missing parent directories) on the device."""
+    files_module.make_directory(client, serial, path)

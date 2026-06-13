@@ -89,6 +89,11 @@ def list_directory(client, serial, path):
     return entries
 
 
+def make_directory(client, serial, path):
+    """Create `path` (and any missing parent directories) on the device."""
+    client.shell(serial, f"mkdir -p {shlex.quote(path)}")
+
+
 def sort_entries(entries, by="name", reverse=False):
     """Return entries sorted by 'name', 'size', 'date', or 'type'.
 

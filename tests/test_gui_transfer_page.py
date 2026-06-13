@@ -3,8 +3,10 @@
 from unittest.mock import MagicMock
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QFileDialog
+from PyQt6.QtWidgets import QFileDialog, QInputDialog, QMessageBox
 
+from droidbridge.core.adb import AdbCommandError
+from droidbridge.gui import files_ops
 from droidbridge.gui.device_context import DeviceContext
 from droidbridge.gui.pages.transfer import TransferPage
 from droidbridge.gui.viewmodels.transfer import TransferViewModel
@@ -281,3 +283,128 @@ class TestBrowseButtons:
         qtbot.mouseClick(page.remote_path_browse_button, Qt.MouseButton.LeftButton)
 
         assert page.remote_path_edit.text() == "/sdcard/Existing"
+
+
+class TestNewRemoteFolderButton:
+    def test_creates_folder_under_chosen_parent_and_fills_field(self, qtbot, monkeypatch):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+        page.push_radio.setChecked(True)
+
+        calls = []
+
+        def fake_get_remote_path(parent, client, serial, start_path, mode="any"):
+            calls.append((start_path, mode))
+            return "/sdcard/Pictures"
+
+        monkeypatch.setattr(RemoteBrowseDialog, "get_remote_path", staticmethod(fake_get_remote_path))
+        monkeypatch.setattr(QInputDialog, "getText", staticmethod(lambda *a, **k: ("Vacation2026", True)))
+
+        mkdir_calls = []
+        monkeypatch.setattr(files_ops, "make_directory", lambda client, serial, path: mkdir_calls.append(path))
+
+        qtbot.mouseClick(page.remote_dir_new_folder_button, Qt.MouseButton.LeftButton)
+
+        assert calls == [("/sdcard", "directory")]
+        assert mkdir_calls == ["/sdcard/Pictures/Vacation2026"]
+        assert page.remote_dir_edit.text() == "/sdcard/Pictures/Vacation2026"
+
+    def test_uses_existing_field_value_as_start_path(self, qtbot, monkeypatch):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+        page.push_radio.setChecked(True)
+        page.remote_dir_edit.setText("/sdcard/Existing")
+
+        calls = []
+
+        def fake_get_remote_path(parent, client, serial, start_path, mode="any"):
+            calls.append((start_path, mode))
+            return None
+
+        monkeypatch.setattr(RemoteBrowseDialog, "get_remote_path", staticmethod(fake_get_remote_path))
+
+        qtbot.mouseClick(page.remote_dir_new_folder_button, Qt.MouseButton.LeftButton)
+
+        assert calls == [("/sdcard/Existing", "directory")]
+
+    def test_cancelled_parent_picker_does_not_create_folder(self, qtbot, monkeypatch):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+        page.push_radio.setChecked(True)
+
+        monkeypatch.setattr(RemoteBrowseDialog, "get_remote_path", staticmethod(lambda *a, **k: None))
+        mkdir_calls = []
+        monkeypatch.setattr(files_ops, "make_directory", lambda client, serial, path: mkdir_calls.append(path))
+
+        qtbot.mouseClick(page.remote_dir_new_folder_button, Qt.MouseButton.LeftButton)
+
+        assert mkdir_calls == []
+        assert page.remote_dir_edit.text() == ""
+
+    def test_cancelled_name_prompt_does_not_create_folder(self, qtbot, monkeypatch):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+        page.push_radio.setChecked(True)
+
+        monkeypatch.setattr(RemoteBrowseDialog, "get_remote_path", staticmethod(lambda *a, **k: "/sdcard/Pictures"))
+        monkeypatch.setattr(QInputDialog, "getText", staticmethod(lambda *a, **k: ("", False)))
+        mkdir_calls = []
+        monkeypatch.setattr(files_ops, "make_directory", lambda client, serial, path: mkdir_calls.append(path))
+
+        qtbot.mouseClick(page.remote_dir_new_folder_button, Qt.MouseButton.LeftButton)
+
+        assert mkdir_calls == []
+        assert page.remote_dir_edit.text() == ""
+
+    def test_blank_name_does_not_create_folder(self, qtbot, monkeypatch):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+        page.push_radio.setChecked(True)
+
+        monkeypatch.setattr(RemoteBrowseDialog, "get_remote_path", staticmethod(lambda *a, **k: "/sdcard/Pictures"))
+        monkeypatch.setattr(QInputDialog, "getText", staticmethod(lambda *a, **k: ("   ", True)))
+        mkdir_calls = []
+        monkeypatch.setattr(files_ops, "make_directory", lambda client, serial, path: mkdir_calls.append(path))
+
+        qtbot.mouseClick(page.remote_dir_new_folder_button, Qt.MouseButton.LeftButton)
+
+        assert mkdir_calls == []
+        assert page.remote_dir_edit.text() == ""
+
+    def test_name_with_slash_is_rejected(self, qtbot, monkeypatch):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+        page.push_radio.setChecked(True)
+
+        monkeypatch.setattr(RemoteBrowseDialog, "get_remote_path", staticmethod(lambda *a, **k: "/sdcard/Pictures"))
+        monkeypatch.setattr(QInputDialog, "getText", staticmethod(lambda *a, **k: ("Sub/Folder", True)))
+        mkdir_calls = []
+        monkeypatch.setattr(files_ops, "make_directory", lambda client, serial, path: mkdir_calls.append(path))
+        warnings = []
+        monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: warnings.append(a))
+
+        qtbot.mouseClick(page.remote_dir_new_folder_button, Qt.MouseButton.LeftButton)
+
+        assert mkdir_calls == []
+        assert len(warnings) == 1
+        assert page.remote_dir_edit.text() == ""
+
+    def test_mkdir_error_shows_warning_and_leaves_field_unchanged(self, qtbot, monkeypatch):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+        page.push_radio.setChecked(True)
+
+        monkeypatch.setattr(RemoteBrowseDialog, "get_remote_path", staticmethod(lambda *a, **k: "/sdcard/Pictures"))
+        monkeypatch.setattr(QInputDialog, "getText", staticmethod(lambda *a, **k: ("Vacation2026", True)))
+
+        def failing_mkdir(client, serial, path):
+            raise AdbCommandError(["adb", "shell", "mkdir"], 1, "", "Permission denied")
+
+        monkeypatch.setattr(files_ops, "make_directory", failing_mkdir)
+        warnings = []
+        monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: warnings.append(a))
+
+        qtbot.mouseClick(page.remote_dir_new_folder_button, Qt.MouseButton.LeftButton)
+
+        assert len(warnings) == 1
+        assert page.remote_dir_edit.text() == ""

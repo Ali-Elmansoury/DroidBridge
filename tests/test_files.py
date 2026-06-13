@@ -96,6 +96,15 @@ class TestListDirectory:
         client.shell.assert_called_once_with("SERIAL", "ls -la /")
 
 
+class TestMakeDirectory:
+    def test_runs_mkdir_p_with_quoting(self):
+        client = make_fake_client("")
+
+        files.make_directory(client, "SERIAL", "/sdcard/New Folder")
+
+        client.shell.assert_called_once_with("SERIAL", "mkdir -p '/sdcard/New Folder'")
+
+
 class TestSortEntries:
     def _entries(self):
         return [
