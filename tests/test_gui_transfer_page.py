@@ -169,6 +169,17 @@ class TestHistory:
 
         assert page.history_table.item(0, 3).text() == "-"
 
+    def test_clear_history_button_empties_table(self, qtbot):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        vm.historyEntryAdded.emit({"direction": "pull", "total_files": 1, "total_bytes": 100, "verification_ok": True})
+        assert page.history_table.rowCount() == 1
+
+        qtbot.mouseClick(page.clear_history_button, Qt.MouseButton.LeftButton)
+
+        assert page.history_table.rowCount() == 0
+
 
 class TestCancelButton:
     def test_visible_only_while_busy(self, qtbot):

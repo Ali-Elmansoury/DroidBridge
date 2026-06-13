@@ -128,6 +128,12 @@ class TransferPage(QWidget):
 
         self.history_table = QTableWidget(0, len(_HISTORY_COLUMNS))
         self.history_table.setHorizontalHeaderLabels(_HISTORY_COLUMNS)
+        self.clear_history_button = QPushButton("Clear")
+
+        history_header_row = QHBoxLayout()
+        history_header_row.addWidget(QLabel("Transfer History:"))
+        history_header_row.addStretch()
+        history_header_row.addWidget(self.clear_history_button)
 
         layout = QVBoxLayout(self)
         layout.addLayout(mode_bar)
@@ -139,6 +145,7 @@ class TransferPage(QWidget):
         layout.addWidget(self.progress_bar)
         layout.addWidget(self.progress_label)
         layout.addWidget(self.verification_label)
+        layout.addLayout(history_header_row)
         layout.addWidget(self.history_table)
 
         self.pull_radio.toggled.connect(self.pull_group.setVisible)
@@ -150,6 +157,7 @@ class TransferPage(QWidget):
         self.remote_dir_browse_button.clicked.connect(self._on_browse_remote_dir)
         self.start_button.clicked.connect(self._on_start_clicked)
         self.cancel_button.clicked.connect(self.viewmodel.cancel_transfer)
+        self.clear_history_button.clicked.connect(self._on_clear_history)
 
         self.viewmodel.planChanged.connect(self._on_plan_changed)
         self.viewmodel.progressChanged.connect(self._on_progress_changed)
@@ -232,6 +240,9 @@ class TransferPage(QWidget):
         self.history_table.setItem(row, 2, QTableWidgetItem(format_bytes(entry["total_bytes"])))
         verified = "-" if entry["verification_ok"] is None else ("Yes" if entry["verification_ok"] else "No")
         self.history_table.setItem(row, 3, QTableWidgetItem(verified))
+
+    def _on_clear_history(self):
+        self.history_table.setRowCount(0)
 
     def _on_busy_changed(self, busy):
         self.cancel_button.setVisible(busy)

@@ -105,6 +105,18 @@ class TestSelectionAndAccept:
         assert dialog.selected_path() == "/sdcard/DCIM"
 
 
+class TestDirectoryModeHint:
+    def test_directory_mode_explains_files_are_not_selectable(self, qtbot, monkeypatch):
+        dialog = _make_dialog(qtbot, monkeypatch, mode="directory")
+
+        assert "folder" in dialog.hint_label.text().lower()
+
+    def test_any_mode_has_no_hint(self, qtbot, monkeypatch):
+        dialog = _make_dialog(qtbot, monkeypatch, mode="any")
+
+        assert dialog.hint_label.text() == ""
+
+
 class TestGetRemotePath:
     def test_accepted_returns_selected_path(self, qtbot, monkeypatch):
         monkeypatch.setattr(files_ops, "list_path", _fake_list_path)
@@ -121,6 +133,31 @@ class TestGetRemotePath:
         path = RemoteBrowseDialog.get_remote_path(None, MagicMock(), "SERIAL123", "/sdcard")
 
         assert path is None
+
+
+class TestInitialLoadFallback:
+    def test_file_start_path_falls_back_to_parent_directory_without_warning(self, qtbot, monkeypatch):
+        def fake_list_path(client, serial, path, **kw):
+            if path == "/sdcard/notes.txt":
+                raise AdbCommandError(
+                    ["adb", "-s", "SERIAL123", "shell", "ls", "-la", path],
+                    1, "", "/sdcard/notes.txt: Not a directory",
+                )
+            if path == "/sdcard":
+                return ROOT_ENTRIES
+            return []
+
+        monkeypatch.setattr(files_ops, "list_path", fake_list_path)
+        warnings = []
+        monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: warnings.append(a))
+
+        dialog = RemoteBrowseDialog(MagicMock(), "SERIAL123", "/sdcard/notes.txt")
+        qtbot.addWidget(dialog)
+
+        assert warnings == []
+        assert dialog.path_label.text() == "/sdcard"
+        assert dialog.table.rowCount() == 2
+        assert dialog.table.item(0, 0).text() == "DCIM"
 
 
 class TestLoadError:

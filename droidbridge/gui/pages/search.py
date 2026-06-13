@@ -117,6 +117,7 @@ class SearchPage(QWidget):
         self.select_all_button = QPushButton("Select All")
         self.deselect_all_button = QPushButton("Deselect All")
         self.invert_selection_button = QPushButton("Invert Selection")
+        self.clear_results_button = QPushButton("Clear Results")
         self.pull_selected_button = QPushButton("Pull Selected...")
         self.pull_selected_button.setEnabled(False)
 
@@ -124,6 +125,7 @@ class SearchPage(QWidget):
         selection_bar.addWidget(self.select_all_button)
         selection_bar.addWidget(self.deselect_all_button)
         selection_bar.addWidget(self.invert_selection_button)
+        selection_bar.addWidget(self.clear_results_button)
         selection_bar.addStretch()
         selection_bar.addWidget(self.pull_selected_button)
 
@@ -140,6 +142,7 @@ class SearchPage(QWidget):
         self.select_all_button.clicked.connect(self.table.selectAll)
         self.deselect_all_button.clicked.connect(self.table.clearSelection)
         self.invert_selection_button.clicked.connect(self._on_invert_selection)
+        self.clear_results_button.clicked.connect(self._on_clear_results)
         self.table.itemSelectionChanged.connect(self._on_selection_changed)
         self.pull_selected_button.clicked.connect(self._on_pull_selected)
 
@@ -224,6 +227,11 @@ class SearchPage(QWidget):
     def _on_selection_changed(self):
         selected_rows = sorted({index.row() for index in self.table.selectedIndexes()})
         self.pull_selected_button.setEnabled(bool(selected_rows))
+
+    def _on_clear_results(self):
+        self._rows = []
+        self.table.setRowCount(0)
+        self.pull_selected_button.setEnabled(False)
 
     def _on_invert_selection(self):
         selection_model = self.table.selectionModel()

@@ -99,6 +99,21 @@ class TestResultsTable:
 
         assert page.table.item(0, 0).toolTip() == "/sdcard/DCIM/a.jpg"
 
+    def test_clear_results_button_empties_table_and_disables_pull(self, qtbot):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        vm.resultsChanged.emit(SAMPLE_ROWS)
+        page.table.selectRow(0)
+        assert page.table.rowCount() == 2
+        assert page.pull_selected_button.isEnabled() is True
+
+        qtbot.mouseClick(page.clear_results_button, Qt.MouseButton.LeftButton)
+
+        assert page.table.rowCount() == 0
+        assert page._rows == []
+        assert page.pull_selected_button.isEnabled() is False
+
 
 class TestSearchButton:
     def test_search_button_calls_viewmodel_search_with_form_fields(self, qtbot, monkeypatch):

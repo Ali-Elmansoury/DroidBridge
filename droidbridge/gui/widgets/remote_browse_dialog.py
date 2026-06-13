@@ -18,6 +18,8 @@ from droidbridge.gui import files_ops
 
 _COLUMNS = ("Name", "Type")
 
+_DIRECTORY_MODE_HINT = "Only folders can be selected here; files are shown for navigation."
+
 
 class RemoteBrowseDialog(QDialog):
     """`mode="any"` allows selecting a file or directory (pull source).
@@ -36,6 +38,7 @@ class RemoteBrowseDialog(QDialog):
 
         self.path_label = QLabel()
         self.up_button = QPushButton("Up")
+        self.hint_label = QLabel(_DIRECTORY_MODE_HINT if mode == "directory" else "")
         self.table = QTableWidget(0, len(_COLUMNS))
         self.table.setHorizontalHeaderLabels(_COLUMNS)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -52,6 +55,7 @@ class RemoteBrowseDialog(QDialog):
 
         layout = QVBoxLayout(self)
         layout.addLayout(top_bar)
+        layout.addWidget(self.hint_label)
         layout.addWidget(self.table)
         layout.addWidget(button_box)
 
@@ -61,12 +65,18 @@ class RemoteBrowseDialog(QDialog):
         button_box.accepted.connect(self._on_accept)
         button_box.rejected.connect(self.reject)
 
-        self._load(start_path)
+        self._load(start_path, is_initial=True)
 
-    def _load(self, path):
+    def _load(self, path, is_initial=False):
         try:
             entries = files_ops.list_path(self._client, self._serial, path, show_hidden=False)
         except AdbError as exc:
+            if is_initial:
+                # `path` may be a file (e.g. seeded from a previously-picked
+                # file path) - fall back to its parent directory rather than
+                # opening an empty dialog with an error popup.
+                self._load(files_ops.parent_path(path))
+                return
             QMessageBox.warning(self, "Browse Device", str(exc))
             return
         self._current_path = path
