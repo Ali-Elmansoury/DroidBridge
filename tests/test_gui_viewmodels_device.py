@@ -16,18 +16,26 @@ from droidbridge.modules.device import DeviceInfo, StorageInfo
 
 
 class FakeWorker(QObject):
-    """Synchronous stand-in for gui.workers.Worker: runs fn immediately on start()."""
+    """Synchronous stand-in for gui.workers.Worker: runs fn immediately on start().
+
+    Mirrors gui.workers.Worker's report_progress kwarg: if True, fn is called with
+    a progress_callback that emits the `progress` signal synchronously.
+    """
 
     finished = pyqtSignal(object)
     error = pyqtSignal(object)
+    progress = pyqtSignal(object)
 
-    def __init__(self, fn, *args, **kwargs):
+    def __init__(self, fn, *args, report_progress=False, **kwargs):
         super().__init__()
         self._fn = fn
         self._args = args
         self._kwargs = kwargs
+        self._report_progress = report_progress
 
     def start(self):
+        if self._report_progress:
+            self._kwargs["progress_callback"] = self.progress.emit
         try:
             result = self._fn(*self._args, **self._kwargs)
         except Exception as exc:  # noqa: BLE001
