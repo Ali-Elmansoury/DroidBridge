@@ -133,6 +133,7 @@ class SearchPage(QWidget):
 
         self.root_browse_combo.activated.connect(self._on_root_browse_selected)
         self.root_edit.editingFinished.connect(self._on_root_edit_finished)
+        self.viewmodel.context.connectionChanged.connect(self._on_connection_changed)
 
         self.viewmodel.resultsChanged.connect(self._on_results_changed)
         self.viewmodel.rootSubdirsChanged.connect(self._on_root_subdirs_changed)
@@ -189,6 +190,10 @@ class SearchPage(QWidget):
 
     def _on_root_edit_finished(self):
         self.viewmodel.browse_root(self.root_edit.text().strip())
+
+    def _on_connection_changed(self, connected, _serial, _model):
+        if connected:
+            self.viewmodel.browse_root(self.root_edit.text().strip())
 
     def _on_sort_changed(self, *_args):
         self.viewmodel.set_sort(self.sort_combo.currentText(), self.reverse_checkbox.isChecked())

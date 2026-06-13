@@ -37,9 +37,10 @@ def _row(result):
 SAMPLE_ROWS = [_row(r) for r in SAMPLE_RESULTS]
 
 
-def _make_page():
+def _make_page(connected=True):
     context = DeviceContext()
-    context.set_connected(MagicMock(), "SERIAL123", "Pixel 7")
+    if connected:
+        context.set_connected(MagicMock(), "SERIAL123", "Pixel 7")
     vm = SearchViewModel(context, worker_factory=FakeWorker)
     page = SearchPage(vm)
     return page, vm, context
@@ -242,6 +243,28 @@ class TestRootBrowseCombo:
         page.root_browse_combo.activated.emit(0)  # ".."
 
         assert page.root_edit.text() == "/sdcard"
+        items = [page.root_browse_combo.itemText(i) for i in range(page.root_browse_combo.count())]
+        assert items == ["DCIM", "Download"]
+
+    def test_init_while_disconnected_does_not_populate_or_error(self, qtbot, monkeypatch):
+        calls = []
+        monkeypatch.setattr(files_ops, "list_path", lambda *a, **kw: calls.append(1))
+
+        page, _vm, _context = _make_page(connected=False)
+        qtbot.addWidget(page)
+
+        assert calls == []
+        assert page.root_browse_combo.count() == 0
+
+    def test_connecting_after_init_populates_combo(self, qtbot, monkeypatch):
+        entries = [_dir_entry("DCIM"), _dir_entry("Download")]
+        monkeypatch.setattr(files_ops, "list_path", lambda client, serial, path, **kw: entries)
+
+        page, _vm, context = _make_page(connected=False)
+        qtbot.addWidget(page)
+
+        context.set_connected(MagicMock(), "SERIAL123", "Pixel 7")
+
         items = [page.root_browse_combo.itemText(i) for i in range(page.root_browse_combo.count())]
         assert items == ["DCIM", "Download"]
 

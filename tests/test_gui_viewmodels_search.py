@@ -144,3 +144,20 @@ class TestBrowseRoot:
         vm.browse_root("/sdcard")
 
         assert events == [("/sdcard", ["DCIM", "Download"])]
+
+    def test_browse_root_does_nothing_when_not_connected(self, qtbot, monkeypatch):
+        vm = SearchViewModel(DeviceContext(), worker_factory=FakeWorker)  # not connected
+
+        calls = []
+        monkeypatch.setattr(files_ops, "list_path", lambda *a, **kw: calls.append(1))
+
+        events = []
+        vm.rootSubdirsChanged.connect(lambda path, subdirs: events.append((path, subdirs)))
+        statuses = []
+        vm.statusChanged.connect(statuses.append)
+
+        vm.browse_root("/sdcard")
+
+        assert calls == []
+        assert events == []
+        assert statuses == []

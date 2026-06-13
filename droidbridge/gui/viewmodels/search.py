@@ -63,7 +63,13 @@ class SearchViewModel(QObject):
         )
 
     def browse_root(self, path):
-        """Fetch `path`'s subdirectories for the Root-path browse combo."""
+        """Fetch `path`'s subdirectories for the Root-path browse combo.
+
+        No-ops while disconnected (e.g. on initial page construction, before
+        a device is connected).
+        """
+        if not self.context.is_connected:
+            return
         client, serial = self.context.client, self.context.serial
         self._run(
             lambda: files_ops.list_path(client, serial, path, show_hidden=False),
