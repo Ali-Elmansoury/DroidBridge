@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
     QFileDialog,
     QFormLayout,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
     QPushButton,
@@ -108,6 +109,10 @@ class SearchPage(QWidget):
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QTableWidget.SelectionMode.ExtendedSelection)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
 
         self.select_all_button = QPushButton("Select All")
         self.deselect_all_button = QPushButton("Deselect All")
@@ -209,7 +214,9 @@ class SearchPage(QWidget):
         self._rows = rows
         self.table.setRowCount(len(rows))
         for i, row in enumerate(rows):
-            self.table.setItem(i, 0, QTableWidgetItem(row["path"]))
+            path_item = QTableWidgetItem(row["path"])
+            path_item.setToolTip(row["path"])
+            self.table.setItem(i, 0, path_item)
             self.table.setItem(i, 1, QTableWidgetItem(format_bytes(row["size"])))
             self.table.setItem(i, 2, QTableWidgetItem(row["mtime"].strftime("%Y-%m-%d %H:%M")))
         self.pull_selected_button.setEnabled(False)

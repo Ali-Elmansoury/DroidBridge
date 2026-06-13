@@ -4,7 +4,7 @@ from datetime import date, datetime
 from unittest.mock import MagicMock
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QFileDialog
+from PyQt6.QtWidgets import QFileDialog, QHeaderView
 
 from droidbridge.gui import files_ops
 from droidbridge.gui.device_context import DeviceContext
@@ -81,6 +81,23 @@ class TestResultsTable:
         assert page.table.rowCount() == 2
         assert page.table.item(0, 0).text() == "/sdcard/DCIM/a.jpg"
         assert page.table.item(0, 1).text() == format_bytes(100)
+
+    def test_path_column_stretches_to_fill_available_space(self, qtbot):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        header = page.table.horizontalHeader()
+        assert header.sectionResizeMode(0) == QHeaderView.ResizeMode.Stretch
+        assert header.sectionResizeMode(1) == QHeaderView.ResizeMode.ResizeToContents
+        assert header.sectionResizeMode(2) == QHeaderView.ResizeMode.ResizeToContents
+
+    def test_path_cell_shows_full_path_in_tooltip(self, qtbot):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        vm.resultsChanged.emit(SAMPLE_ROWS)
+
+        assert page.table.item(0, 0).toolTip() == "/sdcard/DCIM/a.jpg"
 
 
 class TestSearchButton:
