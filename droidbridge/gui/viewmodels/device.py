@@ -69,6 +69,7 @@ class DeviceViewModel(QObject):
         self.refresh()
 
     def _on_refresh_finished(self, info):
+        self.statusChanged.emit("")
         data = {
             "serial": info.serial,
             "model": info.model,

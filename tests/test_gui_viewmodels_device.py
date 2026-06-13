@@ -145,6 +145,29 @@ class TestRefresh:
 
         assert statuses == ["adb shell failed"]
 
+    def test_success_after_error_clears_status_bar(self, qtbot, monkeypatch):
+        """A transient auto-refresh failure (e.g. a momentary USB drop reported as
+        "device not found") shouldn't leave a stale error message in the status bar
+        forever - once a later refresh succeeds, the message should be cleared.
+        """
+        context = DeviceContext()
+        context.set_connected(MagicMock(), "SERIAL123", "Pixel 7")
+        vm = DeviceViewModel(context, worker_factory=FakeWorker)
+
+        statuses = []
+        vm.statusChanged.connect(statuses.append)
+
+        monkeypatch.setattr(
+            device_ops, "refresh_info",
+            lambda client, serial: (_ for _ in ()).throw(ValueError("device not found")),
+        )
+        vm.refresh()
+        assert statuses == ["device not found"]
+
+        monkeypatch.setattr(device_ops, "refresh_info", lambda client, serial: SAMPLE_INFO)
+        vm.refresh()
+        assert statuses == ["device not found", ""]
+
 
 class TestWorkerLifecycle:
     """Regression tests for the real Worker/QThread path (FakeWorker is synchronous and
