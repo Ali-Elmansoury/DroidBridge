@@ -21,7 +21,6 @@ class DevicePage(QWidget):
         super().__init__(parent)
         self.viewmodel = viewmodel
 
-        self.connect_button = QPushButton("Connect")
         self.refresh_button = QPushButton("Refresh")
         self.refresh_button.setEnabled(viewmodel.context.is_connected)
 
@@ -46,7 +45,6 @@ class DevicePage(QWidget):
         form.addRow("", self.storage_bar)
 
         buttons = QHBoxLayout()
-        buttons.addWidget(self.connect_button)
         buttons.addWidget(self.refresh_button)
         buttons.addStretch()
 
@@ -55,7 +53,6 @@ class DevicePage(QWidget):
         layout.addLayout(form)
         layout.addStretch()
 
-        self.connect_button.clicked.connect(self.viewmodel.connect_device)
         self.refresh_button.clicked.connect(self.viewmodel.refresh)
         self.viewmodel.infoChanged.connect(self._on_info_changed)
         self.viewmodel.busyChanged.connect(self._on_busy_changed)
@@ -75,7 +72,6 @@ class DevicePage(QWidget):
         self.storage_bar.setValue(int(info["storage_used_percent"]))
 
     def _on_busy_changed(self, busy):
-        self.connect_button.setEnabled(not busy)
         self.refresh_button.setEnabled(not busy and self.viewmodel.context.is_connected)
 
     def _on_connection_changed(self, connected, _serial, _model):

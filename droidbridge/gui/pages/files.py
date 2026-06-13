@@ -26,6 +26,8 @@ from droidbridge.utils.format import format_bytes
 
 _COLUMNS = ("Name", "Type", "Size", "Date Modified")
 
+PREVIEW_MAX_DIMENSION = 240  # px - caps preview image size so it can't grow the window
+
 
 class FilesPage(QWidget):
     """Directory browser bound to FilesViewModel."""
@@ -162,7 +164,13 @@ class FilesPage(QWidget):
 
     def _on_preview_changed(self, payload):
         if payload["kind"] == "image":
-            self.preview_image_label.setPixmap(QPixmap(payload["local_path"]))
+            pixmap = QPixmap(payload["local_path"])
+            if pixmap.width() > PREVIEW_MAX_DIMENSION or pixmap.height() > PREVIEW_MAX_DIMENSION:
+                pixmap = pixmap.scaled(
+                    PREVIEW_MAX_DIMENSION, PREVIEW_MAX_DIMENSION,
+                    Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation,
+                )
+            self.preview_image_label.setPixmap(pixmap)
             self.preview_image_label.setVisible(True)
             self.preview_info_label.setVisible(False)
             return

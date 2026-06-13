@@ -276,6 +276,20 @@ class TestShell:
         _, kwargs = mock_run.call_args
         assert kwargs["timeout"] == 5
 
+    def test_shell_does_not_raise_on_non_utf8_output(self, tmp_path):
+        """Real device filenames can contain bytes that aren't valid UTF-8 (e.g. a
+        stray 0xA0). `ls -la` output containing such a name must not crash the whole
+        operation - invalid bytes are replaced rather than raising UnicodeDecodeError."""
+        fake_adb = tmp_path / "adb"
+        fake_adb.write_text("#!/bin/sh\nprintf 'foo\\240bar\\n'\n")
+        fake_adb.chmod(0o755)
+        client = adb.AdbClient(adb_path=str(fake_adb))
+
+        result = client.shell("SERIAL", "ls -la /sdcard")
+
+        assert "foo" in result and "bar" in result
+        assert "�" in result
+
 
 class TestPull:
     def test_pull_calls_correct_command_with_no_default_timeout(self):

@@ -214,6 +214,24 @@ class TestPreview:
         assert page.preview_image_label.isVisible()
         assert not page.preview_info_label.isVisible()
 
+    def test_large_image_preview_is_scaled_down(self, qtbot, tmp_path):
+        """A large photo must not grow the preview label (and thus the window) past
+        a fixed cap - it should be scaled down, preserving aspect ratio."""
+        from droidbridge.gui.pages.files import PREVIEW_MAX_DIMENSION
+
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        img_path = tmp_path / "large.png"
+        QPixmap(1600, 1200).save(str(img_path))
+
+        vm.previewChanged.emit({"kind": "image", "local_path": str(img_path)})
+
+        pixmap = page.preview_image_label.pixmap()
+        assert pixmap.width() <= PREVIEW_MAX_DIMENSION
+        assert pixmap.height() <= PREVIEW_MAX_DIMENSION
+        assert pixmap.width() == 4 * pixmap.height() // 3  # 1600x1200 aspect ratio kept
+
     def test_info_preview_shows_entry_details(self, qtbot):
         page, vm, _context = _make_page()
         qtbot.addWidget(page)
