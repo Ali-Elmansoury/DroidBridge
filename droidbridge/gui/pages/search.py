@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from droidbridge.gui import files_ops
 from droidbridge.gui.widgets.deselectable_table import DeselectableTableWidget
 from droidbridge.modules import search as search_module
 from droidbridge.utils.format import format_bytes
@@ -37,6 +38,8 @@ class SearchPage(QWidget):
         self._rows = []
 
         self.root_edit = QLineEdit(search_module.DEFAULT_ROOT)
+        self._root_browse_path = search_module.DEFAULT_ROOT
+        self.root_browse_combo = QComboBox()
         self.name_edit = QLineEdit()
         self.extensions_edit = QLineEdit()
         self.extensions_edit.setPlaceholderText("Extensions (comma-separated)")
@@ -65,7 +68,10 @@ class SearchPage(QWidget):
         self.search_button = QPushButton("Search")
 
         form = QFormLayout()
-        form.addRow("Root path:", self.root_edit)
+        root_row = QHBoxLayout()
+        root_row.addWidget(self.root_edit, 1)
+        root_row.addWidget(self.root_browse_combo)
+        form.addRow("Root path:", root_row)
         form.addRow("Name pattern:", self.name_edit)
         form.addRow("Extensions:", self.extensions_edit)
         form.addRow("Min size:", self.min_size_edit)
@@ -125,7 +131,13 @@ class SearchPage(QWidget):
         self.table.itemSelectionChanged.connect(self._on_selection_changed)
         self.pull_selected_button.clicked.connect(self._on_pull_selected)
 
+        self.root_browse_combo.activated.connect(self._on_root_browse_selected)
+        self.root_edit.editingFinished.connect(self._on_root_edit_finished)
+
         self.viewmodel.resultsChanged.connect(self._on_results_changed)
+        self.viewmodel.rootSubdirsChanged.connect(self._on_root_subdirs_changed)
+
+        self.viewmodel.browse_root(self.root_edit.text().strip())
 
     def _on_search_clicked(self):
         preset = self.preset_combo.currentText()
@@ -153,6 +165,30 @@ class SearchPage(QWidget):
             sort_by=self.sort_combo.currentText(),
             reverse=self.reverse_checkbox.isChecked(),
         )
+
+    def _on_root_subdirs_changed(self, path, subdirs):
+        self._root_browse_path = path
+        self.root_browse_combo.blockSignals(True)
+        self.root_browse_combo.clear()
+        if path not in ("/", search_module.DEFAULT_ROOT):
+            self.root_browse_combo.addItem("..")
+        self.root_browse_combo.addItems(subdirs)
+        self.root_browse_combo.setCurrentIndex(-1)
+        self.root_browse_combo.blockSignals(False)
+
+    def _on_root_browse_selected(self, index):
+        name = self.root_browse_combo.itemText(index)
+        if name == "..":
+            new_path = files_ops.parent_path(self._root_browse_path)
+        elif self._root_browse_path == "/":
+            new_path = f"/{name}"
+        else:
+            new_path = f"{self._root_browse_path}/{name}"
+        self.root_edit.setText(new_path)
+        self.viewmodel.browse_root(new_path)
+
+    def _on_root_edit_finished(self):
+        self.viewmodel.browse_root(self.root_edit.text().strip())
 
     def _on_sort_changed(self, *_args):
         self.viewmodel.set_sort(self.sort_combo.currentText(), self.reverse_checkbox.isChecked())

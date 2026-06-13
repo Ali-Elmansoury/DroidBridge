@@ -6,11 +6,13 @@ from unittest.mock import MagicMock
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QFileDialog
 
+from droidbridge.gui import files_ops
 from droidbridge.gui.device_context import DeviceContext
 from droidbridge.gui.pages.search import SearchPage
 from droidbridge.gui.viewmodels.search import SearchViewModel
 from droidbridge.gui.widgets.deselectable_table import DeselectableTableWidget
 from droidbridge.modules import search as search_module
+from droidbridge.modules.files import FileEntry
 from droidbridge.modules.search import SearchResult
 from droidbridge.utils.format import format_bytes
 from tests.test_gui_viewmodels_device import FakeWorker
@@ -183,3 +185,79 @@ class TestTableType:
         qtbot.addWidget(page)
 
         assert isinstance(page.table, DeselectableTableWidget)
+
+
+def _dir_entry(name):
+    return FileEntry(name=name, path=f"/x/{name}", is_dir=True, is_symlink=False,
+                      size=4096, mtime=datetime(2023, 8, 1, 10, 0))
+
+
+def _file_entry(name):
+    return FileEntry(name=name, path=f"/x/{name}", is_dir=False, is_symlink=False,
+                      size=10, mtime=datetime(2023, 8, 1, 10, 0))
+
+
+class TestRootBrowseCombo:
+    def test_combo_populates_with_subdirs_on_init_without_parent_entry(self, qtbot, monkeypatch):
+        entries = [_dir_entry("DCIM"), _file_entry("notes.txt"), _dir_entry("Download")]
+        monkeypatch.setattr(files_ops, "list_path", lambda client, serial, path, **kw: entries)
+
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        items = [page.root_browse_combo.itemText(i) for i in range(page.root_browse_combo.count())]
+        assert items == ["DCIM", "Download"]
+
+    def test_selecting_subdir_drills_down_and_updates_root_edit(self, qtbot, monkeypatch):
+        def fake_list_path(client, serial, path, **kw):
+            if path == "/sdcard/DCIM":
+                return [_dir_entry("Camera"), _file_entry("photo.jpg")]
+            return [_dir_entry("DCIM"), _dir_entry("Download")]
+
+        monkeypatch.setattr(files_ops, "list_path", fake_list_path)
+
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        page.root_browse_combo.activated.emit(0)  # "DCIM"
+
+        assert page.root_edit.text() == "/sdcard/DCIM"
+        items = [page.root_browse_combo.itemText(i) for i in range(page.root_browse_combo.count())]
+        assert items == ["..", "Camera"]
+
+    def test_selecting_parent_entry_navigates_up(self, qtbot, monkeypatch):
+        def fake_list_path(client, serial, path, **kw):
+            if path == "/sdcard/DCIM":
+                return [_dir_entry("Camera")]
+            return [_dir_entry("DCIM"), _dir_entry("Download")]
+
+        monkeypatch.setattr(files_ops, "list_path", fake_list_path)
+
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        vm.browse_root("/sdcard/DCIM")  # drill down without going through the combo
+        assert [page.root_browse_combo.itemText(i) for i in range(page.root_browse_combo.count())] == ["..", "Camera"]
+
+        page.root_browse_combo.activated.emit(0)  # ".."
+
+        assert page.root_edit.text() == "/sdcard"
+        items = [page.root_browse_combo.itemText(i) for i in range(page.root_browse_combo.count())]
+        assert items == ["DCIM", "Download"]
+
+    def test_editing_root_path_refreshes_combo(self, qtbot, monkeypatch):
+        def fake_list_path(client, serial, path, **kw):
+            if path == "/sdcard/DCIM":
+                return [_dir_entry("Camera")]
+            return [_dir_entry("DCIM"), _dir_entry("Download")]
+
+        monkeypatch.setattr(files_ops, "list_path", fake_list_path)
+
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        page.root_edit.setText("/sdcard/DCIM")
+        page.root_edit.editingFinished.emit()
+
+        items = [page.root_browse_combo.itemText(i) for i in range(page.root_browse_combo.count())]
+        assert items == ["..", "Camera"]

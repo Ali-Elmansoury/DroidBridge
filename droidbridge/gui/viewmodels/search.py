@@ -6,7 +6,7 @@ and supports client-side re-sorting of the last result set.
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
-from droidbridge.gui import search_ops
+from droidbridge.gui import files_ops, search_ops
 from droidbridge.gui.workers import Worker
 from droidbridge.modules import search as search_module
 from droidbridge.utils import format as format_utils
@@ -27,6 +27,7 @@ class SearchViewModel(QObject):
     """Drives the Search page: runs `files search`-equivalent queries and re-sorts results."""
 
     resultsChanged = pyqtSignal(list)
+    rootSubdirsChanged = pyqtSignal(str, list)
     busyChanged = pyqtSignal(bool)
     statusChanged = pyqtSignal(str)
     logMessage = pyqtSignal(str, str)
@@ -60,6 +61,17 @@ class SearchViewModel(QObject):
             ),
             self._on_searched,
         )
+
+    def browse_root(self, path):
+        """Fetch `path`'s subdirectories for the Root-path browse combo."""
+        client, serial = self.context.client, self.context.serial
+        self._run(
+            lambda: files_ops.list_path(client, serial, path, show_hidden=False),
+            lambda entries: self._on_root_browsed(path, entries),
+        )
+
+    def _on_root_browsed(self, path, entries):
+        self.rootSubdirsChanged.emit(path, [e.name for e in entries if e.is_dir])
 
     def set_sort(self, by, reverse):
         """Re-sort the last result set client-side and re-emit resultsChanged."""

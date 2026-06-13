@@ -3,9 +3,10 @@
 from datetime import datetime
 from unittest.mock import MagicMock
 
-from droidbridge.gui import search_ops
+from droidbridge.gui import files_ops, search_ops
 from droidbridge.gui.device_context import DeviceContext
 from droidbridge.gui.viewmodels.search import SearchViewModel
+from droidbridge.modules.files import FileEntry
 from droidbridge.modules.search import SearchResult
 from tests.test_gui_viewmodels_device import FakeWorker
 
@@ -121,3 +122,25 @@ class TestSetSort:
         assert len(calls) == 1  # no new search
         rows = events[-1]
         assert [r["size"] for r in rows] == [200, 100]
+
+
+class TestBrowseRoot:
+    def test_browse_root_emits_subdirs_only(self, qtbot, monkeypatch):
+        vm = SearchViewModel(_connected_context(), worker_factory=FakeWorker)
+
+        entries = [
+            FileEntry(name="DCIM", path="/sdcard/DCIM", is_dir=True, is_symlink=False,
+                      size=4096, mtime=datetime(2023, 8, 1, 10, 0)),
+            FileEntry(name="notes.txt", path="/sdcard/notes.txt", is_dir=False, is_symlink=False,
+                      size=10, mtime=datetime(2023, 8, 1, 10, 0)),
+            FileEntry(name="Download", path="/sdcard/Download", is_dir=True, is_symlink=False,
+                      size=4096, mtime=datetime(2023, 8, 1, 10, 0)),
+        ]
+        monkeypatch.setattr(files_ops, "list_path", lambda client, serial, path, **kw: entries)
+
+        events = []
+        vm.rootSubdirsChanged.connect(lambda path, subdirs: events.append((path, subdirs)))
+
+        vm.browse_root("/sdcard")
+
+        assert events == [("/sdcard", ["DCIM", "Download"])]
