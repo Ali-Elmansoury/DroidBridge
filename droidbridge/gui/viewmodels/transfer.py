@@ -56,6 +56,9 @@ def _format_history_entry(direction, result, verification):
     }
 
 
+_BUSY_MESSAGE = "A transfer is already in progress."
+
+
 class TransferViewModel(QObject):
     """Drives the Transfer page: plan/execute/verify pull and push transfers."""
 
@@ -74,8 +77,18 @@ class TransferViewModel(QObject):
         self._workers = []
         self._cancel_requested = False
 
+    def _reject_if_busy(self):
+        """If a transfer is already running, emit a warning and return True."""
+        if self._workers:
+            self.statusChanged.emit(_BUSY_MESSAGE)
+            self.logMessage.emit(_BUSY_MESSAGE, "WARNING")
+            return True
+        return False
+
     def start_pull(self, remote_path, local_dir, conflict, verify):
         """Plan, execute, and (if `verify`) verify a pull of a single remote path."""
+        if self._reject_if_busy():
+            return
         self._cancel_requested = False
         client, serial = self.context.client, self.context.serial
 
@@ -94,6 +107,8 @@ class TransferViewModel(QObject):
 
     def start_push(self, local_path, remote_dir, conflict, verify):
         """Plan, execute, and (if `verify`) verify a push of a single local path."""
+        if self._reject_if_busy():
+            return
         self._cancel_requested = False
         client, serial = self.context.client, self.context.serial
 
@@ -117,6 +132,8 @@ class TransferViewModel(QObject):
         """Pull multiple remote paths (Files/Search "Pull Selected"): always verified,
         conflicts always skipped (never overwrites an existing destination).
         """
+        if self._reject_if_busy():
+            return
         self._cancel_requested = False
         client, serial = self.context.client, self.context.serial
 

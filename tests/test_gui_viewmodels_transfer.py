@@ -190,3 +190,65 @@ class TestError:
         vm.start_pull("/sdcard/DCIM", "/tmp/out", conflict=transfer_module.CONFLICT_SKIP, verify=False)
 
         assert statuses == ["adb shell failed"]
+
+
+class TestBusyGuard:
+    def test_start_pull_rejects_if_busy(self, qtbot, monkeypatch):
+        vm = TransferViewModel(_connected_context(), worker_factory=FakeWorker)
+        vm._workers.append(object())  # Simulate already busy
+
+        def fail_plan(*a, **k):
+            raise AssertionError("plan_pull_many should not be called when busy")
+
+        monkeypatch.setattr(transfer_ops, "plan_pull_many", fail_plan)
+
+        status_events = []
+        log_events = []
+        vm.statusChanged.connect(status_events.append)
+        vm.logMessage.connect(lambda msg, level: log_events.append((msg, level)))
+
+        vm.start_pull("/sdcard/DCIM", "/tmp/out", conflict=transfer_module.CONFLICT_SKIP, verify=True)
+
+        assert status_events == ["A transfer is already in progress."]
+        assert log_events == [("A transfer is already in progress.", "WARNING")]
+        assert len(vm._workers) == 1  # No new worker added
+
+    def test_start_push_rejects_if_busy(self, qtbot, monkeypatch):
+        vm = TransferViewModel(_connected_context(), worker_factory=FakeWorker)
+        vm._workers.append(object())  # Simulate already busy
+
+        def fail_plan(*a, **k):
+            raise AssertionError("plan_push_many should not be called when busy")
+
+        monkeypatch.setattr(transfer_ops, "plan_push_many", fail_plan)
+
+        status_events = []
+        log_events = []
+        vm.statusChanged.connect(status_events.append)
+        vm.logMessage.connect(lambda msg, level: log_events.append((msg, level)))
+
+        vm.start_push("/tmp/a.jpg", "/sdcard/Pictures", conflict=transfer_module.CONFLICT_OVERWRITE, verify=True)
+
+        assert status_events == ["A transfer is already in progress."]
+        assert log_events == [("A transfer is already in progress.", "WARNING")]
+        assert len(vm._workers) == 1  # No new worker added
+
+    def test_pull_selected_rejects_if_busy(self, qtbot, monkeypatch):
+        vm = TransferViewModel(_connected_context(), worker_factory=FakeWorker)
+        vm._workers.append(object())  # Simulate already busy
+
+        def fail_plan(*a, **k):
+            raise AssertionError("plan_pull_many should not be called when busy")
+
+        monkeypatch.setattr(transfer_ops, "plan_pull_many", fail_plan)
+
+        status_events = []
+        log_events = []
+        vm.statusChanged.connect(status_events.append)
+        vm.logMessage.connect(lambda msg, level: log_events.append((msg, level)))
+
+        vm.pull_selected(["/sdcard/a.jpg", "/sdcard/b.jpg"], "/tmp/out")
+
+        assert status_events == ["A transfer is already in progress."]
+        assert log_events == [("A transfer is already in progress.", "WARNING")]
+        assert len(vm._workers) == 1  # No new worker added
