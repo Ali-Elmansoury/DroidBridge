@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import QFileDialog
 from droidbridge.gui.device_context import DeviceContext
 from droidbridge.gui.pages.search import SearchPage
 from droidbridge.gui.viewmodels.search import SearchViewModel
+from droidbridge.gui.widgets.deselectable_table import DeselectableTableWidget
 from droidbridge.modules import search as search_module
 from droidbridge.modules.search import SearchResult
 from droidbridge.utils.format import format_bytes
@@ -174,3 +175,11 @@ class TestPullSelected:
         qtbot.mouseClick(page.pull_selected_button, Qt.MouseButton.LeftButton)
 
         assert events == [(["/sdcard/DCIM/b.jpg"], "/tmp/dest")]
+
+
+class TestTableType:
+    def test_table_is_deselectable(self, qtbot):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        assert isinstance(page.table, DeselectableTableWidget)

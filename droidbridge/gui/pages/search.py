@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from droidbridge.gui.widgets.deselectable_table import DeselectableTableWidget
 from droidbridge.modules import search as search_module
 from droidbridge.utils.format import format_bytes
 
@@ -89,7 +90,7 @@ class SearchPage(QWidget):
 
         form.addRow(self.search_button)
 
-        self.table = QTableWidget(0, len(_COLUMNS))
+        self.table = DeselectableTableWidget(0, len(_COLUMNS))
         self.table.setHorizontalHeaderLabels(_COLUMNS)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QTableWidget.SelectionMode.ExtendedSelection)
