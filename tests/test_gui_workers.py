@@ -34,3 +34,32 @@ class TestWorker:
         worker.wait()
         assert isinstance(blocker.args[0], ValueError)
         assert str(blocker.args[0]) == "boom"
+
+
+class TestWorkerProgress:
+    def test_report_progress_emits_progress_then_finished(self, qtbot):
+        def fn(progress_callback=None):
+            progress_callback("x")
+            progress_callback("y")
+            return "done"
+
+        worker = Worker(fn, report_progress=True)
+
+        progress_events = []
+        worker.progress.connect(progress_events.append)
+
+        with qtbot.waitSignal(worker.finished, timeout=2000) as blocker:
+            worker.start()
+
+        worker.wait()
+        assert progress_events == ["x", "y"]
+        assert blocker.args == ["done"]
+
+    def test_report_progress_false_does_not_inject_callback(self, qtbot):
+        worker = Worker(lambda: 42, report_progress=False)
+
+        with qtbot.waitSignal(worker.finished, timeout=2000) as blocker:
+            worker.start()
+
+        worker.wait()
+        assert blocker.args == [42]

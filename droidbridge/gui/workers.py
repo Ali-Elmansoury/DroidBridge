@@ -10,16 +10,22 @@ class Worker(QObject):
 
     Connect to `finished`/`error`, then call `start()`. Emits exactly one of
     `finished(result)` or `error(exception)`, after which its QThread exits.
+
+    If `report_progress=True`, `fn` is called with an extra `progress_callback`
+    keyword argument; calling it from `fn` (on the worker thread) emits the
+    `progress` signal, received on the calling thread like `finished`/`error`.
     """
 
     finished = pyqtSignal(object)
     error = pyqtSignal(object)
+    progress = pyqtSignal(object)
 
-    def __init__(self, fn, *args, **kwargs):
+    def __init__(self, fn, *args, report_progress=False, **kwargs):
         super().__init__()
         self._fn = fn
         self._args = args
         self._kwargs = kwargs
+        self._report_progress = report_progress
         self._thread = QThread()
         self.moveToThread(self._thread)
         self._thread.started.connect(self._run)
@@ -27,6 +33,8 @@ class Worker(QObject):
         self.error.connect(self._thread.quit)
 
     def _run(self):
+        if self._report_progress:
+            self._kwargs["progress_callback"] = self.progress.emit
         try:
             result = self._fn(*self._args, **self._kwargs)
         except Exception as exc:  # noqa: BLE001 - reported via signal, not raised
