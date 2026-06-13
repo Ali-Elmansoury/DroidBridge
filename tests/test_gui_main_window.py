@@ -7,6 +7,10 @@ from PyQt6.QtGui import QCloseEvent
 from droidbridge.gui import theme
 from droidbridge.gui.device_context import DeviceContext
 from droidbridge.gui.main_window import MODULES, MainWindow
+from droidbridge.gui.pages.files import FilesPage
+from droidbridge.gui.pages.placeholder import PlaceholderPage
+from droidbridge.gui.pages.search import SearchPage
+from droidbridge.gui.pages.transfer import TransferPage
 
 
 class TestMainWindow:
@@ -103,3 +107,75 @@ class TestMainWindow:
         window.closeEvent(QCloseEvent())
 
         session_logger.write_summary.assert_called_once()
+
+
+class TestNewPages:
+    def test_sidebar_indices_1_2_3_are_real_pages(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        assert isinstance(window.stack.widget(1), FilesPage)
+        assert isinstance(window.stack.widget(2), TransferPage)
+        assert isinstance(window.stack.widget(3), SearchPage)
+
+    def test_remaining_modules_are_placeholders(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        for i in range(4, 9):
+            assert isinstance(window.stack.widget(i), PlaceholderPage)
+
+
+class TestPullRequestedWiring:
+    def test_files_pull_requested_switches_to_transfer_and_pulls(self, qtbot, monkeypatch):
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        calls = []
+        monkeypatch.setattr(window.transfer_viewmodel, "pull_selected", lambda paths, d: calls.append((paths, d)))
+
+        window.files_page.pullRequested.emit(["/sdcard/a.jpg"], "/tmp/out")
+
+        assert calls == [(["/sdcard/a.jpg"], "/tmp/out")]
+        assert window.sidebar.currentRow() == 2
+
+    def test_search_pull_requested_switches_to_transfer_and_pulls(self, qtbot, monkeypatch):
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        calls = []
+        monkeypatch.setattr(window.transfer_viewmodel, "pull_selected", lambda paths, d: calls.append((paths, d)))
+
+        window.search_page.pullRequested.emit(["/sdcard/b.jpg"], "/tmp/out2")
+
+        assert calls == [(["/sdcard/b.jpg"], "/tmp/out2")]
+        assert window.sidebar.currentRow() == 2
+
+
+class TestNewViewModelWiring:
+    def test_files_log_message_appends_to_log_panel(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        window.files_viewmodel.logMessage.emit("files hello", "INFO")
+
+        assert "files hello" in window.log_panel.toPlainText()
+
+    def test_transfer_busy_changed_shows_progress_bar(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+        window.show()
+
+        window.transfer_viewmodel.busyChanged.emit(True)
+        assert window.busy_bar.isVisible() is True
+
+        window.transfer_viewmodel.busyChanged.emit(False)
+        assert window.busy_bar.isVisible() is False
+
+    def test_search_status_changed_updates_status_bar(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        window.search_viewmodel.statusChanged.emit("search error")
+
+        assert window.statusBar().currentMessage() == "search error"

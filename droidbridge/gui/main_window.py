@@ -18,8 +18,14 @@ from PyQt6.QtWidgets import (
 from droidbridge.gui import theme
 from droidbridge.gui.device_context import DeviceContext
 from droidbridge.gui.pages.device import DevicePage
+from droidbridge.gui.pages.files import FilesPage
 from droidbridge.gui.pages.placeholder import PlaceholderPage
+from droidbridge.gui.pages.search import SearchPage
+from droidbridge.gui.pages.transfer import TransferPage
 from droidbridge.gui.viewmodels.device import DeviceViewModel
+from droidbridge.gui.viewmodels.files import FilesViewModel
+from droidbridge.gui.viewmodels.search import SearchViewModel
+from droidbridge.gui.viewmodels.transfer import TransferViewModel
 from droidbridge.gui.widgets.log_panel import LogPanel
 
 MODULES = [
@@ -45,13 +51,23 @@ class MainWindow(QMainWindow):
         self.context = context or DeviceContext()
         self.session_logger = session_logger
         self.device_viewmodel = DeviceViewModel(self.context)
+        self.files_viewmodel = FilesViewModel(self.context)
+        self.transfer_viewmodel = TransferViewModel(self.context)
+        self.search_viewmodel = SearchViewModel(self.context)
 
         self.sidebar = QListWidget()
         self.sidebar.addItems(MODULES)
 
+        self.files_page = FilesPage(self.files_viewmodel)
+        self.transfer_page = TransferPage(self.transfer_viewmodel)
+        self.search_page = SearchPage(self.search_viewmodel)
+
         self.stack = QStackedWidget()
         self.stack.addWidget(DevicePage(self.device_viewmodel))
-        for name in MODULES[1:]:
+        self.stack.addWidget(self.files_page)
+        self.stack.addWidget(self.transfer_page)
+        self.stack.addWidget(self.search_page)
+        for name in MODULES[4:]:
             self.stack.addWidget(PlaceholderPage(name))
         self.sidebar.currentRowChanged.connect(self.stack.setCurrentIndex)
         self.sidebar.setCurrentRow(0)
@@ -108,6 +124,14 @@ class MainWindow(QMainWindow):
         )
         self.device_viewmodel.logMessage.connect(self._on_log_message)
 
+        self.files_page.pullRequested.connect(self._on_pull_requested)
+        self.search_page.pullRequested.connect(self._on_pull_requested)
+
+        for vm in (self.files_viewmodel, self.transfer_viewmodel, self.search_viewmodel):
+            vm.statusChanged.connect(self.statusBar().showMessage)
+            vm.busyChanged.connect(self.busy_bar.setVisible)
+            vm.logMessage.connect(self._on_log_message)
+
         self._on_connection_changed(
             self.context.is_connected, self.context.serial or "", self.context.model or ""
         )
@@ -116,6 +140,10 @@ class MainWindow(QMainWindow):
         color = "green" if connected else "red"
         self.status_dot.setStyleSheet(f"background-color: {color}; border-radius: 6px;")
         self.status_text.setText(f"{model} ({serial})" if connected else "Disconnected")
+
+    def _on_pull_requested(self, remote_paths, local_dir):
+        self.transfer_viewmodel.pull_selected(remote_paths, local_dir)
+        self.sidebar.setCurrentRow(2)
 
     def _on_log_message(self, message, level):
         if self.session_logger is not None:
