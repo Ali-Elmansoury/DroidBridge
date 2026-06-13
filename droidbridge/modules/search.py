@@ -17,6 +17,8 @@ PRESET_EXTENSIONS = {
     "apks": ["apk"],
 }
 
+PRESET_NAMES = ("whatsapp", "photos", "videos", "documents", "apks", "large", "old", "no-extension")
+
 LARGE_FILE_THRESHOLD = 50 * 1024 * 1024
 OLD_FILE_AGE = timedelta(days=365)
 

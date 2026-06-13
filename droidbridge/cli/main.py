@@ -185,9 +185,6 @@ def _format_result_line(result):
     return f"{size:>10}  {date}  {result.path}"
 
 
-PRESET_NAMES = ("whatsapp", "photos", "videos", "documents", "apks", "large", "old", "no-extension")
-
-
 @files_cmd.command("search")
 @click.argument("path", default=None, required=False)
 @click.option(
@@ -220,7 +217,7 @@ PRESET_NAMES = ("whatsapp", "photos", "videos", "documents", "apks", "large", "o
 )
 @click.option(
     "--preset",
-    type=click.Choice(PRESET_NAMES),
+    type=click.Choice(search_module.PRESET_NAMES),
     default=None,
     help="Quick discovery preset.",
 )

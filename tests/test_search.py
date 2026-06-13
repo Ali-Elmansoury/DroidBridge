@@ -149,6 +149,20 @@ class TestSortResults:
         assert [r.path for r in result] == ["/c/c.pdf", "/b/B.txt", "/a/a.jpg"]
 
 
+class TestPresetNames:
+    def test_preset_names_contents(self):
+        assert search.PRESET_NAMES == (
+            "whatsapp",
+            "photos",
+            "videos",
+            "documents",
+            "apks",
+            "large",
+            "old",
+            "no-extension",
+        )
+
+
 class TestPresetFilters:
     def test_photos_preset(self):
         root, kwargs = search.preset_filters("photos")
