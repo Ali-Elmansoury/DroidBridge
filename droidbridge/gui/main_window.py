@@ -116,9 +116,13 @@ class MainWindow(QMainWindow):
         self.dark_theme_action.setChecked(theme.load_theme_pref() == theme.DARK)
         self.dark_theme_action.toggled.connect(self._on_theme_toggled)
 
+        self._busy_viewmodels = set()
+
         self.context.connectionChanged.connect(self._on_connection_changed)
         self.device_viewmodel.statusChanged.connect(self.statusBar().showMessage)
-        self.device_viewmodel.busyChanged.connect(self.busy_bar.setVisible)
+        self.device_viewmodel.busyChanged.connect(
+            lambda busy: self._on_busy_changed(self.device_viewmodel, busy)
+        )
         self.device_viewmodel.busyChanged.connect(
             lambda busy: self.connect_button.setEnabled(not busy)
         )
@@ -129,7 +133,7 @@ class MainWindow(QMainWindow):
 
         for vm in (self.files_viewmodel, self.transfer_viewmodel, self.search_viewmodel):
             vm.statusChanged.connect(self.statusBar().showMessage)
-            vm.busyChanged.connect(self.busy_bar.setVisible)
+            vm.busyChanged.connect(lambda busy, vm=vm: self._on_busy_changed(vm, busy))
             vm.logMessage.connect(self._on_log_message)
 
         self._on_connection_changed(
@@ -140,6 +144,19 @@ class MainWindow(QMainWindow):
         color = "green" if connected else "red"
         self.status_dot.setStyleSheet(f"background-color: {color}; border-radius: 6px;")
         self.status_text.setText(f"{model} ({serial})" if connected else "Disconnected")
+
+    def _on_busy_changed(self, vm, busy):
+        """Show the busy bar while *any* viewmodel is busy.
+
+        Each page's viewmodel reports its own busy state independently (e.g.
+        Device's auto-refresh timer can fire while Search is still running),
+        so the bar must stay visible until none of them are busy anymore.
+        """
+        if busy:
+            self._busy_viewmodels.add(vm)
+        else:
+            self._busy_viewmodels.discard(vm)
+        self.busy_bar.setVisible(bool(self._busy_viewmodels))
 
     def _on_pull_requested(self, remote_paths, local_dir):
         self.transfer_viewmodel.pull_selected(remote_paths, local_dir)

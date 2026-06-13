@@ -75,6 +75,25 @@ class TestMainWindow:
         window.device_viewmodel.busyChanged.emit(False)
         assert window.busy_bar.isVisible() is False
 
+    def test_busy_bar_stays_visible_while_another_viewmodel_is_still_busy(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+        window.show()
+
+        # Search starts a long-running operation.
+        window.search_viewmodel.busyChanged.emit(True)
+        assert window.busy_bar.isVisible() is True
+
+        # Device's auto-refresh fires and finishes while Search is still busy.
+        window.device_viewmodel.busyChanged.emit(True)
+        window.device_viewmodel.busyChanged.emit(False)
+
+        assert window.busy_bar.isVisible() is True
+
+        # Once Search also finishes, the bar hides.
+        window.search_viewmodel.busyChanged.emit(False)
+        assert window.busy_bar.isVisible() is False
+
     def test_busy_changed_disables_connect_button(self, qtbot):
         window = MainWindow()
         qtbot.addWidget(window)
