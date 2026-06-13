@@ -206,6 +206,14 @@ ADB-powered file transfer that is 3–5x faster than standard MTP, with resume s
 - Ask each time: prompt user per conflict
 - Remember choice for session
 
+> **Resume takes precedence over conflict mode:** a destination file is only
+> a *conflict* (subject to skip/overwrite/rename above) if it has the **same
+> name but a different size** than the source — a genuine naming collision
+> between two different files. If a destination file already exists with the
+> **same name and the same size** as the source, it's treated as
+> "already transferred" (resume support, §3.3) and is left alone regardless
+> of the selected conflict mode.
+
 ### 3.5 Post-Transfer Verification
 
 - File count verification: source vs destination
