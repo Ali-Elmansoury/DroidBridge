@@ -113,7 +113,7 @@ class FilesPage(QWidget):
         self.sort_combo.currentTextChanged.connect(self._on_sort_changed)
         self.reverse_checkbox.toggled.connect(self._on_sort_changed)
         self.show_hidden_checkbox.toggled.connect(self.viewmodel.set_show_hidden)
-        self.extension_edit.editingFinished.connect(self._on_extension_filter_changed)
+        self.extension_edit.textChanged.connect(self._on_extension_filter_changed)
         self.select_all_button.clicked.connect(self.table.selectAll)
         self.deselect_all_button.clicked.connect(self.table.clearSelection)
         self.invert_selection_button.clicked.connect(self._on_invert_selection)

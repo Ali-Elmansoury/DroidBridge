@@ -150,9 +150,22 @@ class TestSortFilterControls:
         assert ".hidden.txt" in names()
 
         page.extension_edit.setText("jpg")
-        page.extension_edit.editingFinished.emit()
 
         assert names() == ["photo.jpg", "Camera"]
+
+    def test_extension_filter_updates_live_as_typed(self, qtbot, monkeypatch):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        monkeypatch.setattr(files_ops, "list_path", lambda client, serial, path, **kw: SAMPLE_ENTRIES)
+        vm.navigate("/sdcard")
+
+        names = lambda: [page.table.item(r, 0).text() for r in range(page.table.rowCount())]
+        assert names() == ["Camera", "notes.txt", "photo.jpg"]
+
+        qtbot.keyClicks(page.extension_edit, "jpg")
+
+        assert names() == ["Camera", "photo.jpg"]
 
 
 class TestSelection:
