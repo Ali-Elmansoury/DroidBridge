@@ -21,6 +21,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from droidbridge.gui import files_ops
+from droidbridge.gui.widgets.remote_browse_dialog import RemoteBrowseDialog
 from droidbridge.modules import transfer as transfer_module
 from droidbridge.utils.format import format_bytes
 
@@ -47,8 +49,13 @@ class TransferPage(QWidget):
         mode_bar.addStretch()
 
         self.remote_path_edit = QLineEdit()
+        self.remote_path_browse_button = QPushButton("Browse...")
         self.local_dir_edit = QLineEdit()
         self.local_dir_browse_button = QPushButton("Browse...")
+
+        remote_path_row = QHBoxLayout()
+        remote_path_row.addWidget(self.remote_path_edit)
+        remote_path_row.addWidget(self.remote_path_browse_button)
 
         local_dir_row = QHBoxLayout()
         local_dir_row.addWidget(self.local_dir_edit)
@@ -56,23 +63,28 @@ class TransferPage(QWidget):
 
         self.pull_group = QWidget()
         pull_layout = QFormLayout(self.pull_group)
-        pull_layout.addRow("Remote path:", self.remote_path_edit)
+        pull_layout.addRow("Remote path:", remote_path_row)
         pull_layout.addRow("Local folder:", local_dir_row)
 
         self.local_path_edit = QLineEdit()
         self.local_file_browse_button = QPushButton("Browse File...")
         self.local_folder_browse_button = QPushButton("Browse Folder...")
         self.remote_dir_edit = QLineEdit()
+        self.remote_dir_browse_button = QPushButton("Browse...")
 
         local_path_row = QHBoxLayout()
         local_path_row.addWidget(self.local_path_edit)
         local_path_row.addWidget(self.local_file_browse_button)
         local_path_row.addWidget(self.local_folder_browse_button)
 
+        remote_dir_row = QHBoxLayout()
+        remote_dir_row.addWidget(self.remote_dir_edit)
+        remote_dir_row.addWidget(self.remote_dir_browse_button)
+
         self.push_group = QWidget()
         push_layout = QFormLayout(self.push_group)
         push_layout.addRow("Local path:", local_path_row)
-        push_layout.addRow("Remote folder:", self.remote_dir_edit)
+        push_layout.addRow("Remote folder:", remote_dir_row)
 
         self.push_group.setVisible(False)
 
@@ -122,6 +134,8 @@ class TransferPage(QWidget):
         self.local_dir_browse_button.clicked.connect(self._on_browse_local_dir)
         self.local_file_browse_button.clicked.connect(self._on_browse_local_file)
         self.local_folder_browse_button.clicked.connect(self._on_browse_local_folder)
+        self.remote_path_browse_button.clicked.connect(self._on_browse_remote_path)
+        self.remote_dir_browse_button.clicked.connect(self._on_browse_remote_dir)
         self.start_button.clicked.connect(self._on_start_clicked)
         self.cancel_button.clicked.connect(self.viewmodel.cancel_transfer)
 
@@ -145,6 +159,20 @@ class TransferPage(QWidget):
         path = QFileDialog.getExistingDirectory(self, "Select folder to push")
         if path:
             self.local_path_edit.setText(path)
+
+    def _on_browse_remote_path(self):
+        self._browse_remote(self.remote_path_edit, mode="any")
+
+    def _on_browse_remote_dir(self):
+        self._browse_remote(self.remote_dir_edit, mode="directory")
+
+    def _browse_remote(self, line_edit, mode):
+        client, serial = self.viewmodel.context.client, self.viewmodel.context.serial
+        current = line_edit.text().strip()
+        start_path = current if current.startswith("/") else files_ops.QUICK_JUMP_PATHS["Root"]
+        path = RemoteBrowseDialog.get_remote_path(self, client, serial, start_path, mode=mode)
+        if path:
+            line_edit.setText(path)
 
     def _on_start_clicked(self):
         conflict = self.conflict_combo.currentText()

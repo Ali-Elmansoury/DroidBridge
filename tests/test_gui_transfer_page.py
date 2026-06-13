@@ -8,6 +8,7 @@ from PyQt6.QtWidgets import QFileDialog
 from droidbridge.gui.device_context import DeviceContext
 from droidbridge.gui.pages.transfer import TransferPage
 from droidbridge.gui.viewmodels.transfer import TransferViewModel
+from droidbridge.gui.widgets.remote_browse_dialog import RemoteBrowseDialog
 from droidbridge.modules import transfer as transfer_module
 from droidbridge.utils.format import format_bytes
 from tests.test_gui_viewmodels_device import FakeWorker
@@ -213,3 +214,48 @@ class TestBrowseButtons:
         qtbot.mouseClick(page.local_folder_browse_button, Qt.MouseButton.LeftButton)
 
         assert page.local_path_edit.text() == "/tmp/folder"
+
+    def test_browse_remote_path_fills_pull_field(self, qtbot, monkeypatch):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        calls = []
+
+        def fake_get_remote_path(parent, client, serial, start_path, mode="any"):
+            calls.append((start_path, mode))
+            return "/sdcard/DCIM"
+
+        monkeypatch.setattr(RemoteBrowseDialog, "get_remote_path", staticmethod(fake_get_remote_path))
+
+        qtbot.mouseClick(page.remote_path_browse_button, Qt.MouseButton.LeftButton)
+
+        assert page.remote_path_edit.text() == "/sdcard/DCIM"
+        assert calls == [("/sdcard", "any")]
+
+    def test_browse_remote_dir_fills_push_field(self, qtbot, monkeypatch):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        calls = []
+
+        def fake_get_remote_path(parent, client, serial, start_path, mode="any"):
+            calls.append((start_path, mode))
+            return "/sdcard/Pictures"
+
+        monkeypatch.setattr(RemoteBrowseDialog, "get_remote_path", staticmethod(fake_get_remote_path))
+
+        qtbot.mouseClick(page.remote_dir_browse_button, Qt.MouseButton.LeftButton)
+
+        assert page.remote_dir_edit.text() == "/sdcard/Pictures"
+        assert calls == [("/sdcard", "directory")]
+
+    def test_browse_remote_path_cancelled_leaves_field_unchanged(self, qtbot, monkeypatch):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+        page.remote_path_edit.setText("/sdcard/Existing")
+
+        monkeypatch.setattr(RemoteBrowseDialog, "get_remote_path", staticmethod(lambda *a, **k: None))
+
+        qtbot.mouseClick(page.remote_path_browse_button, Qt.MouseButton.LeftButton)
+
+        assert page.remote_path_edit.text() == "/sdcard/Existing"
