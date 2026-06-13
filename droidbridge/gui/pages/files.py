@@ -21,6 +21,7 @@ from PyQt6.QtWidgets import (
 )
 
 from droidbridge.gui import files_ops
+from droidbridge.gui.widgets.deselectable_table import DeselectableTableWidget
 from droidbridge.modules import files as files_module
 from droidbridge.utils.format import format_bytes
 
@@ -71,7 +72,7 @@ class FilesPage(QWidget):
         toolbar.addWidget(self.show_hidden_checkbox)
         toolbar.addWidget(self.extension_edit)
 
-        self.table = QTableWidget(0, len(_COLUMNS))
+        self.table = DeselectableTableWidget(0, len(_COLUMNS))
         self.table.setHorizontalHeaderLabels(_COLUMNS)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QTableWidget.SelectionMode.ExtendedSelection)
@@ -117,6 +118,7 @@ class FilesPage(QWidget):
         self.deselect_all_button.clicked.connect(self.table.clearSelection)
         self.invert_selection_button.clicked.connect(self._on_invert_selection)
         self.table.itemSelectionChanged.connect(self._on_selection_changed)
+        self.table.itemDoubleClicked.connect(self._on_row_double_clicked)
         self.pull_selected_button.clicked.connect(self._on_pull_selected)
 
         self.viewmodel.entriesChanged.connect(self._on_entries_changed)
@@ -153,6 +155,11 @@ class FilesPage(QWidget):
             self.viewmodel.select_entry(self._rows[selected_rows[0]]["entry"])
         else:
             self.viewmodel.select_entry(None)
+
+    def _on_row_double_clicked(self, item):
+        row = self._rows[item.row()]
+        if row["is_dir"]:
+            self.viewmodel.navigate(row["path"])
 
     def _on_invert_selection(self):
         selection_model = self.table.selectionModel()

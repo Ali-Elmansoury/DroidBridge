@@ -11,6 +11,7 @@ from droidbridge.gui import files_ops, preview_ops
 from droidbridge.gui.device_context import DeviceContext
 from droidbridge.gui.pages.files import FilesPage
 from droidbridge.gui.viewmodels.files import FilesViewModel
+from droidbridge.gui.widgets.deselectable_table import DeselectableTableWidget
 from droidbridge.modules.files import FileEntry
 from droidbridge.utils.format import format_bytes
 from tests.test_gui_viewmodels_device import FakeWorker
@@ -280,3 +281,35 @@ class TestPullSelected:
         vm.entriesChanged.emit(SAMPLE_ROWS)
 
         assert page.pull_selected_button.isEnabled() is False
+
+
+class TestRowDoubleClick:
+    def test_table_is_deselectable(self, qtbot):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        assert isinstance(page.table, DeselectableTableWidget)
+
+    def test_double_click_directory_navigates(self, qtbot, monkeypatch):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+        vm.entriesChanged.emit(SAMPLE_ROWS)  # row 0 = Camera (dir), row 1 = photo.jpg (file)
+
+        calls = []
+        monkeypatch.setattr(vm, "navigate", lambda path: calls.append(path))
+
+        page.table.itemDoubleClicked.emit(page.table.item(0, 0))
+
+        assert calls == ["/sdcard/Camera"]
+
+    def test_double_click_file_does_nothing(self, qtbot, monkeypatch):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+        vm.entriesChanged.emit(SAMPLE_ROWS)
+
+        calls = []
+        monkeypatch.setattr(vm, "navigate", lambda path: calls.append(path))
+
+        page.table.itemDoubleClicked.emit(page.table.item(1, 0))
+
+        assert calls == []
