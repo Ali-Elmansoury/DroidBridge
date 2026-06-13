@@ -3,7 +3,9 @@ info`. Purely declarative — binds to DeviceViewModel signals/slots, no formatt
 AdbClient calls of its own.
 """
 
+from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QFormLayout,
     QHBoxLayout,
     QLabel,
@@ -23,6 +25,14 @@ class DevicePage(QWidget):
 
         self.refresh_button = QPushButton("Refresh")
         self.refresh_button.setEnabled(viewmodel.context.is_connected)
+
+        self.auto_refresh_checkbox = QCheckBox("Auto-refresh")
+        self.auto_refresh_checkbox.setChecked(True)
+
+        self._busy = False
+        self._refresh_timer = QTimer(self)
+        self._refresh_timer.setInterval(15000)
+        self._refresh_timer.timeout.connect(self._on_refresh_timer)
 
         self.serial_label = QLabel("-")
         self.model_label = QLabel("-")
@@ -46,6 +56,7 @@ class DevicePage(QWidget):
 
         buttons = QHBoxLayout()
         buttons.addWidget(self.refresh_button)
+        buttons.addWidget(self.auto_refresh_checkbox)
         buttons.addStretch()
 
         layout = QVBoxLayout(self)
@@ -57,6 +68,7 @@ class DevicePage(QWidget):
         self.viewmodel.infoChanged.connect(self._on_info_changed)
         self.viewmodel.busyChanged.connect(self._on_busy_changed)
         self.viewmodel.context.connectionChanged.connect(self._on_connection_changed)
+        self.auto_refresh_checkbox.toggled.connect(self._update_timer_state)
 
     def _on_info_changed(self, info):
         self.serial_label.setText(info["serial"])
@@ -72,7 +84,19 @@ class DevicePage(QWidget):
         self.storage_bar.setValue(int(info["storage_used_percent"]))
 
     def _on_busy_changed(self, busy):
+        self._busy = busy
         self.refresh_button.setEnabled(not busy and self.viewmodel.context.is_connected)
+
+    def _on_refresh_timer(self):
+        if not self._busy:
+            self.viewmodel.refresh()
+
+    def _update_timer_state(self):
+        if self.viewmodel.context.is_connected and self.auto_refresh_checkbox.isChecked():
+            self._refresh_timer.start()
+        else:
+            self._refresh_timer.stop()
 
     def _on_connection_changed(self, connected, _serial, _model):
         self.refresh_button.setEnabled(connected)
+        self._update_timer_state()

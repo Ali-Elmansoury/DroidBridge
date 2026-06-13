@@ -61,3 +61,62 @@ class TestDevicePage:
         context.set_connected(MagicMock(), "SERIAL123", "Pixel 7")
 
         assert page.refresh_button.isEnabled() is True
+
+
+class TestAutoRefresh:
+    def test_checkbox_checked_by_default(self, qtbot):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        assert page.auto_refresh_checkbox.isChecked() is True
+
+    def test_connecting_starts_timer(self, qtbot):
+        page, _vm, context = _make_page()
+        qtbot.addWidget(page)
+
+        context.set_connected(MagicMock(), "SERIAL123", "Pixel 7")
+
+        assert page._refresh_timer.isActive() is True
+        assert page._refresh_timer.interval() == 15000
+
+    def test_unchecking_checkbox_stops_timer(self, qtbot):
+        page, _vm, context = _make_page()
+        qtbot.addWidget(page)
+        context.set_connected(MagicMock(), "SERIAL123", "Pixel 7")
+
+        page.auto_refresh_checkbox.setChecked(False)
+
+        assert page._refresh_timer.isActive() is False
+
+    def test_disconnecting_stops_timer(self, qtbot):
+        page, _vm, context = _make_page()
+        qtbot.addWidget(page)
+        context.set_connected(MagicMock(), "SERIAL123", "Pixel 7")
+
+        context.clear()
+
+        assert page._refresh_timer.isActive() is False
+
+    def test_refresh_timer_calls_refresh_when_idle(self, qtbot, monkeypatch):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        calls = []
+        monkeypatch.setattr(vm, "refresh", lambda: calls.append(True))
+
+        page._busy = False
+        page._on_refresh_timer()
+
+        assert calls == [True]
+
+    def test_refresh_timer_skips_when_busy(self, qtbot, monkeypatch):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        calls = []
+        monkeypatch.setattr(vm, "refresh", lambda: calls.append(True))
+
+        page._busy = True
+        page._on_refresh_timer()
+
+        assert calls == []
