@@ -116,17 +116,22 @@ def filter_entries(
     after=None,
     before=None,
     include_hidden=True,
+    dirs_pass_extension_filter=True,
 ):
     """Filter entries by extension, size range, date range, and hidden status.
 
     Directories always pass the `extensions` filter (so navigation still
-    works), but are still subject to the other filters.
+    works), but are still subject to the other filters. Pass
+    `dirs_pass_extension_filter=False` to hide directories too whenever an
+    extension filter is active.
     """
     result = []
     for entry in entries:
         if not include_hidden and entry.name.startswith("."):
             continue
         if entry.is_dir:
+            if extensions is not None and not dirs_pass_extension_filter:
+                continue
             result.append(entry)
             continue
         if extensions is not None and entry.extension not in extensions:

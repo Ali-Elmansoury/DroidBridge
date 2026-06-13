@@ -167,6 +167,28 @@ class TestSortFilterControls:
 
         assert names() == ["Camera", "photo.jpg"]
 
+    def test_dirs_pass_filter_checkbox_checked_by_default(self, qtbot):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        assert page.dirs_pass_filter_checkbox.isChecked() is True
+
+    def test_unchecking_dirs_pass_filter_hides_directories(self, qtbot, monkeypatch):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        monkeypatch.setattr(files_ops, "list_path", lambda client, serial, path, **kw: SAMPLE_ENTRIES)
+        vm.navigate("/sdcard")
+
+        names = lambda: [page.table.item(r, 0).text() for r in range(page.table.rowCount())]
+
+        qtbot.keyClicks(page.extension_edit, "jpg")
+        assert names() == ["Camera", "photo.jpg"]
+
+        page.dirs_pass_filter_checkbox.setChecked(False)
+
+        assert names() == ["photo.jpg"]
+
 
 class TestSelection:
     def test_single_selection_calls_select_entry(self, qtbot, monkeypatch):

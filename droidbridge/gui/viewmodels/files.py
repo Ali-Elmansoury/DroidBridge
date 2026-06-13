@@ -48,6 +48,7 @@ class FilesViewModel(QObject):
         self._reverse = False
         self._show_hidden = False
         self._extensions = None
+        self._dirs_pass_extension_filter = True
         self._preview_generation = 0
 
     def navigate(self, path):
@@ -77,6 +78,11 @@ class FilesViewModel(QObject):
     def set_extension_filter(self, extensions):
         """Re-filter the already-fetched entries client-side and re-emit entriesChanged."""
         self._extensions = extensions
+        self._refilter_and_resort()
+
+    def set_dirs_pass_extension_filter(self, dirs_pass_extension_filter):
+        """Re-filter the already-fetched entries client-side and re-emit entriesChanged."""
+        self._dirs_pass_extension_filter = dirs_pass_extension_filter
         self._refilter_and_resort()
 
     def select_entry(self, entry_or_none):
@@ -112,7 +118,10 @@ class FilesViewModel(QObject):
 
     def _refilter_and_resort(self):
         entries = files_module.filter_entries(
-            self._entries, extensions=self._extensions, include_hidden=self._show_hidden
+            self._entries,
+            extensions=self._extensions,
+            include_hidden=self._show_hidden,
+            dirs_pass_extension_filter=self._dirs_pass_extension_filter,
         )
         entries = files_module.sort_entries(entries, by=self._sort_by, reverse=self._reverse)
         self.entriesChanged.emit([_format_entry(e) for e in entries])

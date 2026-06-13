@@ -165,6 +165,13 @@ class TestFilterEntries:
 
         assert [e.name for e in result] == ["photo.jpg", "Folder"]
 
+    def test_filter_by_extension_can_exclude_directories(self):
+        result = files.filter_entries(
+            self._entries(), extensions=["jpg"], dirs_pass_extension_filter=False
+        )
+
+        assert [e.name for e in result] == ["photo.jpg"]
+
     def test_filter_by_min_size(self):
         result = files.filter_entries(self._entries(), min_size=1_000_000)
 

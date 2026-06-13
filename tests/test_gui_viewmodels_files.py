@@ -133,6 +133,20 @@ class TestSetters:
         rows = rows_events[-1]
         assert [r["name"] for r in rows] == ["Camera", "photo.jpg"]
 
+    def test_set_dirs_pass_extension_filter(self, qtbot, monkeypatch):
+        vm = FilesViewModel(_connected_context(), worker_factory=FakeWorker)
+        monkeypatch.setattr(files_ops, "list_path", lambda client, serial, path, **kw: SAMPLE_ENTRIES)
+        vm.navigate("/sdcard")
+        vm.set_extension_filter(["jpg"])
+
+        rows_events = []
+        vm.entriesChanged.connect(rows_events.append)
+
+        vm.set_dirs_pass_extension_filter(False)
+
+        rows = rows_events[-1]
+        assert [r["name"] for r in rows] == ["photo.jpg"]
+
 
 class TestSelectEntry:
     def test_previewable_image_emits_image_preview(self, qtbot, monkeypatch):

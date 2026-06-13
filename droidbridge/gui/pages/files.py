@@ -64,6 +64,8 @@ class FilesPage(QWidget):
         self.show_hidden_checkbox = QCheckBox("Show hidden")
         self.extension_edit = QLineEdit()
         self.extension_edit.setPlaceholderText("Extensions (comma-separated)")
+        self.dirs_pass_filter_checkbox = QCheckBox("Show folders when filtering")
+        self.dirs_pass_filter_checkbox.setChecked(True)
 
         toolbar = QHBoxLayout()
         toolbar.addWidget(QLabel("Sort by:"))
@@ -71,6 +73,7 @@ class FilesPage(QWidget):
         toolbar.addWidget(self.reverse_checkbox)
         toolbar.addWidget(self.show_hidden_checkbox)
         toolbar.addWidget(self.extension_edit)
+        toolbar.addWidget(self.dirs_pass_filter_checkbox)
 
         self.table = DeselectableTableWidget(0, len(_COLUMNS))
         self.table.setHorizontalHeaderLabels(_COLUMNS)
@@ -114,6 +117,7 @@ class FilesPage(QWidget):
         self.reverse_checkbox.toggled.connect(self._on_sort_changed)
         self.show_hidden_checkbox.toggled.connect(self.viewmodel.set_show_hidden)
         self.extension_edit.textChanged.connect(self._on_extension_filter_changed)
+        self.dirs_pass_filter_checkbox.toggled.connect(self.viewmodel.set_dirs_pass_extension_filter)
         self.select_all_button.clicked.connect(self.table.selectAll)
         self.deselect_all_button.clicked.connect(self.table.clearSelection)
         self.invert_selection_button.clicked.connect(self._on_invert_selection)
