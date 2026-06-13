@@ -167,6 +167,15 @@ class TestSortFilterControls:
 
         assert names() == ["Camera", "photo.jpg"]
 
+    def test_extension_edit_minimum_width_fits_placeholder(self, qtbot):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        metrics = page.extension_edit.fontMetrics()
+        placeholder_width = metrics.horizontalAdvance(page.extension_edit.placeholderText())
+
+        assert page.extension_edit.minimumWidth() >= placeholder_width
+
     def test_dirs_pass_filter_checkbox_checked_by_default(self, qtbot):
         page, _vm, _context = _make_page()
         qtbot.addWidget(page)
