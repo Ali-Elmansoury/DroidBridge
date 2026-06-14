@@ -8,6 +8,7 @@ from pathlib import PurePosixPath
 from typing import Optional
 
 from droidbridge.core.adb import AdbCommandError
+from droidbridge.modules import search as search_module
 
 _LS_LINE_RE = re.compile(
     r"^(?P<type>[bcdlpsD-])(?P<perms>[r\-wxsStT]{9})\s+"
@@ -170,3 +171,44 @@ def rename_path(client, serial, old_path, new_path):
     output = client.shell(serial, check_and_move).strip()
     if output == "EXISTS":
         raise AdbCommandError(["mv", old_path, new_path], 1, "", f"{new_path} already exists")
+
+
+@dataclass
+class DeletePlan:
+    """Preview of a delete: which top-level paths, total file count, total size."""
+
+    paths: list
+    file_count: int
+    total_size: int
+
+
+def _stat_path(client, serial, path):
+    """Return ('dir', None) or ('file', size_bytes) for `path`."""
+    cmd = (
+        f"if [ -d {shlex.quote(path)} ]; then echo DIR; "
+        f"else find -L {shlex.quote(path)} -maxdepth 0 -printf '%s'; fi"
+    )
+    output = client.shell(serial, cmd).strip()
+    if output == "DIR":
+        return "dir", None
+    return "file", int(output)
+
+
+def build_delete_plan(client, serial, paths):
+    """Stat each of `paths` (file or directory) and total up file count + size
+    for the delete confirmation preview. Directories are recursively scanned
+    via search_module.search_files (same approach as transfer.plan_pull).
+    """
+    file_count = 0
+    total_size = 0
+    for path in paths:
+        kind, size = _stat_path(client, serial, path)
+        if kind == "file":
+            file_count += 1
+            total_size += size
+        else:
+            for result in search_module.search_files(client, serial, path):
+                file_count += 1
+                total_size += result.size
+
+    return DeletePlan(paths=list(paths), file_count=file_count, total_size=total_size)

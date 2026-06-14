@@ -7,6 +7,8 @@ import pytest
 
 from droidbridge.core.adb import AdbCommandError
 from droidbridge.modules import files
+from droidbridge.modules import search as search_module
+from droidbridge.modules.search import SearchResult
 
 LS_OUTPUT_DCIM = (
     "total 2464\n"
@@ -229,3 +231,62 @@ class TestRenamePath:
             files.rename_path(client, "SERIAL", "/sdcard/old.txt", "/sdcard/new.txt")
 
         assert "already exists" in str(exc_info.value)
+
+
+class TestStatPath:
+    def test_file_returns_size(self):
+        client = make_fake_client("12345")
+
+        kind, size = files._stat_path(client, "SERIAL", "/sdcard/photo.jpg")
+
+        assert kind == "file"
+        assert size == 12345
+        client.shell.assert_called_once_with(
+            "SERIAL",
+            "if [ -d /sdcard/photo.jpg ]; then echo DIR; "
+            "else find -L /sdcard/photo.jpg -maxdepth 0 -printf '%s'; fi",
+        )
+
+    def test_directory_returns_dir(self):
+        client = make_fake_client("DIR\n")
+
+        kind, size = files._stat_path(client, "SERIAL", "/sdcard/DCIM")
+
+        assert kind == "dir"
+        assert size is None
+
+
+class TestBuildDeletePlan:
+    def test_single_file(self):
+        client = make_fake_client("100")
+
+        plan = files.build_delete_plan(client, "SERIAL", ["/sdcard/a.jpg"])
+
+        assert plan.paths == ["/sdcard/a.jpg"]
+        assert plan.file_count == 1
+        assert plan.total_size == 100
+
+    def test_single_directory_sums_search_results(self, monkeypatch):
+        client = make_fake_client("DIR\n")
+        results = [
+            SearchResult(path="/sdcard/DCIM/a.jpg", size=100, mtime=datetime(2024, 1, 1)),
+            SearchResult(path="/sdcard/DCIM/b.jpg", size=200, mtime=datetime(2024, 1, 2)),
+        ]
+        monkeypatch.setattr(search_module, "search_files", lambda c, s, p: results)
+
+        plan = files.build_delete_plan(client, "SERIAL", ["/sdcard/DCIM"])
+
+        assert plan.file_count == 2
+        assert plan.total_size == 300
+
+    def test_mixed_paths_totals_combine(self, monkeypatch):
+        client = MagicMock()
+        client.shell.side_effect = ["100", "DIR\n"]
+        results = [SearchResult(path="/sdcard/DCIM/a.jpg", size=200, mtime=datetime(2024, 1, 1))]
+        monkeypatch.setattr(search_module, "search_files", lambda c, s, p: results)
+
+        plan = files.build_delete_plan(client, "SERIAL", ["/sdcard/a.jpg", "/sdcard/DCIM"])
+
+        assert plan.paths == ["/sdcard/a.jpg", "/sdcard/DCIM"]
+        assert plan.file_count == 2
+        assert plan.total_size == 300
