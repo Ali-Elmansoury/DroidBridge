@@ -1,10 +1,13 @@
 """Tests for droidbridge.gui.widgets.delete_flow (Phase 6.3)."""
 
-from PyQt6.QtWidgets import QInputDialog, QMessageBox, QWidget
+from types import SimpleNamespace
+
+from PyQt6.QtWidgets import QFileDialog, QInputDialog, QMessageBox, QWidget
 
 from droidbridge.core.adb import AdbError
-from droidbridge.gui import delete_ops
+from droidbridge.gui import delete_ops, transfer_ops
 from droidbridge.gui.widgets import delete_flow
+from droidbridge.modules.files import DeletePlan, DeleteVerification
 from tests.test_gui_viewmodels_device import FakeWorker
 
 
@@ -114,3 +117,182 @@ class TestRunRenameFlow:
 
         assert result is None
         assert warnings
+
+
+def _clicked_button_by_text(text):
+    def clicked_button(self):
+        for button in self.buttons():
+            if button.text() == text:
+                return button
+        return None
+    return clicked_button
+
+
+class TestRunDeleteFlow:
+    def test_nothing_to_delete_shows_info(self, qtbot, monkeypatch):
+        parent = QWidget()
+        qtbot.addWidget(parent)
+        info_calls = []
+        monkeypatch.setattr(
+            delete_ops, "build_delete_plan",
+            lambda c, s, paths: DeletePlan(paths=[], file_count=0, total_size=0),
+        )
+        monkeypatch.setattr(QMessageBox, "information", staticmethod(lambda *a: info_calls.append(a[1:])))
+
+        result = delete_flow.run_delete_flow(parent, object(), "SERIAL", ["/sdcard/Empty"], worker_factory=FakeWorker)
+
+        assert result == set()
+        assert info_calls
+
+    def test_cancel_returns_empty_set(self, qtbot, monkeypatch):
+        parent = QWidget()
+        qtbot.addWidget(parent)
+        monkeypatch.setattr(
+            delete_ops, "build_delete_plan",
+            lambda c, s, paths: DeletePlan(paths=["/sdcard/a.jpg"], file_count=1, total_size=100),
+        )
+        monkeypatch.setattr(QMessageBox, "exec", lambda self: 0)
+        monkeypatch.setattr(QMessageBox, "clickedButton", _clicked_button_by_text("Cancel"))
+
+        result = delete_flow.run_delete_flow(parent, object(), "SERIAL", ["/sdcard/a.jpg"], worker_factory=FakeWorker)
+
+        assert result == set()
+
+    def test_delete_without_backup_confirmed(self, qtbot, monkeypatch):
+        parent = QWidget()
+        qtbot.addWidget(parent)
+        calls = []
+        monkeypatch.setattr(
+            delete_ops, "build_delete_plan",
+            lambda c, s, paths: DeletePlan(paths=["/sdcard/a.jpg"], file_count=1, total_size=100),
+        )
+        monkeypatch.setattr(delete_ops, "delete_paths", lambda c, s, paths: calls.append(paths))
+        monkeypatch.setattr(
+            delete_ops, "verify_deletion",
+            lambda c, s, paths: DeleteVerification(deleted=["/sdcard/a.jpg"], remaining=[]),
+        )
+        monkeypatch.setattr(QMessageBox, "exec", lambda self: 0)
+        monkeypatch.setattr(QMessageBox, "clickedButton", _clicked_button_by_text("Delete Without Backup"))
+        monkeypatch.setattr(QInputDialog, "getText", staticmethod(lambda *a, **k: ("YES DELETE", True)))
+
+        result = delete_flow.run_delete_flow(parent, object(), "SERIAL", ["/sdcard/a.jpg"], worker_factory=FakeWorker)
+
+        assert result == {"/sdcard/a.jpg"}
+        assert calls == [["/sdcard/a.jpg"]]
+
+    def test_delete_without_backup_wrong_confirmation(self, qtbot, monkeypatch):
+        parent = QWidget()
+        qtbot.addWidget(parent)
+        calls = []
+        monkeypatch.setattr(
+            delete_ops, "build_delete_plan",
+            lambda c, s, paths: DeletePlan(paths=["/sdcard/a.jpg"], file_count=1, total_size=100),
+        )
+        monkeypatch.setattr(delete_ops, "delete_paths", lambda c, s, paths: calls.append(paths))
+        monkeypatch.setattr(QMessageBox, "exec", lambda self: 0)
+        monkeypatch.setattr(QMessageBox, "clickedButton", _clicked_button_by_text("Delete Without Backup"))
+        monkeypatch.setattr(QInputDialog, "getText", staticmethod(lambda *a, **k: ("nope", True)))
+
+        result = delete_flow.run_delete_flow(parent, object(), "SERIAL", ["/sdcard/a.jpg"], worker_factory=FakeWorker)
+
+        assert result == set()
+        assert calls == []
+
+    def test_backup_dialog_cancelled_returns_empty_set(self, qtbot, monkeypatch):
+        parent = QWidget()
+        qtbot.addWidget(parent)
+        monkeypatch.setattr(
+            delete_ops, "build_delete_plan",
+            lambda c, s, paths: DeletePlan(paths=["/sdcard/a.jpg"], file_count=1, total_size=100),
+        )
+        monkeypatch.setattr(QMessageBox, "exec", lambda self: 0)
+        monkeypatch.setattr(QMessageBox, "clickedButton", _clicked_button_by_text("Back Up First..."))
+        monkeypatch.setattr(QFileDialog, "getExistingDirectory", staticmethod(lambda *a, **k: ""))
+
+        result = delete_flow.run_delete_flow(parent, object(), "SERIAL", ["/sdcard/a.jpg"], worker_factory=FakeWorker)
+
+        assert result == set()
+
+    def test_backup_verification_failure_aborts_delete(self, qtbot, monkeypatch):
+        parent = QWidget()
+        qtbot.addWidget(parent)
+        warn_calls = []
+        monkeypatch.setattr(
+            delete_ops, "build_delete_plan",
+            lambda c, s, paths: DeletePlan(paths=["/sdcard/a.jpg"], file_count=1, total_size=100),
+        )
+        monkeypatch.setattr(transfer_ops, "plan_pull_many", lambda c, s, paths, local_dir: ["plan1"])
+        monkeypatch.setattr(
+            transfer_ops, "execute_plans",
+            lambda c, s, plans, progress_callback=None: progress_callback and progress_callback("step"),
+        )
+        monkeypatch.setattr(
+            transfer_ops, "verify_plans",
+            lambda c, s, plans, direction, local_dir=None: SimpleNamespace(ok=False),
+        )
+        monkeypatch.setattr(QMessageBox, "exec", lambda self: 0)
+        monkeypatch.setattr(QMessageBox, "clickedButton", _clicked_button_by_text("Back Up First..."))
+        monkeypatch.setattr(QMessageBox, "warning", staticmethod(lambda *a: warn_calls.append(a[1:])))
+        monkeypatch.setattr(QFileDialog, "getExistingDirectory", staticmethod(lambda *a, **k: "/tmp/backup"))
+
+        result = delete_flow.run_delete_flow(parent, object(), "SERIAL", ["/sdcard/a.jpg"], worker_factory=FakeWorker)
+
+        assert result == set()
+        assert warn_calls
+
+    def test_backup_verified_then_delete_confirmed(self, qtbot, monkeypatch):
+        parent = QWidget()
+        qtbot.addWidget(parent)
+        calls = []
+        monkeypatch.setattr(
+            delete_ops, "build_delete_plan",
+            lambda c, s, paths: DeletePlan(paths=["/sdcard/a.jpg"], file_count=1, total_size=100),
+        )
+        monkeypatch.setattr(delete_ops, "delete_paths", lambda c, s, paths: calls.append(paths))
+        monkeypatch.setattr(
+            delete_ops, "verify_deletion",
+            lambda c, s, paths: DeleteVerification(deleted=["/sdcard/a.jpg"], remaining=[]),
+        )
+        monkeypatch.setattr(transfer_ops, "plan_pull_many", lambda c, s, paths, local_dir: ["plan1"])
+        monkeypatch.setattr(
+            transfer_ops, "execute_plans",
+            lambda c, s, plans, progress_callback=None: progress_callback and progress_callback("step"),
+        )
+        monkeypatch.setattr(
+            transfer_ops, "verify_plans",
+            lambda c, s, plans, direction, local_dir=None: SimpleNamespace(ok=True),
+        )
+        monkeypatch.setattr(QMessageBox, "exec", lambda self: 0)
+        monkeypatch.setattr(QMessageBox, "clickedButton", _clicked_button_by_text("Back Up First..."))
+        monkeypatch.setattr(QFileDialog, "getExistingDirectory", staticmethod(lambda *a, **k: "/tmp/backup"))
+        monkeypatch.setattr(QInputDialog, "getText", staticmethod(lambda *a, **k: ("YES DELETE", True)))
+
+        result = delete_flow.run_delete_flow(parent, object(), "SERIAL", ["/sdcard/a.jpg"], worker_factory=FakeWorker)
+
+        assert result == {"/sdcard/a.jpg"}
+        assert calls == [["/sdcard/a.jpg"]]
+
+    def test_partial_deletion_warns_about_remaining(self, qtbot, monkeypatch):
+        parent = QWidget()
+        qtbot.addWidget(parent)
+        warn_calls = []
+        monkeypatch.setattr(
+            delete_ops, "build_delete_plan",
+            lambda c, s, paths: DeletePlan(paths=["/sdcard/a.jpg", "/sdcard/b.jpg"], file_count=2, total_size=200),
+        )
+        monkeypatch.setattr(delete_ops, "delete_paths", lambda c, s, paths: None)
+        monkeypatch.setattr(
+            delete_ops, "verify_deletion",
+            lambda c, s, paths: DeleteVerification(deleted=["/sdcard/a.jpg"], remaining=["/sdcard/b.jpg"]),
+        )
+        monkeypatch.setattr(QMessageBox, "exec", lambda self: 0)
+        monkeypatch.setattr(QMessageBox, "clickedButton", _clicked_button_by_text("Delete Without Backup"))
+        monkeypatch.setattr(QMessageBox, "warning", staticmethod(lambda *a: warn_calls.append(a[1:])))
+        monkeypatch.setattr(QInputDialog, "getText", staticmethod(lambda *a, **k: ("YES DELETE", True)))
+
+        result = delete_flow.run_delete_flow(
+            parent, object(), "SERIAL", ["/sdcard/a.jpg", "/sdcard/b.jpg"], worker_factory=FakeWorker,
+        )
+
+        assert result == {"/sdcard/a.jpg"}
+        assert warn_calls
