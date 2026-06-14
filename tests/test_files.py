@@ -353,3 +353,51 @@ class TestVerifyDeletion:
 
         assert result.deleted == ["/sdcard/a.jpg", "/sdcard/b.jpg"]
         assert result.remaining == []
+
+
+class TestVerifyBackup:
+    def test_file_present_with_matching_size_is_not_missing(self, tmp_path):
+        (tmp_path / "a.jpg").write_bytes(b"x" * 100)
+        client = make_fake_client("100")
+
+        missing = files.verify_backup(client, "SERIAL", ["/sdcard/a.jpg"], str(tmp_path))
+
+        assert missing == []
+
+    def test_file_missing_is_reported(self, tmp_path):
+        client = make_fake_client("100")
+
+        missing = files.verify_backup(client, "SERIAL", ["/sdcard/a.jpg"], str(tmp_path))
+
+        assert missing == ["/sdcard/a.jpg"]
+
+    def test_file_size_mismatch_is_reported(self, tmp_path):
+        (tmp_path / "a.jpg").write_bytes(b"x" * 50)
+        client = make_fake_client("100")
+
+        missing = files.verify_backup(client, "SERIAL", ["/sdcard/a.jpg"], str(tmp_path))
+
+        assert missing == ["/sdcard/a.jpg"]
+
+    def test_directory_present_with_matching_files_is_not_missing(self, tmp_path, monkeypatch):
+        client = make_fake_client("DIR\n")
+        backup_dcim = tmp_path / "DCIM"
+        backup_dcim.mkdir()
+        (backup_dcim / "a.jpg").write_bytes(b"x" * 100)
+        results = [SearchResult(path="/sdcard/DCIM/a.jpg", size=100, mtime=datetime(2024, 1, 1))]
+        monkeypatch.setattr(search_module, "search_files", lambda c, s, p: results)
+
+        missing = files.verify_backup(client, "SERIAL", ["/sdcard/DCIM"], str(tmp_path))
+
+        assert missing == []
+
+    def test_directory_missing_file_is_reported(self, tmp_path, monkeypatch):
+        client = make_fake_client("DIR\n")
+        backup_dcim = tmp_path / "DCIM"
+        backup_dcim.mkdir()
+        results = [SearchResult(path="/sdcard/DCIM/a.jpg", size=100, mtime=datetime(2024, 1, 1))]
+        monkeypatch.setattr(search_module, "search_files", lambda c, s, p: results)
+
+        missing = files.verify_backup(client, "SERIAL", ["/sdcard/DCIM"], str(tmp_path))
+
+        assert missing == ["/sdcard/DCIM/a.jpg"]

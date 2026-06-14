@@ -1,5 +1,6 @@
 """Module 2 - File Browser: directory listing, sorting, filtering."""
 
+import os
 import re
 import shlex
 from dataclasses import dataclass
@@ -258,3 +259,28 @@ def verify_deletion(client, serial, paths):
         output = client.shell(serial, f"[ -e {shlex.quote(path)} ] && echo YES || echo NO").strip()
         (remaining if output == "YES" else deleted).append(path)
     return DeleteVerification(deleted=deleted, remaining=remaining)
+
+
+def verify_backup(client, serial, paths, backup_dir):
+    """Check that each of `paths` has a matching copy under `backup_dir`, using
+    the same destination layout `transfer.plan_pull` would produce when
+    pulling `path` into `backup_dir` (`<backup_dir>/<basename(path)>/...`).
+
+    Returns the list of source paths missing from the backup or whose on-disk
+    size doesn't match - empty means the backup is complete.
+    """
+    missing = []
+    for path in paths:
+        kind, size = _stat_path(client, serial, path)
+        name = PurePosixPath(path).name
+        if kind == "file":
+            backup_path = os.path.join(backup_dir, name)
+            if not os.path.exists(backup_path) or os.path.getsize(backup_path) != size:
+                missing.append(path)
+        else:
+            for result in search_module.search_files(client, serial, path):
+                rel = PurePosixPath(result.path).relative_to(path)
+                backup_path = os.path.join(backup_dir, name, *rel.parts)
+                if not os.path.exists(backup_path) or os.path.getsize(backup_path) != result.size:
+                    missing.append(result.path)
+    return missing
