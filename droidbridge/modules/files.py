@@ -212,3 +212,31 @@ def build_delete_plan(client, serial, paths):
                 total_size += result.size
 
     return DeletePlan(paths=list(paths), file_count=file_count, total_size=total_size)
+
+
+# Files per `rm -f` command - batching is 10-20x faster than one adb shell
+# call per file. Mirrors whatsapp.execute_delete_plan's _DELETE_BATCH_SIZE.
+_DELETE_BATCH_SIZE = 500
+
+
+def delete_paths(client, serial, paths):
+    """Delete `paths` (files and/or directories) from the device.
+
+    Directories are removed recursively, one `rm -rf` per directory (the
+    500-per-call batching applies to individual files, not subtrees - a
+    single `rm -rf` removes an entire subtree regardless of size). Files are
+    batched into `rm -f` calls of up to `_DELETE_BATCH_SIZE`.
+    """
+    dirs = []
+    files_to_delete = []
+    for path in paths:
+        kind, _size = _stat_path(client, serial, path)
+        (dirs if kind == "dir" else files_to_delete).append(path)
+
+    for directory in dirs:
+        client.shell(serial, f"rm -rf {shlex.quote(directory)}")
+
+    for i in range(0, len(files_to_delete), _DELETE_BATCH_SIZE):
+        batch = files_to_delete[i : i + _DELETE_BATCH_SIZE]
+        quoted = " ".join(shlex.quote(p) for p in batch)
+        client.shell(serial, f"rm -f {quoted}")

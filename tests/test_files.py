@@ -290,3 +290,46 @@ class TestBuildDeletePlan:
         assert plan.paths == ["/sdcard/a.jpg", "/sdcard/DCIM"]
         assert plan.file_count == 2
         assert plan.total_size == 300
+
+
+class TestDeletePaths:
+    def test_directory_removed_with_rm_rf(self):
+        client = MagicMock()
+        client.shell.side_effect = ["DIR\n", ""]
+
+        files.delete_paths(client, "SERIAL", ["/sdcard/DCIM"])
+
+        assert client.shell.call_args_list[1].args == ("SERIAL", "rm -rf /sdcard/DCIM")
+
+    def test_files_batched_into_single_rm_f_call(self):
+        client = MagicMock()
+        client.shell.side_effect = ["100", "200", ""]
+
+        files.delete_paths(client, "SERIAL", ["/sdcard/a.jpg", "/sdcard/b.jpg"])
+
+        assert client.shell.call_args_list[-1].args == (
+            "SERIAL", "rm -f /sdcard/a.jpg /sdcard/b.jpg",
+        )
+
+    def test_more_than_batch_size_splits_into_multiple_rm_calls(self):
+        client = MagicMock()
+        paths = [f"/sdcard/f{i}.jpg" for i in range(501)]
+        client.shell.side_effect = ["1"] * 501 + ["", ""]
+
+        files.delete_paths(client, "SERIAL", paths)
+
+        rm_calls = [c for c in client.shell.call_args_list if c.args[1].startswith("rm -f")]
+        assert len(rm_calls) == 2
+        assert len(rm_calls[0].args[1].split()[2:]) == 500
+        assert len(rm_calls[1].args[1].split()[2:]) == 1
+
+    def test_mixed_dirs_and_files(self):
+        client = MagicMock()
+        client.shell.side_effect = ["DIR\n", "100", "", ""]
+
+        files.delete_paths(client, "SERIAL", ["/sdcard/DCIM", "/sdcard/a.jpg"])
+
+        rm_rf_calls = [c.args[1] for c in client.shell.call_args_list if c.args[1].startswith("rm -rf")]
+        rm_f_calls = [c.args[1] for c in client.shell.call_args_list if c.args[1].startswith("rm -f")]
+        assert rm_rf_calls == ["rm -rf /sdcard/DCIM"]
+        assert rm_f_calls == ["rm -f /sdcard/a.jpg"]
