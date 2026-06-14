@@ -4,9 +4,13 @@ Both pages need the same "scan -> confirm -> delete -> verify" and "rename"
 flows; living here keeps that logic out of the page classes.
 """
 
-from PyQt6.QtCore import QEventLoop, Qt
-from PyQt6.QtWidgets import QMessageBox, QProgressDialog
+from pathlib import PurePosixPath
 
+from PyQt6.QtCore import QEventLoop, Qt
+from PyQt6.QtWidgets import QInputDialog, QMessageBox, QProgressDialog
+
+from droidbridge.core.adb import AdbError
+from droidbridge.gui import delete_ops, files_ops
 from droidbridge.gui.workers import Worker
 
 
@@ -66,3 +70,30 @@ def _run_with_progress(parent, fn, *args, title="Working...", worker_factory=Wor
         return None
 
     return result.get("value")
+
+
+def run_rename_flow(parent, client, serial, path):
+    """Prompt for a new name and rename `path` on the device.
+
+    Returns the new path, or None if the user cancelled, left the name
+    unchanged, entered an invalid name, or the rename failed.
+    """
+    old_name = PurePosixPath(path).name
+    new_name, ok = QInputDialog.getText(parent, "Rename", "New name:", text=old_name)
+    new_name = new_name.strip()
+    if not ok or not new_name or new_name == old_name:
+        return None
+
+    if "/" in new_name:
+        QMessageBox.warning(parent, "Rename", "Name cannot contain '/'.")
+        return None
+
+    new_path = files_ops.join_path(files_ops.parent_path(path), new_name)
+
+    try:
+        delete_ops.rename_path(client, serial, path, new_path)
+    except AdbError as exc:
+        QMessageBox.warning(parent, "Rename", str(exc))
+        return None
+
+    return new_path
