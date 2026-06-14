@@ -287,6 +287,34 @@ def files_search(path, serial, name, extensions, min_size, max_size, after, befo
         click.echo(_format_result_line(result))
 
 
+@files_cmd.command("rename")
+@click.argument("old_path")
+@click.argument("new_path")
+@click.option(
+    "--serial",
+    "-s",
+    default=None,
+    help="Device serial number (required if multiple devices are connected).",
+)
+def files_rename(old_path, new_path, serial):
+    """Rename/move OLD_PATH to NEW_PATH on the device."""
+    try:
+        client = _build_client()
+    except AdbError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+
+    serial = _resolve_serial(client, serial)
+
+    try:
+        files_module.rename_path(client, serial, old_path, new_path)
+    except AdbError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+
+    click.echo(f"Renamed {old_path} -> {new_path}")
+
+
 @cli.group("transfer")
 def transfer_cmd():
     """Transfer files between this computer and the device."""

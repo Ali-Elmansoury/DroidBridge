@@ -113,3 +113,28 @@ class TestFilesBrowse:
 
         assert result.exit_code == 1
         assert "no such file or directory" in result.output.lower()
+
+
+class TestFilesRename:
+    def test_success_prints_confirmation(self, monkeypatch):
+        client = make_fake_client(READY_DEVICE, shell_result="")
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(main.cli, ["files", "rename", "/sdcard/old.txt", "/sdcard/new.txt"])
+
+        assert result.exit_code == 0
+        assert "Renamed /sdcard/old.txt -> /sdcard/new.txt" in result.output
+        client.shell.assert_called_once_with(
+            "SERIAL123",
+            "if [ -e /sdcard/new.txt ]; then echo EXISTS; "
+            "else mv /sdcard/old.txt /sdcard/new.txt; fi",
+        )
+
+    def test_existing_target_shows_error_and_exits_nonzero(self, monkeypatch):
+        client = make_fake_client(READY_DEVICE, shell_result="EXISTS\n")
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(main.cli, ["files", "rename", "/sdcard/old.txt", "/sdcard/new.txt"])
+
+        assert result.exit_code == 1
+        assert "already exists" in result.output.lower()
