@@ -4,7 +4,7 @@ Both pages need the same "scan -> confirm -> delete -> verify" and "rename"
 flows; living here keeps that logic out of the page classes.
 """
 
-from PyQt6.QtCore import QEventLoop, Qt, QTimer
+from PyQt6.QtCore import QEventLoop, Qt
 from PyQt6.QtWidgets import QMessageBox, QProgressDialog
 
 from droidbridge.gui.workers import Worker
@@ -47,8 +47,16 @@ def _run_with_progress(parent, fn, *args, title="Working...", worker_factory=Wor
 
     loop = QEventLoop()
     dialog.show()
-    QTimer.singleShot(0, worker.start)
-    loop.exec()
+    # `worker` was moved to its own QThread via moveToThread, so deferring
+    # start() via QTimer.singleShot would queue the call onto that
+    # not-yet-running thread's event loop and deadlock. Call it directly;
+    # synchronous worker_factory implementations (e.g. tests' FakeWorker) may
+    # already populate `result` and call loop.quit() here, before loop.exec()
+    # has started - quit() on a not-yet-running loop is a no-op, so skip
+    # exec() entirely in that case to avoid hanging forever.
+    worker.start()
+    if not result:
+        loop.exec()
 
     dialog.close()
     worker.wait()

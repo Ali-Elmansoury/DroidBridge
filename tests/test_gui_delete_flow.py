@@ -7,6 +7,14 @@ from tests.test_gui_viewmodels_device import FakeWorker
 
 
 class TestRunWithProgress:
+    def test_real_worker_returns_value(self, qtbot):
+        parent = QWidget()
+        qtbot.addWidget(parent)
+
+        result = delete_flow._run_with_progress(parent, lambda: 42, title="Testing")
+
+        assert result == 42
+
     def test_success_returns_value(self, qtbot):
         parent = QWidget()
         qtbot.addWidget(parent)
