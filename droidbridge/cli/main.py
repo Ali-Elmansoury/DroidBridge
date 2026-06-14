@@ -315,6 +315,73 @@ def files_rename(old_path, new_path, serial):
     click.echo(f"Renamed {old_path} -> {new_path}")
 
 
+@files_cmd.command("delete")
+@click.argument("paths", nargs=-1, required=True)
+@click.option(
+    "--serial",
+    "-s",
+    default=None,
+    help="Device serial number (required if multiple devices are connected).",
+)
+@click.option(
+    "--backup-dir",
+    default=None,
+    type=click.Path(exists=True, file_okay=False),
+    help="Verify a backup of PATHS exists here before allowing deletion.",
+)
+@click.option("--yes", is_flag=True, help="Skip the confirmation prompt.")
+def files_delete(paths, serial, backup_dir, yes):
+    """Permanently delete one or more files/folders from the device."""
+    try:
+        client = _build_client()
+    except AdbError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+
+    serial = _resolve_serial(client, serial)
+
+    try:
+        plan = files_module.build_delete_plan(client, serial, list(paths))
+    except AdbError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+
+    if plan.file_count == 0:
+        click.echo("Nothing to delete.")
+        return
+
+    for path in plan.paths:
+        click.echo(f"  {path}")
+    file_word = "file" if plan.file_count == 1 else "files"
+    click.echo(f"This will permanently delete {plan.file_count} {file_word}, {format_bytes(plan.total_size)}.")
+
+    if backup_dir:
+        missing = files_module.verify_backup(client, serial, plan.paths, backup_dir)
+        if missing:
+            click.echo(
+                f"Error: {len(missing)} file(s) are not backed up at {backup_dir}.",
+                err=True,
+            )
+            sys.exit(1)
+
+    if not yes:
+        confirm = click.prompt("Type 'YES DELETE' to confirm", default="", show_default=False)
+        if confirm != "YES DELETE":
+            click.echo("Aborted.")
+            return
+
+    files_module.delete_paths(client, serial, plan.paths)
+
+    verification = files_module.verify_deletion(client, serial, plan.paths)
+    if verification.remaining:
+        click.echo(f"Warning: {len(verification.remaining)} path(s) could not be deleted:", err=True)
+        for path in verification.remaining:
+            click.echo(f"  {path}", err=True)
+        sys.exit(1)
+
+    click.echo(f"Deleted {len(verification.deleted)} path(s), {format_bytes(plan.total_size)}.")
+
+
 @cli.group("transfer")
 def transfer_cmd():
     """Transfer files between this computer and the device."""

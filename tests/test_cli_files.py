@@ -6,6 +6,7 @@ from click.testing import CliRunner
 
 from droidbridge.cli import main
 from droidbridge.core.adb import AdbCommandError, Device
+from droidbridge.modules import search as search_module
 from tests.test_files import LS_OUTPUT_DCIM, LS_OUTPUT_EMPTY
 
 
@@ -138,3 +139,77 @@ class TestFilesRename:
 
         assert result.exit_code == 1
         assert "already exists" in result.output.lower()
+
+
+class TestFilesDelete:
+    def test_nothing_to_delete_for_empty_directory(self, monkeypatch):
+        client = make_fake_client(READY_DEVICE)
+        client.shell.side_effect = ["DIR\n"]
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+        monkeypatch.setattr(search_module, "search_files", lambda c, s, p: [])
+
+        result = CliRunner().invoke(main.cli, ["files", "delete", "/sdcard/EmptyDir"])
+
+        assert result.exit_code == 0
+        assert "Nothing to delete." in result.output
+
+    def test_confirm_deletes_and_reports_result(self, monkeypatch):
+        client = make_fake_client(READY_DEVICE)
+        client.shell.side_effect = ["100", "100", "", "NO\n"]
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(
+            main.cli, ["files", "delete", "/sdcard/old.jpg"], input="YES DELETE\n"
+        )
+
+        assert result.exit_code == 0
+        assert "This will permanently delete 1 file, 100 B." in result.output
+        assert "Deleted 1 path(s), 100 B." in result.output
+
+    def test_wrong_confirmation_aborts_without_deleting(self, monkeypatch):
+        client = make_fake_client(READY_DEVICE)
+        client.shell.side_effect = ["100"]
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(
+            main.cli, ["files", "delete", "/sdcard/old.jpg"], input="nope\n"
+        )
+
+        assert result.exit_code == 0
+        assert "Aborted." in result.output
+        assert client.shell.call_count == 1
+
+    def test_yes_flag_skips_prompt(self, monkeypatch):
+        client = make_fake_client(READY_DEVICE)
+        client.shell.side_effect = ["100", "100", "", "NO\n"]
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(main.cli, ["files", "delete", "/sdcard/old.jpg", "--yes"])
+
+        assert result.exit_code == 0
+        assert "Deleted 1 path(s), 100 B." in result.output
+
+    def test_backup_dir_missing_files_blocks_deletion(self, monkeypatch, tmp_path):
+        client = make_fake_client(READY_DEVICE)
+        client.shell.side_effect = ["100", "100"]
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(
+            main.cli, ["files", "delete", "/sdcard/old.jpg", "--backup-dir", str(tmp_path)],
+        )
+
+        assert result.exit_code == 1
+        assert "not backed up" in result.output
+        assert client.shell.call_count == 2
+
+    def test_remaining_after_delete_warns_and_exits_nonzero(self, monkeypatch):
+        client = make_fake_client(READY_DEVICE)
+        client.shell.side_effect = ["100", "100", "", "YES\n"]
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(
+            main.cli, ["files", "delete", "/sdcard/old.jpg"], input="YES DELETE\n"
+        )
+
+        assert result.exit_code == 1
+        assert "could not be deleted" in result.output
