@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
 )
 
 from droidbridge.gui import files_ops
+from droidbridge.gui.widgets import delete_flow
 from droidbridge.gui.widgets.deselectable_table import DeselectableTableWidget
 from droidbridge.modules import search as search_module
 from droidbridge.utils.format import format_bytes
@@ -118,6 +119,10 @@ class SearchPage(QWidget):
         self.deselect_all_button = QPushButton("Deselect All")
         self.invert_selection_button = QPushButton("Invert Selection")
         self.clear_results_button = QPushButton("Clear Results")
+        self.rename_button = QPushButton("Rename")
+        self.rename_button.setEnabled(False)
+        self.delete_button = QPushButton("Delete...")
+        self.delete_button.setEnabled(False)
         self.pull_selected_button = QPushButton("Pull Selected...")
         self.pull_selected_button.setEnabled(False)
 
@@ -127,6 +132,8 @@ class SearchPage(QWidget):
         selection_bar.addWidget(self.invert_selection_button)
         selection_bar.addWidget(self.clear_results_button)
         selection_bar.addStretch()
+        selection_bar.addWidget(self.rename_button)
+        selection_bar.addWidget(self.delete_button)
         selection_bar.addWidget(self.pull_selected_button)
 
         layout = QVBoxLayout(self)
@@ -145,6 +152,8 @@ class SearchPage(QWidget):
         self.clear_results_button.clicked.connect(self._on_clear_results)
         self.table.itemSelectionChanged.connect(self._on_selection_changed)
         self.pull_selected_button.clicked.connect(self._on_pull_selected)
+        self.rename_button.clicked.connect(self._on_rename)
+        self.delete_button.clicked.connect(self._on_delete)
 
         self.root_browse_combo.activated.connect(self._on_root_browse_selected)
         self.root_edit.editingFinished.connect(self._on_root_edit_finished)
@@ -215,23 +224,32 @@ class SearchPage(QWidget):
 
     def _on_results_changed(self, rows):
         self._rows = rows
-        self.table.setRowCount(len(rows))
-        for i, row in enumerate(rows):
+        self._populate_table()
+        self.pull_selected_button.setEnabled(False)
+        self.rename_button.setEnabled(False)
+        self.delete_button.setEnabled(False)
+
+    def _populate_table(self):
+        self.table.setRowCount(len(self._rows))
+        for i, row in enumerate(self._rows):
             path_item = QTableWidgetItem(row["path"])
             path_item.setToolTip(row["path"])
             self.table.setItem(i, 0, path_item)
             self.table.setItem(i, 1, QTableWidgetItem(format_bytes(row["size"])))
             self.table.setItem(i, 2, QTableWidgetItem(row["mtime"].strftime("%Y-%m-%d %H:%M")))
-        self.pull_selected_button.setEnabled(False)
 
     def _on_selection_changed(self):
         selected_rows = sorted({index.row() for index in self.table.selectedIndexes()})
         self.pull_selected_button.setEnabled(bool(selected_rows))
+        self.rename_button.setEnabled(len(selected_rows) == 1)
+        self.delete_button.setEnabled(bool(selected_rows))
 
     def _on_clear_results(self):
         self._rows = []
         self.table.setRowCount(0)
         self.pull_selected_button.setEnabled(False)
+        self.rename_button.setEnabled(False)
+        self.delete_button.setEnabled(False)
 
     def _on_invert_selection(self):
         selection_model = self.table.selectionModel()
@@ -250,3 +268,37 @@ class SearchPage(QWidget):
         if not local_dir:
             return
         self.pullRequested.emit(remote_paths, local_dir)
+
+    def _on_rename(self):
+        selected_rows = sorted({index.row() for index in self.table.selectedIndexes()})
+        if len(selected_rows) != 1:
+            return
+        row_index = selected_rows[0]
+        path = self._rows[row_index]["path"]
+        new_path = delete_flow.run_rename_flow(
+            self, self.viewmodel.context.client, self.viewmodel.context.serial, path,
+        )
+        if new_path is not None:
+            self._update_row_path(row_index, new_path)
+
+    def _update_row_path(self, row_index, new_path):
+        self._rows[row_index]["path"] = new_path
+        self._populate_table()
+
+    def _on_delete(self):
+        selected_rows = sorted({index.row() for index in self.table.selectedIndexes()})
+        if not selected_rows:
+            return
+        paths = [self._rows[r]["path"] for r in selected_rows]
+        deleted = delete_flow.run_delete_flow(
+            self, self.viewmodel.context.client, self.viewmodel.context.serial, paths,
+        )
+        if deleted:
+            self._remove_deleted_rows(deleted)
+
+    def _remove_deleted_rows(self, deleted_paths):
+        self._rows = [row for row in self._rows if row["path"] not in deleted_paths]
+        self._populate_table()
+        self.pull_selected_button.setEnabled(False)
+        self.rename_button.setEnabled(False)
+        self.delete_button.setEnabled(False)

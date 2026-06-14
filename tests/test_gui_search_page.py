@@ -10,6 +10,7 @@ from droidbridge.gui import files_ops
 from droidbridge.gui.device_context import DeviceContext
 from droidbridge.gui.pages.search import SearchPage
 from droidbridge.gui.viewmodels.search import SearchViewModel
+from droidbridge.gui.widgets import delete_flow
 from droidbridge.gui.widgets.deselectable_table import DeselectableTableWidget
 from droidbridge.modules import search as search_module
 from droidbridge.modules.files import FileEntry
@@ -323,3 +324,78 @@ class TestRootBrowseCombo:
 
         items = [page.root_browse_combo.itemText(i) for i in range(page.root_browse_combo.count())]
         assert items == ["..", "Camera"]
+
+
+class TestRenameAndDeleteButtons:
+    def test_enabled_state_follows_selection(self, qtbot):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+        vm.resultsChanged.emit(SAMPLE_ROWS)
+
+        assert page.rename_button.isEnabled() is False
+        assert page.delete_button.isEnabled() is False
+
+        page.table.selectRow(1)
+        assert page.rename_button.isEnabled() is True
+        assert page.delete_button.isEnabled() is True
+
+        page.table.selectAll()
+        assert page.rename_button.isEnabled() is False
+        assert page.delete_button.isEnabled() is True
+
+
+class TestRename:
+    def test_success_updates_row_path(self, qtbot, monkeypatch):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+        vm.resultsChanged.emit(SAMPLE_ROWS)
+        page.table.selectRow(1)  # /sdcard/DCIM/b.jpg
+
+        monkeypatch.setattr(delete_flow, "run_rename_flow", lambda *a, **k: "/sdcard/DCIM/renamed.jpg")
+
+        qtbot.mouseClick(page.rename_button, Qt.MouseButton.LeftButton)
+
+        assert page._rows[1]["path"] == "/sdcard/DCIM/renamed.jpg"
+        assert page.table.item(1, 0).text() == "/sdcard/DCIM/renamed.jpg"
+
+    def test_cancel_leaves_row_unchanged(self, qtbot, monkeypatch):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+        vm.resultsChanged.emit(SAMPLE_ROWS)
+        page.table.selectRow(1)
+
+        monkeypatch.setattr(delete_flow, "run_rename_flow", lambda *a, **k: None)
+
+        qtbot.mouseClick(page.rename_button, Qt.MouseButton.LeftButton)
+
+        assert page._rows[1]["path"] == "/sdcard/DCIM/b.jpg"
+        assert page.table.item(1, 0).text() == "/sdcard/DCIM/b.jpg"
+
+
+class TestDelete:
+    def test_success_removes_deleted_rows(self, qtbot, monkeypatch):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+        vm.resultsChanged.emit(SAMPLE_ROWS)
+        page.table.selectRow(1)  # /sdcard/DCIM/b.jpg
+
+        monkeypatch.setattr(delete_flow, "run_delete_flow", lambda *a, **k: {"/sdcard/DCIM/b.jpg"})
+
+        qtbot.mouseClick(page.delete_button, Qt.MouseButton.LeftButton)
+
+        assert [row["path"] for row in page._rows] == ["/sdcard/DCIM/a.jpg"]
+        assert page.table.rowCount() == 1
+        assert page.table.item(0, 0).text() == "/sdcard/DCIM/a.jpg"
+
+    def test_nothing_deleted_leaves_rows_unchanged(self, qtbot, monkeypatch):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+        vm.resultsChanged.emit(SAMPLE_ROWS)
+        page.table.selectRow(1)
+
+        monkeypatch.setattr(delete_flow, "run_delete_flow", lambda *a, **k: set())
+
+        qtbot.mouseClick(page.delete_button, Qt.MouseButton.LeftButton)
+
+        assert len(page._rows) == 2
+        assert page.table.rowCount() == 2
