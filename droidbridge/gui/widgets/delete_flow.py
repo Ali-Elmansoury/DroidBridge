@@ -178,9 +178,8 @@ def _run_backup(parent, client, serial, paths, backup_dir, worker_factory):
     Returns True if the backup verified successfully, False otherwise (a
     warning dialog has already been shown in the False case).
     """
-    plans = transfer_ops.plan_pull_many(client, serial, paths, backup_dir)
-
     def do_backup(progress_callback=None):
+        plans = transfer_ops.plan_pull_many(client, serial, paths, backup_dir)
         transfer_ops.execute_plans(client, serial, plans, progress_callback=progress_callback)
         return transfer_ops.verify_plans(client, serial, plans, "pull", local_dir=backup_dir)
 

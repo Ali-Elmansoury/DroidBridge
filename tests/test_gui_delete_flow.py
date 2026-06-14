@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import QFileDialog, QInputDialog, QMessageBox, QWidget
 from droidbridge.core.adb import AdbError
 from droidbridge.gui import delete_ops, transfer_ops
 from droidbridge.gui.widgets import delete_flow
+from droidbridge.gui.widgets.delete_flow import _DELETE_CHOICE_BACKUP, _DELETE_CHOICE_NO_BACKUP
 from droidbridge.modules.files import DeletePlan, DeleteVerification
 from tests.test_gui_viewmodels_device import FakeWorker
 
@@ -172,7 +173,7 @@ class TestRunDeleteFlow:
             lambda c, s, paths: DeleteVerification(deleted=["/sdcard/a.jpg"], remaining=[]),
         )
         monkeypatch.setattr(QMessageBox, "exec", lambda self: 0)
-        monkeypatch.setattr(QMessageBox, "clickedButton", _clicked_button_by_text("Delete Without Backup"))
+        monkeypatch.setattr(QMessageBox, "clickedButton", _clicked_button_by_text(_DELETE_CHOICE_NO_BACKUP))
         monkeypatch.setattr(QInputDialog, "getText", staticmethod(lambda *a, **k: ("YES DELETE", True)))
 
         result = delete_flow.run_delete_flow(parent, object(), "SERIAL", ["/sdcard/a.jpg"], worker_factory=FakeWorker)
@@ -190,7 +191,7 @@ class TestRunDeleteFlow:
         )
         monkeypatch.setattr(delete_ops, "delete_paths", lambda c, s, paths: calls.append(paths))
         monkeypatch.setattr(QMessageBox, "exec", lambda self: 0)
-        monkeypatch.setattr(QMessageBox, "clickedButton", _clicked_button_by_text("Delete Without Backup"))
+        monkeypatch.setattr(QMessageBox, "clickedButton", _clicked_button_by_text(_DELETE_CHOICE_NO_BACKUP))
         monkeypatch.setattr(QInputDialog, "getText", staticmethod(lambda *a, **k: ("nope", True)))
 
         result = delete_flow.run_delete_flow(parent, object(), "SERIAL", ["/sdcard/a.jpg"], worker_factory=FakeWorker)
@@ -206,7 +207,7 @@ class TestRunDeleteFlow:
             lambda c, s, paths: DeletePlan(paths=["/sdcard/a.jpg"], file_count=1, total_size=100),
         )
         monkeypatch.setattr(QMessageBox, "exec", lambda self: 0)
-        monkeypatch.setattr(QMessageBox, "clickedButton", _clicked_button_by_text("Back Up First..."))
+        monkeypatch.setattr(QMessageBox, "clickedButton", _clicked_button_by_text(_DELETE_CHOICE_BACKUP))
         monkeypatch.setattr(QFileDialog, "getExistingDirectory", staticmethod(lambda *a, **k: ""))
 
         result = delete_flow.run_delete_flow(parent, object(), "SERIAL", ["/sdcard/a.jpg"], worker_factory=FakeWorker)
@@ -231,7 +232,7 @@ class TestRunDeleteFlow:
             lambda c, s, plans, direction, local_dir=None: SimpleNamespace(ok=False),
         )
         monkeypatch.setattr(QMessageBox, "exec", lambda self: 0)
-        monkeypatch.setattr(QMessageBox, "clickedButton", _clicked_button_by_text("Back Up First..."))
+        monkeypatch.setattr(QMessageBox, "clickedButton", _clicked_button_by_text(_DELETE_CHOICE_BACKUP))
         monkeypatch.setattr(QMessageBox, "warning", staticmethod(lambda *a: warn_calls.append(a[1:])))
         monkeypatch.setattr(QFileDialog, "getExistingDirectory", staticmethod(lambda *a, **k: "/tmp/backup"))
 
@@ -263,7 +264,7 @@ class TestRunDeleteFlow:
             lambda c, s, plans, direction, local_dir=None: SimpleNamespace(ok=True),
         )
         monkeypatch.setattr(QMessageBox, "exec", lambda self: 0)
-        monkeypatch.setattr(QMessageBox, "clickedButton", _clicked_button_by_text("Back Up First..."))
+        monkeypatch.setattr(QMessageBox, "clickedButton", _clicked_button_by_text(_DELETE_CHOICE_BACKUP))
         monkeypatch.setattr(QFileDialog, "getExistingDirectory", staticmethod(lambda *a, **k: "/tmp/backup"))
         monkeypatch.setattr(QInputDialog, "getText", staticmethod(lambda *a, **k: ("YES DELETE", True)))
 
@@ -286,7 +287,7 @@ class TestRunDeleteFlow:
             lambda c, s, paths: DeleteVerification(deleted=["/sdcard/a.jpg"], remaining=["/sdcard/b.jpg"]),
         )
         monkeypatch.setattr(QMessageBox, "exec", lambda self: 0)
-        monkeypatch.setattr(QMessageBox, "clickedButton", _clicked_button_by_text("Delete Without Backup"))
+        monkeypatch.setattr(QMessageBox, "clickedButton", _clicked_button_by_text(_DELETE_CHOICE_NO_BACKUP))
         monkeypatch.setattr(QMessageBox, "warning", staticmethod(lambda *a: warn_calls.append(a[1:])))
         monkeypatch.setattr(QInputDialog, "getText", staticmethod(lambda *a, **k: ("YES DELETE", True)))
 
