@@ -333,3 +333,23 @@ class TestDeletePaths:
         rm_f_calls = [c.args[1] for c in client.shell.call_args_list if c.args[1].startswith("rm -f")]
         assert rm_rf_calls == ["rm -rf /sdcard/DCIM"]
         assert rm_f_calls == ["rm -f /sdcard/a.jpg"]
+
+
+class TestVerifyDeletion:
+    def test_mixed_deleted_and_remaining(self):
+        client = MagicMock()
+        client.shell.side_effect = ["NO\n", "YES\n"]
+
+        result = files.verify_deletion(client, "SERIAL", ["/sdcard/a.jpg", "/sdcard/b.jpg"])
+
+        assert result.deleted == ["/sdcard/a.jpg"]
+        assert result.remaining == ["/sdcard/b.jpg"]
+
+    def test_all_deleted(self):
+        client = MagicMock()
+        client.shell.side_effect = ["NO\n", "NO\n"]
+
+        result = files.verify_deletion(client, "SERIAL", ["/sdcard/a.jpg", "/sdcard/b.jpg"])
+
+        assert result.deleted == ["/sdcard/a.jpg", "/sdcard/b.jpg"]
+        assert result.remaining == []

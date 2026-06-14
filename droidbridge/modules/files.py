@@ -240,3 +240,21 @@ def delete_paths(client, serial, paths):
         batch = files_to_delete[i : i + _DELETE_BATCH_SIZE]
         quoted = " ".join(shlex.quote(p) for p in batch)
         client.shell(serial, f"rm -f {quoted}")
+
+
+@dataclass
+class DeleteVerification:
+    """Result of rechecking `paths` after `delete_paths` - reports deleted vs failed."""
+
+    deleted: list
+    remaining: list
+
+
+def verify_deletion(client, serial, paths):
+    """Check which of the top-level `paths` still exist after `delete_paths`."""
+    deleted = []
+    remaining = []
+    for path in paths:
+        output = client.shell(serial, f"[ -e {shlex.quote(path)} ] && echo YES || echo NO").strip()
+        (remaining if output == "YES" else deleted).append(path)
+    return DeleteVerification(deleted=deleted, remaining=remaining)
