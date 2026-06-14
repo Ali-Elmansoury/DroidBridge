@@ -3,6 +3,9 @@
 from datetime import datetime
 from unittest.mock import MagicMock
 
+import pytest
+
+from droidbridge.core.adb import AdbCommandError
 from droidbridge.modules import files
 
 LS_OUTPUT_DCIM = (
@@ -205,3 +208,24 @@ class TestFilterEntries:
 
         assert ".hidden" not in [e.name for e in result]
         assert len(result) == 3
+
+
+class TestRenamePath:
+    def test_success_runs_check_and_move(self):
+        client = make_fake_client("")
+
+        files.rename_path(client, "SERIAL", "/sdcard/old.txt", "/sdcard/new.txt")
+
+        client.shell.assert_called_once_with(
+            "SERIAL",
+            "if [ -e /sdcard/new.txt ]; then echo EXISTS; "
+            "else mv /sdcard/old.txt /sdcard/new.txt; fi",
+        )
+
+    def test_existing_target_raises_without_calling_mv(self):
+        client = make_fake_client("EXISTS\n")
+
+        with pytest.raises(AdbCommandError) as exc_info:
+            files.rename_path(client, "SERIAL", "/sdcard/old.txt", "/sdcard/new.txt")
+
+        assert "already exists" in str(exc_info.value)

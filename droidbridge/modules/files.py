@@ -7,6 +7,8 @@ from datetime import datetime
 from pathlib import PurePosixPath
 from typing import Optional
 
+from droidbridge.core.adb import AdbCommandError
+
 _LS_LINE_RE = re.compile(
     r"^(?P<type>[bcdlpsD-])(?P<perms>[r\-wxsStT]{9})\s+"
     r"(?P<links>\d+)\s+"
@@ -152,3 +154,19 @@ def filter_entries(
         result.append(entry)
 
     return result
+
+
+def rename_path(client, serial, old_path, new_path):
+    """Rename/move `old_path` to `new_path` on the device.
+
+    Raises AdbCommandError if `new_path` already exists (refuses to overwrite).
+    `old_path`/`new_path` can be in different directories - this is a general
+    move, matching `mv` semantics.
+    """
+    check_and_move = (
+        f"if [ -e {shlex.quote(new_path)} ]; then echo EXISTS; "
+        f"else mv {shlex.quote(old_path)} {shlex.quote(new_path)}; fi"
+    )
+    output = client.shell(serial, check_and_move).strip()
+    if output == "EXISTS":
+        raise AdbCommandError(["mv", old_path, new_path], 1, "", f"{new_path} already exists")
