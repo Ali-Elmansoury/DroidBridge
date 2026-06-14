@@ -184,14 +184,17 @@ class DeletePlan:
 
 
 def _stat_path(client, serial, path):
-    """Return ('dir', None) or ('file', size_bytes) for `path`."""
+    """Return ('dir', None), ('file', size_bytes), or ('missing', None) for `path`."""
     cmd = (
         f"if [ -d {shlex.quote(path)} ]; then echo DIR; "
-        f"else find -L {shlex.quote(path)} -maxdepth 0 -printf '%s'; fi"
+        f"elif [ -e {shlex.quote(path)} ]; then find -L {shlex.quote(path)} -maxdepth 0 -printf '%s'; "
+        f"else echo MISSING; fi"
     )
     output = client.shell(serial, cmd).strip()
     if output == "DIR":
         return "dir", None
+    if output == "MISSING":
+        return "missing", None
     return "file", int(output)
 
 
@@ -207,10 +210,11 @@ def build_delete_plan(client, serial, paths):
         if kind == "file":
             file_count += 1
             total_size += size
-        else:
+        elif kind == "dir":
             for result in search_module.search_files(client, serial, path):
                 file_count += 1
                 total_size += result.size
+        # "missing" paths contribute nothing
 
     return DeletePlan(paths=list(paths), file_count=file_count, total_size=total_size)
 
@@ -272,6 +276,8 @@ def verify_backup(client, serial, paths, backup_dir):
     missing = []
     for path in paths:
         kind, size = _stat_path(client, serial, path)
+        if kind == "missing":
+            continue
         name = PurePosixPath(path).name
         if kind == "file":
             backup_path = os.path.join(backup_dir, name)

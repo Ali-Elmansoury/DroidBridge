@@ -244,7 +244,8 @@ class TestStatPath:
         client.shell.assert_called_once_with(
             "SERIAL",
             "if [ -d /sdcard/photo.jpg ]; then echo DIR; "
-            "else find -L /sdcard/photo.jpg -maxdepth 0 -printf '%s'; fi",
+            "elif [ -e /sdcard/photo.jpg ]; then find -L /sdcard/photo.jpg -maxdepth 0 -printf '%s'; "
+            "else echo MISSING; fi",
         )
 
     def test_directory_returns_dir(self):
@@ -253,6 +254,14 @@ class TestStatPath:
         kind, size = files._stat_path(client, "SERIAL", "/sdcard/DCIM")
 
         assert kind == "dir"
+        assert size is None
+
+    def test_missing_path_returns_missing(self):
+        client = make_fake_client("MISSING\n")
+
+        kind, size = files._stat_path(client, "SERIAL", "/sdcard/nope.txt")
+
+        assert kind == "missing"
         assert size is None
 
 
@@ -290,6 +299,15 @@ class TestBuildDeletePlan:
         assert plan.paths == ["/sdcard/a.jpg", "/sdcard/DCIM"]
         assert plan.file_count == 2
         assert plan.total_size == 300
+
+    def test_missing_path_contributes_nothing(self):
+        client = make_fake_client("MISSING\n")
+
+        plan = files.build_delete_plan(client, "SERIAL", ["/sdcard/nope.txt"])
+
+        assert plan.paths == ["/sdcard/nope.txt"]
+        assert plan.file_count == 0
+        assert plan.total_size == 0
 
 
 class TestDeletePaths:
@@ -401,3 +419,10 @@ class TestVerifyBackup:
         missing = files.verify_backup(client, "SERIAL", ["/sdcard/DCIM"], str(tmp_path))
 
         assert missing == ["/sdcard/DCIM/a.jpg"]
+
+    def test_missing_source_path_is_skipped(self, tmp_path):
+        client = make_fake_client("MISSING\n")
+
+        missing = files.verify_backup(client, "SERIAL", ["/sdcard/nope.txt"], str(tmp_path))
+
+        assert missing == []

@@ -153,6 +153,16 @@ class TestFilesDelete:
         assert result.exit_code == 0
         assert "Nothing to delete." in result.output
 
+    def test_nothing_to_delete_for_nonexistent_path(self, monkeypatch):
+        client = make_fake_client(READY_DEVICE)
+        client.shell.side_effect = ["MISSING\n"]
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(main.cli, ["files", "delete", "/sdcard/does-not-exist.txt"])
+
+        assert result.exit_code == 0
+        assert "Nothing to delete." in result.output
+
     def test_confirm_deletes_and_reports_result(self, monkeypatch):
         client = make_fake_client(READY_DEVICE)
         client.shell.side_effect = ["100", "100", "", "NO\n"]
