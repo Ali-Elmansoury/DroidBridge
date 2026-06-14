@@ -21,6 +21,7 @@ from PyQt6.QtWidgets import (
 )
 
 from droidbridge.gui import files_ops
+from droidbridge.gui.widgets import delete_flow
 from droidbridge.gui.widgets.deselectable_table import DeselectableTableWidget
 from droidbridge.modules import files as files_module
 from droidbridge.utils.format import format_bytes
@@ -87,6 +88,10 @@ class FilesPage(QWidget):
         self.select_all_button = QPushButton("Select All")
         self.deselect_all_button = QPushButton("Deselect All")
         self.invert_selection_button = QPushButton("Invert Selection")
+        self.rename_button = QPushButton("Rename")
+        self.rename_button.setEnabled(False)
+        self.delete_button = QPushButton("Delete...")
+        self.delete_button.setEnabled(False)
         self.pull_selected_button = QPushButton("Pull Selected...")
         self.pull_selected_button.setEnabled(False)
 
@@ -95,6 +100,8 @@ class FilesPage(QWidget):
         selection_bar.addWidget(self.deselect_all_button)
         selection_bar.addWidget(self.invert_selection_button)
         selection_bar.addStretch()
+        selection_bar.addWidget(self.rename_button)
+        selection_bar.addWidget(self.delete_button)
         selection_bar.addWidget(self.pull_selected_button)
 
         self.preview_image_label = QLabel()
@@ -127,6 +134,8 @@ class FilesPage(QWidget):
         self.table.itemSelectionChanged.connect(self._on_selection_changed)
         self.table.itemDoubleClicked.connect(self._on_row_double_clicked)
         self.pull_selected_button.clicked.connect(self._on_pull_selected)
+        self.rename_button.clicked.connect(self._on_rename)
+        self.delete_button.clicked.connect(self._on_delete)
 
         self.viewmodel.entriesChanged.connect(self._on_entries_changed)
         self.viewmodel.pathChanged.connect(self._on_path_changed)
@@ -158,6 +167,8 @@ class FilesPage(QWidget):
     def _on_selection_changed(self):
         selected_rows = sorted({index.row() for index in self.table.selectedIndexes()})
         self.pull_selected_button.setEnabled(bool(selected_rows))
+        self.rename_button.setEnabled(len(selected_rows) == 1)
+        self.delete_button.setEnabled(bool(selected_rows))
         if len(selected_rows) == 1:
             self.viewmodel.select_entry(self._rows[selected_rows[0]]["entry"])
         else:
@@ -212,3 +223,25 @@ class FilesPage(QWidget):
         if not local_dir:
             return
         self.pullRequested.emit(remote_paths, local_dir)
+
+    def _on_rename(self):
+        selected_rows = sorted({index.row() for index in self.table.selectedIndexes()})
+        if len(selected_rows) != 1:
+            return
+        path = self._rows[selected_rows[0]]["path"]
+        new_path = delete_flow.run_rename_flow(
+            self, self.viewmodel.context.client, self.viewmodel.context.serial, path,
+        )
+        if new_path is not None:
+            self.viewmodel.navigate(self.viewmodel.current_path)
+
+    def _on_delete(self):
+        selected_rows = sorted({index.row() for index in self.table.selectedIndexes()})
+        if not selected_rows:
+            return
+        paths = [self._rows[r]["path"] for r in selected_rows]
+        deleted = delete_flow.run_delete_flow(
+            self, self.viewmodel.context.client, self.viewmodel.context.serial, paths,
+        )
+        if deleted:
+            self.viewmodel.navigate(self.viewmodel.current_path)

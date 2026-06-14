@@ -11,6 +11,7 @@ from droidbridge.gui import files_ops, preview_ops
 from droidbridge.gui.device_context import DeviceContext
 from droidbridge.gui.pages.files import FilesPage
 from droidbridge.gui.viewmodels.files import FilesViewModel
+from droidbridge.gui.widgets import delete_flow
 from droidbridge.gui.widgets.deselectable_table import DeselectableTableWidget
 from droidbridge.modules.files import FileEntry
 from droidbridge.utils.format import format_bytes
@@ -355,5 +356,87 @@ class TestRowDoubleClick:
         monkeypatch.setattr(vm, "navigate", lambda path: calls.append(path))
 
         page.table.itemDoubleClicked.emit(page.table.item(1, 0))
+
+        assert calls == []
+
+
+class TestRenameAndDeleteButtons:
+    def test_enabled_state_follows_selection(self, qtbot):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+        vm.entriesChanged.emit(SAMPLE_ROWS)
+
+        assert page.rename_button.isEnabled() is False
+        assert page.delete_button.isEnabled() is False
+
+        page.table.selectRow(1)
+        assert page.rename_button.isEnabled() is True
+        assert page.delete_button.isEnabled() is True
+
+        page.table.selectAll()
+        assert page.rename_button.isEnabled() is False
+        assert page.delete_button.isEnabled() is True
+
+        page.table.clearSelection()
+        assert page.rename_button.isEnabled() is False
+        assert page.delete_button.isEnabled() is False
+
+
+class TestRename:
+    def test_success_refreshes_listing(self, qtbot, monkeypatch):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+        vm.entriesChanged.emit(SAMPLE_ROWS)
+        page.table.selectRow(1)  # photo.jpg
+
+        monkeypatch.setattr(delete_flow, "run_rename_flow", lambda *a, **k: "/sdcard/renamed.jpg")
+        calls = []
+        monkeypatch.setattr(files_ops, "list_path", lambda client, serial, path, **kw: calls.append(path) or [])
+
+        qtbot.mouseClick(page.rename_button, Qt.MouseButton.LeftButton)
+
+        assert calls == [vm.current_path]
+
+    def test_cancel_does_not_refresh(self, qtbot, monkeypatch):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+        vm.entriesChanged.emit(SAMPLE_ROWS)
+        page.table.selectRow(1)
+
+        monkeypatch.setattr(delete_flow, "run_rename_flow", lambda *a, **k: None)
+        calls = []
+        monkeypatch.setattr(files_ops, "list_path", lambda client, serial, path, **kw: calls.append(path) or [])
+
+        qtbot.mouseClick(page.rename_button, Qt.MouseButton.LeftButton)
+
+        assert calls == []
+
+
+class TestDelete:
+    def test_success_refreshes_listing(self, qtbot, monkeypatch):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+        vm.entriesChanged.emit(SAMPLE_ROWS)
+        page.table.selectRow(1)  # photo.jpg
+
+        monkeypatch.setattr(delete_flow, "run_delete_flow", lambda *a, **k: {"/sdcard/photo.jpg"})
+        calls = []
+        monkeypatch.setattr(files_ops, "list_path", lambda client, serial, path, **kw: calls.append(path) or [])
+
+        qtbot.mouseClick(page.delete_button, Qt.MouseButton.LeftButton)
+
+        assert calls == [vm.current_path]
+
+    def test_nothing_deleted_does_not_refresh(self, qtbot, monkeypatch):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+        vm.entriesChanged.emit(SAMPLE_ROWS)
+        page.table.selectRow(1)
+
+        monkeypatch.setattr(delete_flow, "run_delete_flow", lambda *a, **k: set())
+        calls = []
+        monkeypatch.setattr(files_ops, "list_path", lambda client, serial, path, **kw: calls.append(path) or [])
+
+        qtbot.mouseClick(page.delete_button, Qt.MouseButton.LeftButton)
 
         assert calls == []
