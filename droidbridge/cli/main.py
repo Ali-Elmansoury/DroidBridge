@@ -19,7 +19,7 @@ from droidbridge.modules import search as search_module
 from droidbridge.modules import storage as storage_module
 from droidbridge.modules import transfer as transfer_module
 from droidbridge.modules import whatsapp as whatsapp_module
-from droidbridge.reports import backup_reports, storage_reports, whatsapp_reports
+from droidbridge.reports import backup_reports, deletion_reports, storage_reports, whatsapp_reports
 from droidbridge.reports.generators import Report, to_csv, to_html, to_json, to_txt
 from droidbridge.utils.format import format_bar, format_bytes, format_duration, format_size_kb, parse_size
 
@@ -425,6 +425,10 @@ def _write_report(report, filename_stem):
     out = Path("session_logs") / "reports" / f"{filename_stem}.txt"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(content, encoding="utf-8")
+
+
+def _slug(label):
+    return label.lower().replace(" ", "_")
 
 
 _CONFLICT_OPTION = click.option(
@@ -979,6 +983,8 @@ def whatsapp_fix_extensions(src_dir):
 )
 def whatsapp_delete(serial, app, before, keep_types, backup_dir):
     """Delete WhatsApp media dated before --before, after verifying a backup exists (spec §4.6)."""
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
     try:
         before_date = datetime.strptime(before, "%Y-%m-%d").date()
     except ValueError:
@@ -1040,6 +1046,9 @@ def whatsapp_delete(serial, app, before, keep_types, backup_dir):
         click.echo(f"  Keeping: {len(plan.kept)} file(s)")
         click.echo()
 
+        preview_report = deletion_reports.build_deletion_preview_report(plan)
+        _write_report(preview_report, f"whatsapp-deletion-preview_{_slug(install.label)}_{timestamp}")
+
     missing_backup = False
     for install, plan in plans:
         if plan.total_files == 0:
@@ -1073,6 +1082,11 @@ def whatsapp_delete(serial, app, before, keep_types, backup_dir):
         click.echo(f"{install.label}: deleted {result.deleted} file(s), {len(result.remaining)} remaining.")
         if result.remaining:
             any_remaining = True
+
+        result_report = deletion_reports.build_deletion_result_report(plan, result)
+        _write_report(result_report, f"whatsapp-deletion-result_{_slug(install.label)}_{timestamp}")
+
+    click.echo("Reports saved to session_logs/reports/")
 
     if any_remaining:
         sys.exit(1)

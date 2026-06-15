@@ -585,6 +585,7 @@ class TestWhatsAppDelete:
         assert "invalid --keep" in result.output.lower()
 
     def test_nothing_to_delete_message(self, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
         shell_outputs = [DETECT_WA_ONLY, DELETE_RESCAN_OUTPUT]  # both files post-cutoff
         client = make_fake_client(READY_DEVICE, shell_side_effect=shell_outputs)
         monkeypatch.setattr(main, "_build_client", lambda: client)
@@ -595,8 +596,10 @@ class TestWhatsAppDelete:
 
         assert result.exit_code == 0
         assert "nothing to delete" in result.output.lower()
+        assert not (tmp_path / "session_logs" / "reports").exists()
 
     def test_blocks_when_backup_missing(self, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
         shell_outputs = [DETECT_WA_ONLY, DELETE_SCAN_OUTPUT]
         client = make_fake_client(READY_DEVICE, shell_side_effect=shell_outputs)
         monkeypatch.setattr(main, "_build_client", lambda: client)
@@ -609,7 +612,11 @@ class TestWhatsAppDelete:
         assert "not backed up" in result.output.lower()
         assert client.shell.call_count == 2
 
+        reports = list((tmp_path / "session_logs" / "reports").glob("whatsapp-deletion-preview_whatsapp_*.txt"))
+        assert len(reports) == 1
+
     def test_aborts_without_yes_delete_confirmation(self, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
         _write_backup_file(tmp_path, "WhatsApp Images/IMG-20230101-WA0001.jpg", 1000)
         shell_outputs = [DETECT_WA_ONLY, DELETE_SCAN_OUTPUT]
         client = make_fake_client(READY_DEVICE, shell_side_effect=shell_outputs)
@@ -626,6 +633,7 @@ class TestWhatsAppDelete:
         assert client.shell.call_count == 2
 
     def test_full_flow_deletes_and_reports(self, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
         _write_backup_file(tmp_path, "WhatsApp Images/IMG-20230101-WA0001.jpg", 1000)
         shell_outputs = [DETECT_WA_ONLY, DELETE_SCAN_OUTPUT, "", DELETE_RESCAN_OUTPUT]
         client = make_fake_client(READY_DEVICE, shell_side_effect=shell_outputs)
@@ -640,6 +648,7 @@ class TestWhatsAppDelete:
         assert result.exit_code == 0
         assert "Total to delete: 1 file" in result.output
         assert "deleted 1 file" in result.output.lower()
+        assert "Reports saved to session_logs/reports/" in result.output
         assert client.shell.call_count == 4
 
         rm_serial, rm_command = client.shell.call_args_list[2][0]
@@ -648,7 +657,12 @@ class TestWhatsAppDelete:
         assert f"{WA_MEDIA}/WhatsApp Images/IMG-20230101-WA0001.jpg" in rm_command
         assert "IMG-20250101-WA0002.jpg" not in rm_command
 
+        reports_dir = tmp_path / "session_logs" / "reports"
+        assert list(reports_dir.glob("whatsapp-deletion-preview_whatsapp_*.txt"))
+        assert list(reports_dir.glob("whatsapp-deletion-result_whatsapp_*.txt"))
+
     def test_keep_excludes_type_from_deletion(self, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
         _write_backup_file(tmp_path, "WhatsApp Images/IMG-20230101-WA0001.jpg", 1000)
         shell_outputs = [DETECT_WA_ONLY, DELETE_SCAN_OUTPUT_WITH_DOC, "", DELETE_RESCAN_OUTPUT]
         client = make_fake_client(READY_DEVICE, shell_side_effect=shell_outputs)
@@ -670,6 +684,10 @@ class TestWhatsAppDelete:
 
         rm_serial, rm_command = client.shell.call_args_list[2][0]
         assert "DOC-20230101-WA0001.pdf" not in rm_command
+
+        reports_dir = tmp_path / "session_logs" / "reports"
+        assert list(reports_dir.glob("whatsapp-deletion-preview_whatsapp_*.txt"))
+        assert list(reports_dir.glob("whatsapp-deletion-result_whatsapp_*.txt"))
 
 
 WA_BASE = "/sdcard/Android/media/com.whatsapp/WhatsApp"
