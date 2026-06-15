@@ -43,6 +43,16 @@ class TestConnect:
         with pytest.raises(device_module.DeviceSelectionError):
             device_ops.connect()
 
+    def test_unauthorized_device_raises_with_unauthorized_guidance(self, monkeypatch):
+        client = MagicMock()
+        client.devices.return_value = [Device(serial="SERIAL123", state="unauthorized")]
+        monkeypatch.setattr(device_ops, "AdbClient", lambda: client)
+
+        with pytest.raises(device_module.DeviceSelectionError) as exc_info:
+            device_ops.connect()
+
+        assert "allow" in str(exc_info.value).lower()
+
 
 class TestRefreshInfo:
     def test_delegates_to_get_device_info(self, monkeypatch):

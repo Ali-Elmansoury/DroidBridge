@@ -81,10 +81,20 @@ def resolve_ready_device(client, serial=None):
     Raises DeviceSelectionError (with a human-readable guidance message) if there are no
     ready devices, if `serial` is None and multiple devices are ready, or if `serial` does
     not match a ready device.
+
+    If adb sees device(s) but none are ready (e.g. "unauthorized" - USB debugging is
+    enabled but the "Allow USB debugging?" prompt hasn't been accepted on the phone yet,
+    or "offline"), the error message uses that device's specific connection guidance
+    rather than the generic "no device" message, which would otherwise wrongly tell the
+    user to enable USB debugging when it's already enabled.
     """
-    ready = get_ready_devices(client)
+    devices = client.devices()
+    ready = [d for d in devices if d.is_ready]
     if not ready:
-        raise DeviceSelectionError(connection_guidance("no device"))
+        if not devices:
+            raise DeviceSelectionError(connection_guidance("no device"))
+        lines = [f"{d.serial}: {connection_guidance(d.state)}" for d in devices]
+        raise DeviceSelectionError("\n".join(lines))
 
     ready_serials = [d.serial for d in ready]
     if serial is None:

@@ -245,3 +245,23 @@ class TestResolveReadyDevice:
 
         assert "Z" in str(exc_info.value)
         assert "not found or not ready" in str(exc_info.value)
+
+    def test_unauthorized_device_raises_with_unauthorized_guidance(self):
+        client = MagicMock()
+        client.devices.return_value = [Device(serial="A", state="unauthorized")]
+
+        with pytest.raises(device.DeviceSelectionError) as exc_info:
+            device.resolve_ready_device(client)
+
+        message = str(exc_info.value)
+        assert "allow" in message.lower()
+        assert "A" in message
+
+    def test_offline_device_raises_with_offline_guidance(self):
+        client = MagicMock()
+        client.devices.return_value = [Device(serial="A", state="offline")]
+
+        with pytest.raises(device.DeviceSelectionError) as exc_info:
+            device.resolve_ready_device(client)
+
+        assert "Device is offline" in str(exc_info.value)
