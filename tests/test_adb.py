@@ -234,6 +234,40 @@ class TestServerManagement:
         assert state == "not found"
 
 
+class TestWaitForDevice:
+    def test_calls_wait_for_device(self):
+        client = adb.AdbClient(adb_path="/fake/adb")
+        with patch.object(adb.subprocess, "run") as mock_run:
+            mock_run.return_value = _completed()
+
+            client.wait_for_device()
+
+        args, kwargs = mock_run.call_args
+        assert args[0] == ["/fake/adb", "wait-for-device"]
+        assert kwargs["timeout"] is None
+
+    def test_passes_serial_and_timeout(self):
+        client = adb.AdbClient(adb_path="/fake/adb")
+        with patch.object(adb.subprocess, "run") as mock_run:
+            mock_run.return_value = _completed()
+
+            client.wait_for_device(serial="SERIAL123", timeout=5)
+
+        args, kwargs = mock_run.call_args
+        assert args[0] == ["/fake/adb", "-s", "SERIAL123", "wait-for-device"]
+        assert kwargs["timeout"] == 5
+
+    def test_timeout_raises_adb_timeout_error(self):
+        client = adb.AdbClient(adb_path="/fake/adb")
+        with patch.object(adb.subprocess, "run") as mock_run:
+            mock_run.side_effect = subprocess.TimeoutExpired(
+                cmd=["adb", "wait-for-device"], timeout=5
+            )
+
+            with pytest.raises(adb.AdbTimeoutError):
+                client.wait_for_device(timeout=5)
+
+
 class TestShell:
     def test_shell_with_string_command(self):
         client = adb.AdbClient(adb_path="/fake/adb")

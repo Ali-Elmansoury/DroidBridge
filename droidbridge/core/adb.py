@@ -176,6 +176,14 @@ class AdbClient:
             return "not found"
         return result.stdout.strip()
 
+    def wait_for_device(self, serial=None, timeout=None):
+        """Block until `adb` reports a device is connected (`adb wait-for-device`).
+
+        Raises AdbTimeoutError if `timeout` (seconds) elapses first. The default
+        `timeout=None` waits indefinitely.
+        """
+        self._run(["wait-for-device"], serial=serial, timeout=timeout)
+
     def shell(self, serial, command, timeout=_UNSET):
         """Run `adb -s <serial> shell <command>` and return stdout."""
         if isinstance(command, (list, tuple)):
