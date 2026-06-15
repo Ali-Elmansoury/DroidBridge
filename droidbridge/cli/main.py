@@ -1020,16 +1020,17 @@ def whatsapp_delete(serial, app, before, keep_types, backup_dir):
     plans = []
     for install in installs:
         media_files = whatsapp_module.scan_media(client, serial, install)
-        plans.append((install, whatsapp_module.plan_delete(media_files, before_date, keep_types=keep_set)))
+        plan = whatsapp_module.plan_delete(media_files, before_date, keep_types=keep_set)
+        plans.append((install, plan, media_files))
 
-    total_files = sum(plan.total_files for _, plan in plans)
+    total_files = sum(plan.total_files for _, plan, _ in plans)
     if total_files == 0:
         click.echo("Nothing to delete.")
         return
 
     before_storage = device_module.get_storage_breakdown(client, serial)
 
-    for install, plan in plans:
+    for install, plan, _ in plans:
         if plan.total_files == 0:
             continue
 
@@ -1052,7 +1053,7 @@ def whatsapp_delete(serial, app, before, keep_types, backup_dir):
         _write_report(preview_report, f"whatsapp-deletion-preview_{_slug(install.label)}_{timestamp}")
 
     missing_backup = False
-    for install, plan in plans:
+    for install, plan, _ in plans:
         if plan.total_files == 0:
             continue
         missing = whatsapp_module.verify_backup_exists(install, backup_dir, plan.to_delete)
@@ -1067,7 +1068,7 @@ def whatsapp_delete(serial, app, before, keep_types, backup_dir):
     if missing_backup:
         sys.exit(1)
 
-    total_bytes = sum(plan.total_bytes for _, plan in plans)
+    total_bytes = sum(plan.total_bytes for _, plan, _ in plans)
     file_word = "file" if total_files == 1 else "files"
     click.echo(f"This will permanently delete {total_files} {file_word}, {format_bytes(total_bytes)}.")
     confirm = click.prompt("Type 'YES DELETE' to confirm", default="", show_default=False)
@@ -1076,7 +1077,7 @@ def whatsapp_delete(serial, app, before, keep_types, backup_dir):
         return
 
     any_remaining = False
-    for install, plan in plans:
+    for install, plan, media_files in plans:
         if plan.total_files == 0:
             continue
         whatsapp_module.execute_delete_plan(client, serial, plan)
@@ -1087,6 +1088,9 @@ def whatsapp_delete(serial, app, before, keep_types, backup_dir):
 
         result_report = deletion_reports.build_deletion_result_report(plan, result)
         _write_report(result_report, f"whatsapp-deletion-result_{_slug(install.label)}_{timestamp}")
+
+        cleanup_report = whatsapp_reports.build_cleanup_comparison_report(media_files, result.after_files)
+        _write_report(cleanup_report, f"whatsapp-cleanup-comparison_{_slug(install.label)}_{timestamp}")
 
     after_storage = device_module.get_storage_breakdown(client, serial)
     storage_report = deletion_reports.build_storage_comparison_report(before_storage, after_storage)

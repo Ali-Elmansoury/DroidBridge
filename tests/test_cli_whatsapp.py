@@ -668,6 +668,7 @@ class TestWhatsAppDelete:
         assert list(reports_dir.glob("whatsapp-deletion-preview_whatsapp_*.txt"))
         assert list(reports_dir.glob("whatsapp-deletion-result_whatsapp_*.txt"))
         assert list(reports_dir.glob("whatsapp-storage-comparison_*.txt"))
+        assert list(reports_dir.glob("whatsapp-cleanup-comparison_whatsapp_*.txt"))
 
     def test_keep_excludes_type_from_deletion(self, monkeypatch, tmp_path):
         monkeypatch.chdir(tmp_path)
@@ -697,6 +698,7 @@ class TestWhatsAppDelete:
         assert list(reports_dir.glob("whatsapp-deletion-preview_whatsapp_*.txt"))
         assert list(reports_dir.glob("whatsapp-deletion-result_whatsapp_*.txt"))
         assert list(reports_dir.glob("whatsapp-storage-comparison_*.txt"))
+        assert list(reports_dir.glob("whatsapp-cleanup-comparison_whatsapp_*.txt"))
 
 
 WA_BASE = "/sdcard/Android/media/com.whatsapp/WhatsApp"
