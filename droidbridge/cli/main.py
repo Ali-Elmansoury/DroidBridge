@@ -431,6 +431,38 @@ def _slug(label):
     return label.lower().replace(" ", "_")
 
 
+def _build_backup_verification(profile_name):
+    """Build a backup-verification report and result for `profile_name` (spec §6.3).
+
+    Compares the profile's last recorded `BackupRecord` against a fresh walk of
+    its destination folder. Exits 1 with an error message if the profile or its
+    history is missing.
+    """
+    profile = backup_module.get_profile(backup_module.DEFAULT_PROFILES_PATH, profile_name)
+    if profile is None:
+        click.echo(f"Error: profile {profile_name!r} not found.", err=True)
+        sys.exit(1)
+
+    history = backup_module.load_history(backup_module.DEFAULT_HISTORY_PATH)
+    record = backup_module.last_backup(history, profile_name)
+    if record is None:
+        click.echo(
+            f"No backups recorded for profile {profile_name!r}. Run `backup run --profile {profile_name}` first.",
+            err=True,
+        )
+        sys.exit(1)
+
+    actual_files, actual_bytes = backup_module.measure_destination(record.destination)
+    result = transfer_module.VerificationResult(
+        expected_files=record.file_count,
+        expected_bytes=record.total_bytes,
+        actual_files=actual_files,
+        actual_bytes=actual_bytes,
+    )
+    report = backup_reports.build_backup_verification_report(profile_name, result)
+    return report, result
+
+
 _CONFLICT_OPTION = click.option(
     "--conflict",
     type=click.Choice(transfer_module.CONFLICT_MODES),
@@ -1819,28 +1851,7 @@ def backup_restore(profile_name, sources, after, before, conflict, no_verify, se
 @click.option("--profile", "profile_name", required=True, help="Name of a saved backup profile.")
 def backup_verify(profile_name):
     """Verify a backup's integrity against its last recorded run (spec §6.3)."""
-    profile = backup_module.get_profile(backup_module.DEFAULT_PROFILES_PATH, profile_name)
-    if profile is None:
-        click.echo(f"Error: profile {profile_name!r} not found.", err=True)
-        sys.exit(1)
-
-    history = backup_module.load_history(backup_module.DEFAULT_HISTORY_PATH)
-    record = backup_module.last_backup(history, profile_name)
-    if record is None:
-        click.echo(
-            f"No backups recorded for profile {profile_name!r}. Run `backup run --profile {profile_name}` first.",
-            err=True,
-        )
-        sys.exit(1)
-
-    actual_files, actual_bytes = backup_module.measure_destination(record.destination)
-    result = transfer_module.VerificationResult(
-        expected_files=record.file_count,
-        expected_bytes=record.total_bytes,
-        actual_files=actual_files,
-        actual_bytes=actual_bytes,
-    )
-    report = backup_reports.build_backup_verification_report(profile_name, result)
+    report, result = _build_backup_verification(profile_name)
     click.echo(to_txt(report))
 
     stem = f"backup-verification_{profile_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -2048,26 +2059,7 @@ def report_generate(serial, app, report_type, report_format, output_path, top_n,
         if not profile_name:
             click.echo("Error: --profile is required for --type backup-verification.", err=True)
             sys.exit(1)
-        profile = backup_module.get_profile(backup_module.DEFAULT_PROFILES_PATH, profile_name)
-        if profile is None:
-            click.echo(f"Error: profile {profile_name!r} not found.", err=True)
-            sys.exit(1)
-        history = backup_module.load_history(backup_module.DEFAULT_HISTORY_PATH)
-        record = backup_module.last_backup(history, profile_name)
-        if record is None:
-            click.echo(
-                f"No backups recorded for profile {profile_name!r}. Run `backup run --profile {profile_name}` first.",
-                err=True,
-            )
-            sys.exit(1)
-        actual_files, actual_bytes = backup_module.measure_destination(record.destination)
-        result = transfer_module.VerificationResult(
-            expected_files=record.file_count,
-            expected_bytes=record.total_bytes,
-            actual_files=actual_files,
-            actual_bytes=actual_bytes,
-        )
-        report = backup_reports.build_backup_verification_report(profile_name, result)
+        report, _result = _build_backup_verification(profile_name)
     elif report_type == "whatsapp-inventory":
         media_files = _build_whatsapp_media_files(client, serial, app)
         report = whatsapp_reports.build_media_inventory_report(media_files)
