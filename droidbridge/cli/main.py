@@ -60,11 +60,22 @@ def device_connect():
     device_module.ensure_adb_server_running(client)
     devices, messages = device_module.check_connection_health(client)
 
+    if any(d.state == "offline" for d in devices):
+        click.echo("Offline device detected; restarting ADB server...")
+        device_module.restart_adb_server(client)
+        devices, messages = device_module.check_connection_health(client)
+
     for message in messages:
         click.echo(message)
 
-    if not any(d.is_ready for d in devices):
+    ready = [d for d in devices if d.is_ready]
+    if not ready:
         sys.exit(1)
+
+    if len(ready) == 1:
+        mode_info = device_module.get_usb_mode_info(client, ready[0].serial)
+        if mode_info.guidance:
+            click.echo(mode_info.guidance)
 
 
 @device_cmd.command("info")
