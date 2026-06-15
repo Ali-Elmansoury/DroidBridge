@@ -111,14 +111,14 @@ def get_apps(client, serial):
     return apps
 
 
-APP_SORT_KEYS = ("name", "total", "apk", "data", "cache", "install_date", "update_date")
+APP_SORT_KEYS = ("name", "total", "size", "apk", "data", "cache", "install_date", "update_date")
 
 
 def sort_apps(apps, by="name", reverse=False):
-    """Sort AppInfo list by 'name', 'total', 'apk', 'data', 'cache', 'install_date', or 'update_date'."""
+    """Sort AppInfo list by 'name', 'total'/'size', 'apk', 'data', 'cache', 'install_date', or 'update_date'."""
     if by == "name":
         key = lambda a: a.name.lower()
-    elif by == "total":
+    elif by in ("total", "size"):
         key = lambda a: a.total_size
     elif by == "apk":
         key = lambda a: a.apk_size

@@ -124,6 +124,15 @@ class TestSortApps:
 
         assert [x.package for x in result] == ["com.b", "com.c", "com.a"]
 
+    def test_sort_by_size_descending_matches_total(self):
+        a = _make_app("com.a", total=(100, 0, 0))
+        b = _make_app("com.b", total=(500, 0, 0))
+        c = _make_app("com.c", total=(200, 0, 0))
+
+        result = apps.sort_apps([a, b, c], by="size", reverse=True)
+
+        assert [x.package for x in result] == ["com.b", "com.c", "com.a"]
+
     def test_sort_by_name_ascending(self):
         a = _make_app("com.charlie")
         b = _make_app("com.alpha")
