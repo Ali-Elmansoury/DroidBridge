@@ -631,6 +631,10 @@ class TestWhatsAppDelete:
         assert result.exit_code == 0
         assert "aborted" in result.output.lower()
         assert client.shell.call_count == 2
+        reports_dir = tmp_path / "session_logs" / "reports"
+        assert list(reports_dir.glob("whatsapp-deletion-preview_whatsapp_*.txt"))
+        assert not list(reports_dir.glob("whatsapp-deletion-result_whatsapp_*.txt"))
+        assert "Reports saved to session_logs/reports/" not in result.output
 
     def test_full_flow_deletes_and_reports(self, monkeypatch, tmp_path):
         monkeypatch.chdir(tmp_path)
