@@ -110,6 +110,12 @@ def device_info(serial):
         f"({info.storage.used_percent}%)"
     )
     click.echo(f"  Free:   {format_size_kb(info.storage.free_kb)}")
+    click.echo(f"USB type:      {info.usb_speed.usb_type}")
+    click.echo(f"Est. speed:    {info.usb_speed.estimated_speed}")
+    if info.usb_mode.mtp_enabled:
+        click.echo(f"USB mode:      {', '.join(info.usb_mode.functions)} (File Transfer enabled)")
+    else:
+        click.echo(f"USB mode:      {', '.join(info.usb_mode.functions)} (not File Transfer/MTP)")
 
 
 @cli.group("files")

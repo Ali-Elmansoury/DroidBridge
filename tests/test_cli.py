@@ -191,3 +191,41 @@ class TestDeviceInfo:
 
         assert result.exit_code == 1
         assert "ZZZ" in result.output
+
+    def test_includes_usb_type_speed_and_mode(self, monkeypatch):
+        client = make_fake_client([Device(serial="SERIAL123", state="device", model="Pixel_7")])
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(main.cli, ["device", "info"])
+
+        assert result.exit_code == 0
+        assert "USB type:" in result.output
+        assert "Est. speed:" in result.output
+        assert "Unknown" in result.output
+        assert "USB mode:" in result.output
+        assert "mtp, adb (File Transfer enabled)" in result.output
+
+    def test_usb_mode_not_mtp_shows_guidance_text(self, monkeypatch):
+        client = make_fake_client([Device(serial="SERIAL123", state="device", model="Pixel_7")])
+
+        def fake_shell(serial, command, timeout=None):
+            if command == ["getprop", "sys.usb.state"]:
+                return "adb\n"
+            if command[0] == "getprop":
+                return PROP_VALUES[command[1]]
+            if command[:2] == ["dumpsys", "battery"]:
+                return BATTERY_OUTPUT_CHARGING
+            if command[0] == "df":
+                return DF_OUTPUT
+            if command[0] == "cat":
+                return ""
+            raise AssertionError(f"Unexpected shell command: {command}")
+
+        client.shell.side_effect = fake_shell
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(main.cli, ["device", "info"])
+
+        assert result.exit_code == 0
+        assert "USB mode:" in result.output
+        assert "adb (not File Transfer/MTP)" in result.output
