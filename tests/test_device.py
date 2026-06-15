@@ -259,6 +259,22 @@ class TestRestartAdbServer:
         client.start_server.assert_called_once()
 
 
+class TestWaitForDevice:
+    def test_delegates_to_client_wait_for_device(self):
+        client = MagicMock()
+
+        device.wait_for_device(client, serial="SERIAL123", timeout=5)
+
+        client.wait_for_device.assert_called_once_with(serial="SERIAL123", timeout=5)
+
+    def test_defaults_to_no_serial_and_no_timeout(self):
+        client = MagicMock()
+
+        device.wait_for_device(client)
+
+        client.wait_for_device.assert_called_once_with(serial=None, timeout=None)
+
+
 class TestResolveReadyDevice:
     def test_no_ready_devices_raises_with_no_device_guidance(self):
         client = MagicMock()

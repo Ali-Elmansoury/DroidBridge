@@ -259,3 +259,8 @@ def ensure_adb_server_running(client):
 def restart_adb_server(client):
     """Restart the adb server (e.g. to recover from an offline device)."""
     client.restart_server()
+
+
+def wait_for_device(client, serial=None, timeout=None):
+    """Block until adb reports a device is connected (spec §1.1)."""
+    client.wait_for_device(serial=serial, timeout=timeout)
