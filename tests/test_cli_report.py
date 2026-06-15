@@ -202,6 +202,69 @@ class TestReportGenerateBackupSummary:
         assert "no backups recorded" in result.output.lower()
 
 
+class TestReportGenerateBackupVerification:
+    def test_requires_profile_option(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(backup_manager, "DEFAULT_PROFILES_PATH", tmp_path / "profiles.json")
+        monkeypatch.setattr(backup_manager, "DEFAULT_HISTORY_PATH", tmp_path / "backup_history.json")
+
+        result = CliRunner().invoke(main.cli, ["report", "generate", "--type", "backup-verification"])
+
+        assert result.exit_code == 1
+        assert "--profile" in result.output
+
+    def test_no_backups_for_profile_errors(self, monkeypatch, tmp_path):
+        profiles_path = tmp_path / "profiles.json"
+        monkeypatch.setattr(backup_manager, "DEFAULT_PROFILES_PATH", profiles_path)
+        monkeypatch.setattr(backup_manager, "DEFAULT_HISTORY_PATH", tmp_path / "backup_history.json")
+        backup_manager.save_profile(
+            profiles_path,
+            backup_manager.BackupProfile(name="whatsapp_full", sources=["/sdcard/a.jpg"], dest=str(tmp_path / "dest")),
+        )
+
+        result = CliRunner().invoke(
+            main.cli, ["report", "generate", "--type", "backup-verification", "--profile", "whatsapp_full"]
+        )
+
+        assert result.exit_code == 1
+        assert "no backups recorded" in result.output.lower()
+
+    def test_no_device_needed_and_writes_report(self, monkeypatch, tmp_path):
+        profiles_path = tmp_path / "profiles.json"
+        history_path = tmp_path / "backup_history.json"
+        monkeypatch.setattr(backup_manager, "DEFAULT_PROFILES_PATH", profiles_path)
+        monkeypatch.setattr(backup_manager, "DEFAULT_HISTORY_PATH", history_path)
+        monkeypatch.chdir(tmp_path)
+
+        dest = tmp_path / "dest"
+        dest.mkdir()
+        (dest / "a.jpg").write_bytes(b"x" * 1000)
+
+        backup_manager.save_profile(
+            profiles_path,
+            backup_manager.BackupProfile(name="whatsapp_full", sources=["/sdcard/a.jpg"], dest=str(dest)),
+        )
+        backup_manager.append_history(
+            history_path,
+            backup_manager.BackupRecord("whatsapp_full", "2026-06-01T00:00:00+00:00", 1, 1000, 1.0, str(dest), True),
+        )
+
+        def _fail_build_client():
+            raise AssertionError("_build_client should not be called for backup-verification")
+
+        monkeypatch.setattr(main, "_build_client", _fail_build_client)
+
+        result = CliRunner().invoke(
+            main.cli,
+            ["report", "generate", "--type", "backup-verification", "--profile", "whatsapp_full", "--format", "json"],
+        )
+
+        assert result.exit_code == 0
+        out_files = list((tmp_path / "session_logs" / "reports").glob("backup-verification_*.json"))
+        assert len(out_files) == 1
+        content = json.loads(out_files[0].read_text())
+        assert content["title"] == "Backup Verification — whatsapp_full"
+
+
 class TestReportGenerateWhatsApp:
     def test_no_whatsapp_installed_exits_nonzero(self, monkeypatch):
         client = make_fake_client(READY_DEVICE, shell_side_effect=[DETECT_NONE])

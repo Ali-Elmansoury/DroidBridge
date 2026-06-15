@@ -1896,6 +1896,7 @@ _REPORT_TYPES = (
     "whatsapp-documents",
     "backup-history",
     "backup-summary",
+    "backup-verification",
 )
 
 _REPORT_RENDERERS = {"txt": to_txt, "html": to_html, "csv": to_csv, "json": to_json}
@@ -1972,10 +1973,10 @@ def _build_full_report(client, serial, app, top_n):
 @click.option("--top", "top_n", type=int, default=20, show_default=True, help="Number of apps for --type top-apps (or full).")
 @click.option("--min-size", default=None, help="Minimum file size for --type large-files, e.g. 50MB (default: 50MB).")
 @click.option("--cutoff", default=None, help="Cutoff date (YYYY-MM-DD), required for --type whatsapp-cutoff.")
-@click.option("--profile", "profile_name", default=None, help="Backup profile name, required for --type backup-summary.")
+@click.option("--profile", "profile_name", default=None, help="Backup profile name, required for --type backup-summary or backup-verification.")
 def report_generate(serial, app, report_type, report_format, output_path, top_n, min_size, cutoff, profile_name):
     """Generate a report and write it to a file, e.g. `droidbridge report generate --format html` (spec §9)."""
-    needs_device = report_type not in ("storage-trend", "backup-history", "backup-summary")
+    needs_device = report_type not in ("storage-trend", "backup-history", "backup-summary", "backup-verification")
 
     client = None
     if needs_device:
@@ -2019,6 +2020,30 @@ def report_generate(serial, app, report_type, report_format, output_path, top_n,
             click.echo(f"No backups recorded for profile {profile_name!r}.", err=True)
             sys.exit(1)
         report = backup_reports.build_backup_summary_report(record)
+    elif report_type == "backup-verification":
+        if not profile_name:
+            click.echo("Error: --profile is required for --type backup-verification.", err=True)
+            sys.exit(1)
+        profile = backup_module.get_profile(backup_module.DEFAULT_PROFILES_PATH, profile_name)
+        if profile is None:
+            click.echo(f"Error: profile {profile_name!r} not found.", err=True)
+            sys.exit(1)
+        history = backup_module.load_history(backup_module.DEFAULT_HISTORY_PATH)
+        record = backup_module.last_backup(history, profile_name)
+        if record is None:
+            click.echo(
+                f"No backups recorded for profile {profile_name!r}. Run `backup run --profile {profile_name}` first.",
+                err=True,
+            )
+            sys.exit(1)
+        actual_files, actual_bytes = backup_module.measure_destination(record.destination)
+        result = transfer_module.VerificationResult(
+            expected_files=record.file_count,
+            expected_bytes=record.total_bytes,
+            actual_files=actual_files,
+            actual_bytes=actual_bytes,
+        )
+        report = backup_reports.build_backup_verification_report(profile_name, result)
     elif report_type == "whatsapp-inventory":
         media_files = _build_whatsapp_media_files(client, serial, app)
         report = whatsapp_reports.build_media_inventory_report(media_files)
