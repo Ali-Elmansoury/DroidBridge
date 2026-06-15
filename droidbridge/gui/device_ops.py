@@ -31,3 +31,8 @@ def connect():
 def refresh_info(client, serial):
     """Return a DeviceInfo for `serial` (thin wrapper around device_module.get_device_info)."""
     return device_module.get_device_info(client, serial)
+
+
+def is_device_ready(client, serial):
+    """Return True if `serial` is currently in adb's ready ('device') list (spec §1.1)."""
+    return any(d.serial == serial for d in device_module.get_ready_devices(client))

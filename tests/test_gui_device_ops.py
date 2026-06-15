@@ -73,3 +73,23 @@ class TestRefreshInfo:
         result = device_ops.refresh_info(client, "SERIAL123")
 
         assert result is expected
+
+
+class TestIsDeviceReady:
+    def test_true_when_serial_in_ready_devices(self):
+        client = MagicMock()
+        client.devices.return_value = [Device(serial="SERIAL123", state="device")]
+
+        assert device_ops.is_device_ready(client, "SERIAL123") is True
+
+    def test_false_when_serial_not_ready(self):
+        client = MagicMock()
+        client.devices.return_value = [Device(serial="OTHER", state="device")]
+
+        assert device_ops.is_device_ready(client, "SERIAL123") is False
+
+    def test_false_when_no_devices(self):
+        client = MagicMock()
+        client.devices.return_value = []
+
+        assert device_ops.is_device_ready(client, "SERIAL123") is False
