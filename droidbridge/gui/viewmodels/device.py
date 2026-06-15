@@ -25,6 +25,7 @@ class DeviceViewModel(QObject):
         self.context = context
         self._worker_factory = worker_factory
         self._workers = []
+        self._device_offline = False
 
     def connect_device(self):
         """Build a client, ensure the adb server is running, and pick a device."""
@@ -35,14 +36,33 @@ class DeviceViewModel(QObject):
         """Reload device info for the currently connected device."""
         self.logMessage.emit("Refreshing device info...", "INFO")
         client, serial = self.context.client, self.context.serial
-        self._run(lambda: device_ops.refresh_info(client, serial), self._on_refresh_finished)
+        self._run(
+            lambda: device_ops.refresh_info(client, serial),
+            self._on_refresh_finished,
+            self._on_refresh_error,
+        )
 
-    def _run(self, fn, on_finished):
+    def poll(self):
+        """Called by the Device page's auto-refresh timer (spec §1.1 reconnect)."""
+        if self._workers or not self.context.is_connected:
+            return
+        if self._device_offline:
+            client, serial = self.context.client, self.context.serial
+            self._run(
+                lambda: device_ops.is_device_ready(client, serial),
+                self._on_presence_checked,
+                self._on_presence_check_failed,
+            )
+        else:
+            self.refresh()
+
+    def _run(self, fn, on_finished, on_error=None):
+        on_error = on_error or self._on_error
         self.busyChanged.emit(True)
         worker = self._worker_factory(fn)
         self._workers.append(worker)
         worker.finished.connect(lambda result: self._finish(worker, on_finished, result))
-        worker.error.connect(lambda exc: self._finish(worker, self._on_error, exc))
+        worker.error.connect(lambda exc: self._finish(worker, on_error, exc))
         worker.start()
 
     def _finish(self, worker, callback, payload):
@@ -69,6 +89,9 @@ class DeviceViewModel(QObject):
         self.refresh()
 
     def _on_refresh_finished(self, info):
+        if self._device_offline:
+            self._device_offline = False
+            self.logMessage.emit("Device reconnected.", "INFO")
         self.statusChanged.emit("")
         data = {
             "serial": info.serial,
@@ -88,3 +111,16 @@ class DeviceViewModel(QObject):
     def _on_error(self, exc):
         self.statusChanged.emit(str(exc))
         self.logMessage.emit(str(exc), "ERROR")
+
+    def _on_refresh_error(self, exc):
+        if not self._device_offline:
+            self._device_offline = True
+            self.statusChanged.emit("Device disconnected. Waiting to reconnect...")
+            self.logMessage.emit(f"Device disconnected: {exc}", "WARNING")
+
+    def _on_presence_checked(self, ready):
+        if ready:
+            self.refresh()
+
+    def _on_presence_check_failed(self, exc):
+        pass  # adb hiccup; just wait for the next tick

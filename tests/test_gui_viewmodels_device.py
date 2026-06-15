@@ -128,7 +128,7 @@ class TestRefresh:
         assert info_events[0]["storage_used"] == "500.0 KB"
         assert info_events[0]["storage_free"] == "500.0 KB"
 
-    def test_error_emits_status_and_log(self, qtbot, monkeypatch):
+    def test_error_sets_offline_status_and_logs_warning(self, qtbot, monkeypatch):
         context = DeviceContext()
         context.set_connected(MagicMock(), "SERIAL123", "Pixel 7")
         vm = DeviceViewModel(context, worker_factory=FakeWorker)
@@ -140,15 +140,19 @@ class TestRefresh:
 
         statuses = []
         vm.statusChanged.connect(statuses.append)
+        logs = []
+        vm.logMessage.connect(lambda msg, level: logs.append((msg, level)))
 
         vm.refresh()
 
-        assert statuses == ["adb shell failed"]
+        assert statuses == ["Device disconnected. Waiting to reconnect..."]
+        assert vm._device_offline is True
+        assert any(level == "WARNING" and "Device disconnected" in msg for msg, level in logs)
 
-    def test_success_after_error_clears_status_bar(self, qtbot, monkeypatch):
+    def test_success_after_error_clears_offline_status_and_logs_reconnect(self, qtbot, monkeypatch):
         """A transient auto-refresh failure (e.g. a momentary USB drop reported as
-        "device not found") shouldn't leave a stale error message in the status bar
-        forever - once a later refresh succeeds, the message should be cleared.
+        "device not found") sets the offline status - once a later refresh succeeds,
+        the status should clear and a "Device reconnected." message logged.
         """
         context = DeviceContext()
         context.set_connected(MagicMock(), "SERIAL123", "Pixel 7")
@@ -156,17 +160,22 @@ class TestRefresh:
 
         statuses = []
         vm.statusChanged.connect(statuses.append)
+        logs = []
+        vm.logMessage.connect(lambda msg, level: logs.append((msg, level)))
 
         monkeypatch.setattr(
             device_ops, "refresh_info",
             lambda client, serial: (_ for _ in ()).throw(ValueError("device not found")),
         )
         vm.refresh()
-        assert statuses == ["device not found"]
+        assert statuses == ["Device disconnected. Waiting to reconnect..."]
+        assert vm._device_offline is True
 
         monkeypatch.setattr(device_ops, "refresh_info", lambda client, serial: SAMPLE_INFO)
         vm.refresh()
-        assert statuses == ["device not found", ""]
+        assert statuses == ["Device disconnected. Waiting to reconnect...", ""]
+        assert vm._device_offline is False
+        assert ("Device reconnected.", "INFO") in logs
 
 
 class TestWorkerLifecycle:
@@ -208,4 +217,96 @@ class TestWorkerLifecycle:
             vm.connect_device()
 
         assert info_events, "infoChanged must fire before busyChanged(False)"
+        assert vm._workers == []
+
+
+class TestPoll:
+    def test_connected_and_online_calls_refresh(self, qtbot, monkeypatch):
+        context = DeviceContext()
+        context.set_connected(MagicMock(), "SERIAL123", "Pixel 7")
+        vm = DeviceViewModel(context, worker_factory=FakeWorker)
+        monkeypatch.setattr(device_ops, "refresh_info", lambda client, serial: SAMPLE_INFO)
+
+        info_events = []
+        vm.infoChanged.connect(info_events.append)
+
+        vm.poll()
+
+        assert info_events[0]["serial"] == "SERIAL123"
+
+    def test_not_connected_does_nothing(self, qtbot, monkeypatch):
+        context = DeviceContext()
+        vm = DeviceViewModel(context, worker_factory=FakeWorker)
+
+        calls = []
+        monkeypatch.setattr(device_ops, "refresh_info", lambda c, s: calls.append(True))
+
+        vm.poll()
+
+        assert calls == []
+
+    def test_busy_does_nothing(self, qtbot, monkeypatch):
+        context = DeviceContext()
+        context.set_connected(MagicMock(), "SERIAL123", "Pixel 7")
+        vm = DeviceViewModel(context, worker_factory=FakeWorker)
+        vm._workers.append(object())
+
+        calls = []
+        monkeypatch.setattr(device_ops, "refresh_info", lambda c, s: calls.append(True))
+
+        vm.poll()
+
+        assert calls == []
+
+    def test_offline_and_device_ready_reconnects(self, qtbot, monkeypatch):
+        context = DeviceContext()
+        context.set_connected(MagicMock(), "SERIAL123", "Pixel 7")
+        vm = DeviceViewModel(context, worker_factory=FakeWorker)
+        vm._device_offline = True
+
+        monkeypatch.setattr(device_ops, "is_device_ready", lambda client, serial: True)
+        monkeypatch.setattr(device_ops, "refresh_info", lambda client, serial: SAMPLE_INFO)
+
+        info_events = []
+        vm.infoChanged.connect(info_events.append)
+        logs = []
+        vm.logMessage.connect(lambda msg, level: logs.append((msg, level)))
+
+        vm.poll()
+
+        assert vm._device_offline is False
+        assert info_events[0]["serial"] == "SERIAL123"
+        assert ("Device reconnected.", "INFO") in logs
+        assert vm._workers == []
+
+    def test_offline_and_device_not_ready_stays_offline(self, qtbot, monkeypatch):
+        context = DeviceContext()
+        context.set_connected(MagicMock(), "SERIAL123", "Pixel 7")
+        vm = DeviceViewModel(context, worker_factory=FakeWorker)
+        vm._device_offline = True
+
+        monkeypatch.setattr(device_ops, "is_device_ready", lambda client, serial: False)
+        refresh_calls = []
+        monkeypatch.setattr(device_ops, "refresh_info", lambda c, s: refresh_calls.append(True))
+
+        vm.poll()
+
+        assert vm._device_offline is True
+        assert refresh_calls == []
+        assert vm._workers == []
+
+    def test_offline_and_presence_check_errors_stays_offline(self, qtbot, monkeypatch):
+        context = DeviceContext()
+        context.set_connected(MagicMock(), "SERIAL123", "Pixel 7")
+        vm = DeviceViewModel(context, worker_factory=FakeWorker)
+        vm._device_offline = True
+
+        def raise_error(client, serial):
+            raise ValueError("adb hiccup")
+
+        monkeypatch.setattr(device_ops, "is_device_ready", raise_error)
+
+        vm.poll()
+
+        assert vm._device_offline is True
         assert vm._workers == []
