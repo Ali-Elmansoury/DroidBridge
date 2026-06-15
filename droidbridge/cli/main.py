@@ -420,6 +420,13 @@ def _report_verification(result):
     return False
 
 
+def _write_report(report, filename_stem):
+    content = to_txt(report)
+    out = Path("session_logs") / "reports" / f"{filename_stem}.txt"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(content, encoding="utf-8")
+
+
 _CONFLICT_OPTION = click.option(
     "--conflict",
     type=click.Choice(transfer_module.CONFLICT_MODES),
@@ -1781,6 +1788,42 @@ def backup_restore(profile_name, sources, after, before, conflict, no_verify, se
         click.echo()
 
     if any_failed:
+        sys.exit(1)
+
+
+@backup_cmd.command("verify")
+@click.option("--profile", "profile_name", required=True, help="Name of a saved backup profile.")
+def backup_verify(profile_name):
+    """Verify a backup's integrity against its last recorded run (spec §6.3)."""
+    profile = backup_module.get_profile(backup_module.DEFAULT_PROFILES_PATH, profile_name)
+    if profile is None:
+        click.echo(f"Error: profile {profile_name!r} not found.", err=True)
+        sys.exit(1)
+
+    history = backup_module.load_history(backup_module.DEFAULT_HISTORY_PATH)
+    record = backup_module.last_backup(history, profile_name)
+    if record is None:
+        click.echo(
+            f"No backups recorded for profile {profile_name!r}. Run `backup run --profile {profile_name}` first.",
+            err=True,
+        )
+        sys.exit(1)
+
+    actual_files, actual_bytes = backup_module.measure_destination(record.destination)
+    result = transfer_module.VerificationResult(
+        expected_files=record.file_count,
+        expected_bytes=record.total_bytes,
+        actual_files=actual_files,
+        actual_bytes=actual_bytes,
+    )
+    report = backup_reports.build_backup_verification_report(profile_name, result)
+    click.echo(to_txt(report))
+
+    stem = f"backup-verification_{profile_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    _write_report(report, stem)
+    click.echo(f"Report written to session_logs/reports/{stem}.txt")
+
+    if not result.ok:
         sys.exit(1)
 
 

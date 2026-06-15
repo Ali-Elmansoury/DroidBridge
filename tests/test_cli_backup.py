@@ -399,3 +399,84 @@ class TestBackupProfileRemove:
 
         assert result.exit_code != 0
         assert "not found" in result.output.lower()
+
+
+class TestBackupVerify:
+    def test_unknown_profile_errors(self, tmp_path, monkeypatch):
+        profiles_path = tmp_path / "profiles.json"
+        history_path = tmp_path / "history.json"
+        monkeypatch.setattr(backup_manager, "DEFAULT_PROFILES_PATH", profiles_path)
+        monkeypatch.setattr(backup_manager, "DEFAULT_HISTORY_PATH", history_path)
+
+        result = CliRunner().invoke(main.cli, ["backup", "verify", "--profile", "nope"])
+
+        assert result.exit_code != 0
+        assert "not found" in result.output.lower()
+
+    def test_no_backup_history_errors(self, tmp_path, monkeypatch):
+        profiles_path = tmp_path / "profiles.json"
+        history_path = tmp_path / "history.json"
+        monkeypatch.setattr(backup_manager, "DEFAULT_PROFILES_PATH", profiles_path)
+        monkeypatch.setattr(backup_manager, "DEFAULT_HISTORY_PATH", history_path)
+        backup_manager.save_profile(
+            profiles_path,
+            backup_manager.BackupProfile(name="test", sources=["/sdcard/a.jpg"], dest=str(tmp_path / "dest")),
+        )
+
+        result = CliRunner().invoke(main.cli, ["backup", "verify", "--profile", "test"])
+
+        assert result.exit_code == 1
+        assert "no backups recorded" in result.output.lower()
+
+    def test_matching_destination_passes_and_writes_report(self, tmp_path, monkeypatch):
+        profiles_path = tmp_path / "profiles.json"
+        history_path = tmp_path / "history.json"
+        monkeypatch.setattr(backup_manager, "DEFAULT_PROFILES_PATH", profiles_path)
+        monkeypatch.setattr(backup_manager, "DEFAULT_HISTORY_PATH", history_path)
+        monkeypatch.chdir(tmp_path)
+
+        dest = tmp_path / "dest"
+        dest.mkdir()
+        (dest / "a.jpg").write_bytes(b"x" * 1000)
+
+        backup_manager.save_profile(
+            profiles_path,
+            backup_manager.BackupProfile(name="test", sources=["/sdcard/a.jpg"], dest=str(dest)),
+        )
+        backup_manager.append_history(
+            history_path,
+            backup_manager.BackupRecord("test", "2026-06-01T00:00:00+00:00", 1, 1000, 1.0, str(dest), True),
+        )
+
+        result = CliRunner().invoke(main.cli, ["backup", "verify", "--profile", "test"])
+
+        assert result.exit_code == 0
+        assert "Status: OK" in result.output
+
+        reports = list((tmp_path / "session_logs" / "reports").glob("backup-verification_test_*.txt"))
+        assert len(reports) == 1
+
+    def test_mismatched_destination_fails(self, tmp_path, monkeypatch):
+        profiles_path = tmp_path / "profiles.json"
+        history_path = tmp_path / "history.json"
+        monkeypatch.setattr(backup_manager, "DEFAULT_PROFILES_PATH", profiles_path)
+        monkeypatch.setattr(backup_manager, "DEFAULT_HISTORY_PATH", history_path)
+        monkeypatch.chdir(tmp_path)
+
+        dest = tmp_path / "dest"
+        dest.mkdir()
+        (dest / "a.jpg").write_bytes(b"x" * 500)
+
+        backup_manager.save_profile(
+            profiles_path,
+            backup_manager.BackupProfile(name="test", sources=["/sdcard/a.jpg"], dest=str(dest)),
+        )
+        backup_manager.append_history(
+            history_path,
+            backup_manager.BackupRecord("test", "2026-06-01T00:00:00+00:00", 1, 1000, 1.0, str(dest), True),
+        )
+
+        result = CliRunner().invoke(main.cli, ["backup", "verify", "--profile", "test"])
+
+        assert result.exit_code == 1
+        assert "Status: MISMATCH" in result.output
