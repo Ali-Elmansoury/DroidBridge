@@ -927,6 +927,26 @@ def whatsapp_organize(src, type_name):
     click.echo(f"Done. See {whatsapp_module._organized_dest_root(src)}")
 
 
+@whatsapp_cmd.command("fix-extensions")
+@click.option(
+    "--path",
+    "src_dir",
+    required=True,
+    type=click.Path(exists=True, file_okay=False),
+    help="Local backup folder to fix (collapse double dots, sniff missing extensions).",
+)
+def whatsapp_fix_extensions(src_dir):
+    """Fix double-dot and missing-extension filenames in a backup folder (spec §4.5)."""
+    renames = whatsapp_module.fix_filenames(src_dir)
+    if not renames:
+        click.echo("No filenames needed fixing.")
+        return
+    for old_path, new_path in renames:
+        click.echo(f"{old_path} -> {new_path}")
+    word = "filename" if len(renames) == 1 else "filenames"
+    click.echo(f"Fixed {len(renames)} {word}.")
+
+
 @whatsapp_cmd.command("delete")
 @_SERIAL_OPTION
 @_APP_OPTION

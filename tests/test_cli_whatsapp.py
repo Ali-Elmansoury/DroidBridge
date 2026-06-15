@@ -490,6 +490,29 @@ class TestWhatsAppOrganize:
         assert "nothing to organize" in result.output.lower()
 
 
+class TestWhatsAppFixExtensions:
+    def test_fixes_double_dot_and_missing_extension(self, tmp_path):
+        (tmp_path / "Sheet..pdf").write_bytes(b"%PDF-1.4")
+        (tmp_path / "DOC-20220310-WA0001.").write_bytes(b"%PDF-1.4")
+
+        result = CliRunner().invoke(main.cli, ["whatsapp", "fix-extensions", "--path", str(tmp_path)])
+
+        assert result.exit_code == 0
+        assert f"{tmp_path / 'Sheet..pdf'} -> {tmp_path / 'Sheet.pdf'}" in result.output
+        assert f"{tmp_path / 'DOC-20220310-WA0001.'} -> {tmp_path / 'DOC-20220310-WA0001.pdf'}" in result.output
+        assert "Fixed 2 filenames" in result.output
+        assert (tmp_path / "Sheet.pdf").exists()
+        assert (tmp_path / "DOC-20220310-WA0001.pdf").exists()
+
+    def test_nothing_to_fix_message(self, tmp_path):
+        (tmp_path / "IMG-20230101-WA0001.jpg").write_bytes(b"\xff\xd8\xff\xe0")
+
+        result = CliRunner().invoke(main.cli, ["whatsapp", "fix-extensions", "--path", str(tmp_path)])
+
+        assert result.exit_code == 0
+        assert "No filenames needed fixing." in result.output
+
+
 # IMG-20230101 (pre-cutoff) and IMG-20250101 (post-cutoff).
 DELETE_SCAN_OUTPUT = (
     f"{WA_MEDIA}/WhatsApp Images/IMG-20230101-WA0001.jpg\t1000\t1672531200.0\n"
