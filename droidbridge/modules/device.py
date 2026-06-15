@@ -105,6 +105,8 @@ class DeviceInfo:
     battery_level: Optional[int] = None
     battery_status: str = ""
     storage: Optional[StorageInfo] = None
+    usb_speed: Optional[UsbSpeedInfo] = None
+    usb_mode: Optional[UsbModeInfo] = None
 
 
 def list_devices(client):
@@ -226,7 +228,7 @@ def get_usb_speed_info(client, serial):
 
 
 def get_device_info(client, serial):
-    """Gather model, manufacturer, Android version, battery, and storage info."""
+    """Gather model, manufacturer, Android version, battery, storage, and USB info."""
     battery_level, battery_status = get_battery_info(client, serial)
     return DeviceInfo(
         serial=serial,
@@ -238,6 +240,8 @@ def get_device_info(client, serial):
         battery_level=battery_level,
         battery_status=battery_status,
         storage=get_storage_breakdown(client, serial),
+        usb_speed=get_usb_speed_info(client, serial),
+        usb_mode=get_usb_mode_info(client, serial),
     )
 
 

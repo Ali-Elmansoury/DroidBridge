@@ -34,6 +34,7 @@ PROP_VALUES = {
     "ro.build.version.release": "14\n",
     "ro.build.version.sdk": "34\n",
     "ro.build.display.id": "UQ1A.240205.004\n",
+    "sys.usb.state": "mtp,adb\n",
 }
 
 
@@ -48,6 +49,8 @@ def make_fake_client(battery_output=BATTERY_OUTPUT_CHARGING, df_output=DF_OUTPUT
             return battery_output
         if command[0] == "df":
             return df_output
+        if command[0] == "cat":
+            return ""
         raise AssertionError(f"Unexpected shell command: {command}")
 
     client.shell.side_effect = fake_shell
@@ -174,6 +177,16 @@ class TestGetDeviceInfo:
         assert info.battery_level == 85
         assert info.battery_status == "charging"
         assert info.storage.total_kb == 120000000
+
+    def test_includes_usb_mode_and_speed_info(self):
+        client = make_fake_client()
+
+        info = device.get_device_info(client, "SERIAL123")
+
+        assert info.usb_mode.mtp_enabled is True
+        assert info.usb_mode.functions == ["mtp", "adb"]
+        assert info.usb_speed.usb_type == "Unknown"
+        assert info.usb_speed.estimated_speed == "Unknown"
 
 
 class TestListDevices:
