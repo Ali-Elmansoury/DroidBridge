@@ -615,6 +615,7 @@ class TestWhatsAppDelete:
 
         reports = list((tmp_path / "session_logs" / "reports").glob("whatsapp-deletion-preview_whatsapp_*.txt"))
         assert len(reports) == 1
+        assert not list((tmp_path / "session_logs" / "reports").glob("whatsapp-storage-comparison_*.txt"))
 
     def test_aborts_without_yes_delete_confirmation(self, monkeypatch, tmp_path):
         monkeypatch.chdir(tmp_path)
@@ -636,6 +637,7 @@ class TestWhatsAppDelete:
         assert list(reports_dir.glob("whatsapp-deletion-preview_whatsapp_*.txt"))
         assert not list(reports_dir.glob("whatsapp-deletion-result_whatsapp_*.txt"))
         assert "Reports saved to session_logs/reports/" not in result.output
+        assert not list(reports_dir.glob("whatsapp-storage-comparison_*.txt"))
 
     def test_full_flow_deletes_and_reports(self, monkeypatch, tmp_path):
         monkeypatch.chdir(tmp_path)
