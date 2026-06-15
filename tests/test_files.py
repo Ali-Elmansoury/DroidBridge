@@ -352,6 +352,14 @@ class TestDeletePaths:
         assert rm_rf_calls == ["rm -rf /sdcard/DCIM"]
         assert rm_f_calls == ["rm -f /sdcard/a.jpg"]
 
+    def test_missing_path_is_skipped(self):
+        client = MagicMock()
+        client.shell.side_effect = ["MISSING\n"]
+
+        files.delete_paths(client, "SERIAL", ["/sdcard/nope.txt"])
+
+        assert client.shell.call_count == 1
+
 
 class TestVerifyDeletion:
     def test_mixed_deleted_and_remaining(self):

@@ -236,6 +236,8 @@ def delete_paths(client, serial, paths):
     files_to_delete = []
     for path in paths:
         kind, _size = _stat_path(client, serial, path)
+        if kind == "missing":
+            continue
         (dirs if kind == "dir" else files_to_delete).append(path)
 
     for directory in dirs:
