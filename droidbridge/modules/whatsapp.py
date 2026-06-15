@@ -754,6 +754,7 @@ class DeleteVerification:
 
     deleted: int
     remaining: list
+    after_files: list = field(default_factory=list)
 
 
 def verify_delete(client, serial, install, plan):
@@ -769,7 +770,7 @@ def verify_delete(client, serial, install, plan):
     remaining = [media_file for media_file in plan.to_delete if media_file.path in still_present]
     deleted = len(plan.to_delete) - len(remaining)
 
-    return DeleteVerification(deleted=deleted, remaining=remaining)
+    return DeleteVerification(deleted=deleted, remaining=remaining, after_files=rescanned)
 
 
 def plan_backup(client, serial, installs, dest_dir, types=None, conflict=transfer_module.CONFLICT_SKIP):

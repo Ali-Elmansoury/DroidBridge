@@ -813,6 +813,20 @@ class TestVerifyDelete:
         assert result.deleted == 0
         assert result.remaining == []
 
+    def test_after_files_reflects_full_rescan(self):
+        deleted_path = f"{WA_MEDIA}/WhatsApp Images/IMG-20230101-WA0001.jpg"
+        remaining_path = f"{WA_MEDIA}/WhatsApp Images/IMG-20230102-WA0002.jpg"
+        deleted_file = self._file(deleted_path, size=1000)
+        remaining_file = self._file(remaining_path, size=2000)
+        plan = whatsapp.DeletePlan(to_delete=[deleted_file, remaining_file], kept=[])
+
+        rescan_output = f"{remaining_path}\t2000\t1672617600.0\n"
+
+        result = whatsapp.verify_delete(make_client(rescan_output), "SERIAL", WA_INSTALL, plan)
+        expected_after = whatsapp.scan_media(make_client(rescan_output), "SERIAL", WA_INSTALL)
+
+        assert result.after_files == expected_after
+
 
 class TestIsEncryptedDbFile:
     def test_crypt14_is_encrypted(self):
