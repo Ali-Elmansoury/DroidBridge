@@ -74,6 +74,15 @@ class TestFilesSearch:
         assert "report.pdf" in result.output
         assert ".png" not in result.output
 
+    def test_type_alias_for_extension_filter(self, monkeypatch):
+        client = make_fake_client(READY_DEVICE)
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(main.cli, ["files", "search", "--type", "pdf"])
+
+        assert "report.pdf" in result.output
+        assert ".png" not in result.output
+
     def test_size_filters_with_human_units(self, monkeypatch):
         client = make_fake_client(READY_DEVICE)
         monkeypatch.setattr(main, "_build_client", lambda: client)

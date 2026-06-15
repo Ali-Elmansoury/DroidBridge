@@ -197,6 +197,7 @@ def _format_result_line(result):
 @click.option(
     "--ext",
     "-e",
+    "--type",
     "extensions",
     multiple=True,
     help="Only show files with this extension (repeatable).",
