@@ -98,6 +98,25 @@ class TestPlanBackup:
         assert plan.items[0].action == transfer_module.ACTION_OVERWRITE
 
 
+class TestMeasureDestination:
+    def test_empty_directory_returns_zero(self, tmp_path):
+        file_count, total_bytes = backup_manager.measure_destination(str(tmp_path))
+
+        assert file_count == 0
+        assert total_bytes == 0
+
+    def test_sums_files_across_nested_directories(self, tmp_path):
+        (tmp_path / "a.jpg").write_bytes(b"x" * 1000)
+        subdir = tmp_path / "sub"
+        subdir.mkdir()
+        (subdir / "b.jpg").write_bytes(b"y" * 500)
+
+        file_count, total_bytes = backup_manager.measure_destination(str(tmp_path))
+
+        assert file_count == 2
+        assert total_bytes == 1500
+
+
 class TestHistory:
     def test_append_and_load_history(self, tmp_path):
         path = tmp_path / "history.json"

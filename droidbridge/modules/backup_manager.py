@@ -87,6 +87,17 @@ def find_failed_pull_items(plan):
     return [i for i in relevant if not (os.path.exists(i.dest) and os.path.getsize(i.dest) == i.size)]
 
 
+def measure_destination(dest):
+    """Walk `dest` and return (file_count, total_bytes) for all files under it (spec §6.3)."""
+    file_count = 0
+    total_bytes = 0
+    for root, _, files in os.walk(dest):
+        for fname in files:
+            total_bytes += os.path.getsize(os.path.join(root, fname))
+            file_count += 1
+    return file_count, total_bytes
+
+
 # Backup history (spec §6.4)
 
 
