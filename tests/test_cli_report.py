@@ -203,6 +203,17 @@ class TestReportGenerateBackupSummary:
 
 
 class TestReportGenerateBackupVerification:
+    def test_unknown_profile_errors(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(backup_manager, "DEFAULT_PROFILES_PATH", tmp_path / "profiles.json")
+        monkeypatch.setattr(backup_manager, "DEFAULT_HISTORY_PATH", tmp_path / "backup_history.json")
+
+        result = CliRunner().invoke(
+            main.cli, ["report", "generate", "--type", "backup-verification", "--profile", "nope"]
+        )
+
+        assert result.exit_code == 1
+        assert "not found" in result.output.lower()
+
     def test_requires_profile_option(self, monkeypatch, tmp_path):
         monkeypatch.setattr(backup_manager, "DEFAULT_PROFILES_PATH", tmp_path / "profiles.json")
         monkeypatch.setattr(backup_manager, "DEFAULT_HISTORY_PATH", tmp_path / "backup_history.json")
