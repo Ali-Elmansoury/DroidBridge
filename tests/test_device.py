@@ -96,6 +96,28 @@ class TestBatteryInfo:
         assert status == "discharging"
 
 
+class TestUsbModeInfo:
+    def test_mtp_present_has_no_guidance(self):
+        client = MagicMock()
+        client.shell.return_value = "mtp,adb\n"
+
+        info = device.get_usb_mode_info(client, "SERIAL123")
+
+        assert info.functions == ["mtp", "adb"]
+        assert info.mtp_enabled is True
+        assert info.guidance is None
+
+    def test_mtp_absent_has_guidance(self):
+        client = MagicMock()
+        client.shell.return_value = "adb\n"
+
+        info = device.get_usb_mode_info(client, "SERIAL123")
+
+        assert info.functions == ["adb"]
+        assert info.mtp_enabled is False
+        assert "File Transfer" in info.guidance
+
+
 class TestGetDeviceInfo:
     def test_aggregates_all_fields(self):
         client = make_fake_client()

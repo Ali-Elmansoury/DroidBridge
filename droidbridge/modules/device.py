@@ -51,6 +51,15 @@ class StorageInfo:
 
 
 @dataclass
+class UsbModeInfo:
+    """Current USB function mode, parsed from `getprop sys.usb.state` (spec §1.4)."""
+
+    functions: list
+    mtp_enabled: bool
+    guidance: Optional[str] = None
+
+
+@dataclass
 class DeviceInfo:
     """Aggregated device information for Module 1."""
 
@@ -150,6 +159,21 @@ def get_battery_info(client, serial):
         status_match.group(1) if status_match else None, "unknown"
     )
     return level, status
+
+
+def get_usb_mode_info(client, serial):
+    """Return the current USB function mode (spec §1.4)."""
+    raw = client.shell(serial, ["getprop", "sys.usb.state"]).strip()
+    functions = [f for f in raw.split(",") if f]
+    mtp_enabled = "mtp" in functions
+    guidance = None
+    if not mtp_enabled:
+        guidance = (
+            "USB mode is not set to File Transfer (MTP). For best compatibility, "
+            "pull down the USB notification on your phone and select "
+            "'File Transfer' / 'MTP'."
+        )
+    return UsbModeInfo(functions=functions, mtp_enabled=mtp_enabled, guidance=guidance)
 
 
 def get_device_info(client, serial):
