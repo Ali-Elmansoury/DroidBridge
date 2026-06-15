@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from droidbridge.core.adb import Device
+from droidbridge.core.adb import AdbError, Device
 from droidbridge.modules import device
 
 
@@ -116,6 +116,47 @@ class TestUsbModeInfo:
         assert info.functions == ["adb"]
         assert info.mtp_enabled is False
         assert "File Transfer" in info.guidance
+
+
+class TestUsbSpeedInfo:
+    def test_recognized_value_maps_to_type_and_estimate(self):
+        client = MagicMock()
+        client.shell.return_value = "480\n"
+
+        info = device.get_usb_speed_info(client, "SERIAL123")
+
+        assert info.raw == "480"
+        assert info.usb_type == "USB 2.0 (High Speed)"
+        assert info.estimated_speed == "~30-40 MB/s"
+
+    def test_unrecognized_value_sets_raw_only(self):
+        client = MagicMock()
+        client.shell.return_value = "9999\n"
+
+        info = device.get_usb_speed_info(client, "SERIAL123")
+
+        assert info.raw == "9999"
+        assert info.usb_type == "Unknown"
+        assert info.estimated_speed == "Unknown"
+
+    def test_adb_error_falls_back_to_unknown(self):
+        client = MagicMock()
+        client.shell.side_effect = AdbError("no such file")
+
+        info = device.get_usb_speed_info(client, "SERIAL123")
+
+        assert info.raw is None
+        assert info.usb_type == "Unknown"
+        assert info.estimated_speed == "Unknown"
+
+    def test_empty_output_falls_through_to_next_path(self):
+        client = MagicMock()
+        client.shell.side_effect = ["\n", "480\n"]
+
+        info = device.get_usb_speed_info(client, "SERIAL123")
+
+        assert info.raw == "480"
+        assert info.usb_type == "USB 2.0 (High Speed)"
 
 
 class TestGetDeviceInfo:

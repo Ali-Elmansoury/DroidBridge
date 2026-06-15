@@ -4,6 +4,8 @@ import re
 from dataclasses import dataclass
 from typing import Optional
 
+from droidbridge.core.adb import AdbError
+
 BATTERY_STATUS_NAMES = {
     "1": "unknown",
     "2": "charging",
@@ -57,6 +59,37 @@ class UsbModeInfo:
     functions: list
     mtp_enabled: bool
     guidance: Optional[str] = None
+
+
+USB_SPEED_LOOKUP = {
+    # raw value (lowercased) -> (usb_type, estimated_speed)
+    "1.5": ("USB 1.0 (Low Speed)", "~0.1 MB/s"),
+    "12": ("USB 1.1 (Full Speed)", "~1 MB/s"),
+    "480": ("USB 2.0 (High Speed)", "~30-40 MB/s"),
+    "5000": ("USB 3.0 / 3.1 Gen 1 (SuperSpeed)", "~150-300 MB/s"),
+    "10000": ("USB 3.1 / 3.2 Gen 2 (SuperSpeed+)", "~300-600 MB/s"),
+    "low": ("USB 1.0 (Low Speed)", "~0.1 MB/s"),
+    "full": ("USB 1.1 (Full Speed)", "~1 MB/s"),
+    "high": ("USB 2.0 (High Speed)", "~30-40 MB/s"),
+    "super": ("USB 3.0 / 3.1 Gen 1 (SuperSpeed)", "~150-300 MB/s"),
+    "super-speed-plus": ("USB 3.1 / 3.2 Gen 2 (SuperSpeed+)", "~300-600 MB/s"),
+}
+
+# Candidate sysfs paths exposing the gadget-side USB negotiated speed.
+# If none work on a given device, falls back to "Unknown" (no error).
+USB_SPEED_PATHS = (
+    "/sys/class/android_usb/android0/speed",
+    "/sys/class/android_usb/android0/current_speed",
+)
+
+
+@dataclass
+class UsbSpeedInfo:
+    """Best-effort USB connection type/speed estimate (spec §1.2)."""
+
+    raw: Optional[str] = None
+    usb_type: str = "Unknown"
+    estimated_speed: str = "Unknown"
 
 
 @dataclass
@@ -174,6 +207,22 @@ def get_usb_mode_info(client, serial):
             "'File Transfer' / 'MTP'."
         )
     return UsbModeInfo(functions=functions, mtp_enabled=mtp_enabled, guidance=guidance)
+
+
+def get_usb_speed_info(client, serial):
+    """Best-effort USB connection type/speed estimate (spec §1.2)."""
+    for path in USB_SPEED_PATHS:
+        try:
+            output = client.shell(serial, ["cat", path]).strip().lower()
+        except AdbError:
+            continue
+        if not output:
+            continue
+        usb_type, estimated = USB_SPEED_LOOKUP.get(output, (None, None))
+        if usb_type:
+            return UsbSpeedInfo(raw=output, usb_type=usb_type, estimated_speed=estimated)
+        return UsbSpeedInfo(raw=output)
+    return UsbSpeedInfo()
 
 
 def get_device_info(client, serial):
