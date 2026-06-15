@@ -20,6 +20,8 @@ def make_fake_client(devices):
             return BATTERY_OUTPUT_CHARGING
         if command[0] == "df":
             return DF_OUTPUT
+        if command[0] == "cat":
+            return ""
         raise AssertionError(f"Unexpected shell command: {command}")
 
     client.shell.side_effect = fake_shell
