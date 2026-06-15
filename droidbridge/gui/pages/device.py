@@ -89,7 +89,7 @@ class DevicePage(QWidget):
 
     def _on_refresh_timer(self):
         if not self._busy:
-            self.viewmodel.refresh()
+            self.viewmodel.poll()
 
     def _update_timer_state(self):
         if self.viewmodel.context.is_connected and self.auto_refresh_checkbox.isChecked():

@@ -97,12 +97,12 @@ class TestAutoRefresh:
 
         assert page._refresh_timer.isActive() is False
 
-    def test_refresh_timer_calls_refresh_when_idle(self, qtbot, monkeypatch):
+    def test_refresh_timer_calls_poll_when_idle(self, qtbot, monkeypatch):
         page, vm, _context = _make_page()
         qtbot.addWidget(page)
 
         calls = []
-        monkeypatch.setattr(vm, "refresh", lambda: calls.append(True))
+        monkeypatch.setattr(vm, "poll", lambda: calls.append(True))
 
         page._busy = False
         page._on_refresh_timer()
@@ -114,7 +114,7 @@ class TestAutoRefresh:
         qtbot.addWidget(page)
 
         calls = []
-        monkeypatch.setattr(vm, "refresh", lambda: calls.append(True))
+        monkeypatch.setattr(vm, "poll", lambda: calls.append(True))
 
         page._busy = True
         page._on_refresh_timer()
