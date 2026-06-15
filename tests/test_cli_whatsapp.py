@@ -8,6 +8,7 @@ from click.testing import CliRunner
 
 from droidbridge.cli import main
 from droidbridge.core.adb import Device
+from tests.test_device import DF_OUTPUT
 
 
 @contextmanager
@@ -600,7 +601,7 @@ class TestWhatsAppDelete:
 
     def test_blocks_when_backup_missing(self, monkeypatch, tmp_path):
         monkeypatch.chdir(tmp_path)
-        shell_outputs = [DETECT_WA_ONLY, DELETE_SCAN_OUTPUT]
+        shell_outputs = [DETECT_WA_ONLY, DELETE_SCAN_OUTPUT, DF_OUTPUT]
         client = make_fake_client(READY_DEVICE, shell_side_effect=shell_outputs)
         monkeypatch.setattr(main, "_build_client", lambda: client)
 
@@ -610,7 +611,7 @@ class TestWhatsAppDelete:
 
         assert result.exit_code == 1
         assert "not backed up" in result.output.lower()
-        assert client.shell.call_count == 2
+        assert client.shell.call_count == 3
 
         reports = list((tmp_path / "session_logs" / "reports").glob("whatsapp-deletion-preview_whatsapp_*.txt"))
         assert len(reports) == 1
@@ -618,7 +619,7 @@ class TestWhatsAppDelete:
     def test_aborts_without_yes_delete_confirmation(self, monkeypatch, tmp_path):
         monkeypatch.chdir(tmp_path)
         _write_backup_file(tmp_path, "WhatsApp Images/IMG-20230101-WA0001.jpg", 1000)
-        shell_outputs = [DETECT_WA_ONLY, DELETE_SCAN_OUTPUT]
+        shell_outputs = [DETECT_WA_ONLY, DELETE_SCAN_OUTPUT, DF_OUTPUT]
         client = make_fake_client(READY_DEVICE, shell_side_effect=shell_outputs)
         monkeypatch.setattr(main, "_build_client", lambda: client)
 
@@ -630,7 +631,7 @@ class TestWhatsAppDelete:
 
         assert result.exit_code == 0
         assert "aborted" in result.output.lower()
-        assert client.shell.call_count == 2
+        assert client.shell.call_count == 3
         reports_dir = tmp_path / "session_logs" / "reports"
         assert list(reports_dir.glob("whatsapp-deletion-preview_whatsapp_*.txt"))
         assert not list(reports_dir.glob("whatsapp-deletion-result_whatsapp_*.txt"))
@@ -639,7 +640,7 @@ class TestWhatsAppDelete:
     def test_full_flow_deletes_and_reports(self, monkeypatch, tmp_path):
         monkeypatch.chdir(tmp_path)
         _write_backup_file(tmp_path, "WhatsApp Images/IMG-20230101-WA0001.jpg", 1000)
-        shell_outputs = [DETECT_WA_ONLY, DELETE_SCAN_OUTPUT, "", DELETE_RESCAN_OUTPUT]
+        shell_outputs = [DETECT_WA_ONLY, DELETE_SCAN_OUTPUT, DF_OUTPUT, "", DELETE_RESCAN_OUTPUT, DF_OUTPUT]
         client = make_fake_client(READY_DEVICE, shell_side_effect=shell_outputs)
         monkeypatch.setattr(main, "_build_client", lambda: client)
 
@@ -653,9 +654,9 @@ class TestWhatsAppDelete:
         assert "Total to delete: 1 file" in result.output
         assert "deleted 1 file" in result.output.lower()
         assert "Reports saved to session_logs/reports/" in result.output
-        assert client.shell.call_count == 4
+        assert client.shell.call_count == 6
 
-        rm_serial, rm_command = client.shell.call_args_list[2][0]
+        rm_serial, rm_command = client.shell.call_args_list[3][0]
         assert rm_serial == "SERIAL123"
         assert rm_command.startswith("rm -f ")
         assert f"{WA_MEDIA}/WhatsApp Images/IMG-20230101-WA0001.jpg" in rm_command
@@ -664,11 +665,12 @@ class TestWhatsAppDelete:
         reports_dir = tmp_path / "session_logs" / "reports"
         assert list(reports_dir.glob("whatsapp-deletion-preview_whatsapp_*.txt"))
         assert list(reports_dir.glob("whatsapp-deletion-result_whatsapp_*.txt"))
+        assert list(reports_dir.glob("whatsapp-storage-comparison_*.txt"))
 
     def test_keep_excludes_type_from_deletion(self, monkeypatch, tmp_path):
         monkeypatch.chdir(tmp_path)
         _write_backup_file(tmp_path, "WhatsApp Images/IMG-20230101-WA0001.jpg", 1000)
-        shell_outputs = [DETECT_WA_ONLY, DELETE_SCAN_OUTPUT_WITH_DOC, "", DELETE_RESCAN_OUTPUT]
+        shell_outputs = [DETECT_WA_ONLY, DELETE_SCAN_OUTPUT_WITH_DOC, DF_OUTPUT, "", DELETE_RESCAN_OUTPUT, DF_OUTPUT]
         client = make_fake_client(READY_DEVICE, shell_side_effect=shell_outputs)
         monkeypatch.setattr(main, "_build_client", lambda: client)
 
@@ -686,12 +688,13 @@ class TestWhatsAppDelete:
         assert result.exit_code == 0
         assert "Total to delete: 1 file" in result.output
 
-        rm_serial, rm_command = client.shell.call_args_list[2][0]
+        rm_serial, rm_command = client.shell.call_args_list[3][0]
         assert "DOC-20230101-WA0001.pdf" not in rm_command
 
         reports_dir = tmp_path / "session_logs" / "reports"
         assert list(reports_dir.glob("whatsapp-deletion-preview_whatsapp_*.txt"))
         assert list(reports_dir.glob("whatsapp-deletion-result_whatsapp_*.txt"))
+        assert list(reports_dir.glob("whatsapp-storage-comparison_*.txt"))
 
 
 WA_BASE = "/sdcard/Android/media/com.whatsapp/WhatsApp"

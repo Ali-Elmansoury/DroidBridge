@@ -1027,6 +1027,8 @@ def whatsapp_delete(serial, app, before, keep_types, backup_dir):
         click.echo("Nothing to delete.")
         return
 
+    before_storage = device_module.get_storage_breakdown(client, serial)
+
     for install, plan in plans:
         if plan.total_files == 0:
             continue
@@ -1085,6 +1087,10 @@ def whatsapp_delete(serial, app, before, keep_types, backup_dir):
 
         result_report = deletion_reports.build_deletion_result_report(plan, result)
         _write_report(result_report, f"whatsapp-deletion-result_{_slug(install.label)}_{timestamp}")
+
+    after_storage = device_module.get_storage_breakdown(client, serial)
+    storage_report = deletion_reports.build_storage_comparison_report(before_storage, after_storage)
+    _write_report(storage_report, f"whatsapp-storage-comparison_{timestamp}")
 
     click.echo("Reports saved to session_logs/reports/")
 
