@@ -9,7 +9,7 @@ from pathlib import Path
 
 import click
 
-from droidbridge.core.adb import AdbClient, AdbError
+from droidbridge.core.adb import AdbClient, AdbError, AdbTimeoutError
 from droidbridge.core.platform import get_sleep_inhibitor
 from droidbridge.modules import apps as apps_module
 from droidbridge.modules import backup_manager as backup_module
@@ -116,6 +116,42 @@ def device_info(serial):
         click.echo(f"USB mode:      {', '.join(info.usb_mode.functions)} (File Transfer enabled)")
     else:
         click.echo(f"USB mode:      {', '.join(info.usb_mode.functions)} (not File Transfer/MTP)")
+
+
+@device_cmd.command("wait")
+@click.option(
+    "--serial",
+    "-s",
+    default=None,
+    help="Wait for a specific device serial (default: any device).",
+)
+@click.option(
+    "--timeout",
+    default=None,
+    type=int,
+    help="Maximum seconds to wait (default: wait indefinitely).",
+)
+def device_wait(serial, timeout):
+    """Block until a device is connected and ready (spec §1.1)."""
+    try:
+        client = _build_client()
+    except AdbError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+
+    click.echo("Waiting for device...")
+    try:
+        device_module.wait_for_device(client, serial=serial, timeout=timeout)
+    except AdbTimeoutError:
+        click.echo("Timed out waiting for device.", err=True)
+        sys.exit(1)
+
+    devices, messages = device_module.check_connection_health(client)
+    for message in messages:
+        click.echo(message)
+    if not any(d.is_ready for d in devices):
+        sys.exit(1)
+    click.echo("Device ready.")
 
 
 @cli.group("files")

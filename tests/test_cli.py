@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 from click.testing import CliRunner
 
 from droidbridge.cli import main
-from droidbridge.core.adb import AdbNotFoundError, Device
+from droidbridge.core.adb import AdbNotFoundError, AdbTimeoutError, Device
 from tests.test_device import BATTERY_OUTPUT_CHARGING, DF_OUTPUT, PROP_VALUES
 
 
@@ -229,3 +229,36 @@ class TestDeviceInfo:
         assert result.exit_code == 0
         assert "USB mode:" in result.output
         assert "adb (not File Transfer/MTP)" in result.output
+
+
+class TestDeviceWait:
+    def test_happy_path_prints_ready_and_exits_zero(self, monkeypatch):
+        client = make_fake_client([Device(serial="SERIAL123", state="device", model="Pixel_7")])
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(main.cli, ["device", "wait"])
+
+        assert result.exit_code == 0
+        assert "Device ready." in result.output
+        client.wait_for_device.assert_called_once_with(serial=None, timeout=None)
+
+    def test_timeout_prints_message_and_exits_nonzero(self, monkeypatch):
+        client = make_fake_client([])
+        client.wait_for_device.side_effect = AdbTimeoutError(["adb", "wait-for-device"], 5)
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(main.cli, ["device", "wait", "--timeout", "5"])
+
+        assert result.exit_code == 1
+        assert "Timed out" in result.output
+
+    def test_passes_serial_and_timeout_through(self, monkeypatch):
+        client = make_fake_client([Device(serial="SERIAL123", state="device", model="Pixel_7")])
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(
+            main.cli, ["device", "wait", "--serial", "SERIAL123", "--timeout", "10"]
+        )
+
+        assert result.exit_code == 0
+        client.wait_for_device.assert_called_once_with(serial="SERIAL123", timeout=10)
