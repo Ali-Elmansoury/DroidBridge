@@ -320,3 +320,105 @@ class TestHistoryFailedColumn:
 
         assert len(history_events) == 1
         assert history_events[0]["failed"] == 1
+
+
+class TestMirrorMode:
+    def test_start_mirror_pull_emits_mirror_plan_ready(self, qtbot, monkeypatch):
+        vm = TransferViewModel(_connected_context(), worker_factory=FakeWorker)
+
+        mirror_plan = transfer_module.TransferPlan(
+            direction="pull",
+            items=[],
+            extra_items=[transfer_module.ExtraItem(path="/tmp/extra.jpg", size=100)],
+        )
+        monkeypatch.setattr(transfer_module, "plan_mirror_pull", lambda *a, **k: mirror_plan)
+
+        plan_ready_events = []
+        vm.mirrorPlanReady.connect(plan_ready_events.append)
+
+        vm.start_mirror_pull("/sdcard/Camera", "/tmp/out", delete_extras=True, retry_count=3, verify=True)
+
+        assert len(plan_ready_events) == 1
+        info = plan_ready_events[0]
+        assert info["extra_files"] == 1
+        assert info["extra_bytes"] == 100
+        assert info["delete_extras_requested"] is True
+        assert "/tmp/extra.jpg" in info["extra_paths"]
+
+    def test_confirm_mirror_runs_execute_mirror_and_emits_history(self, qtbot, monkeypatch):
+        vm = TransferViewModel(_connected_context(), worker_factory=FakeWorker)
+
+        mirror_plan = transfer_module.TransferPlan(direction="pull", items=[], extra_items=[])
+        monkeypatch.setattr(transfer_module, "plan_mirror_pull", lambda *a, **k: mirror_plan)
+
+        mirror_result = transfer_module.MirrorResult(
+            progress=SAMPLE_RESULT,
+            deleted_files=0,
+            deleted_bytes=0,
+        )
+        captured = {}
+
+        def fake_execute_mirror(client, serial, plan, delete_extras=False, **kwargs):
+            captured["delete_extras"] = delete_extras
+            return mirror_result
+
+        monkeypatch.setattr(transfer_module, "execute_mirror", fake_execute_mirror)
+        monkeypatch.setattr(transfer_module, "verify_pull", lambda p: SAMPLE_VERIFICATION)
+
+        history_events = []
+        vm.historyEntryAdded.connect(history_events.append)
+
+        vm.start_mirror_pull("/sdcard/Camera", "/tmp/out", delete_extras=False, retry_count=3, verify=True)
+        vm.confirm_mirror(delete_extras_confirmed=False)
+
+        assert captured.get("delete_extras") is False
+        assert len(history_events) == 1
+        assert history_events[0]["direction"] == "mirror-pull"
+
+    def test_confirm_mirror_passes_delete_extras_confirmed(self, qtbot, monkeypatch):
+        vm = TransferViewModel(_connected_context(), worker_factory=FakeWorker)
+
+        monkeypatch.setattr(
+            transfer_module, "plan_mirror_push",
+            lambda *a, **k: transfer_module.TransferPlan(direction="push", items=[]),
+        )
+
+        captured = {}
+
+        def fake_execute_mirror(client, serial, plan, delete_extras=False, **kwargs):
+            captured["delete_extras"] = delete_extras
+            return transfer_module.MirrorResult(progress=SAMPLE_RESULT)
+
+        monkeypatch.setattr(transfer_module, "execute_mirror", fake_execute_mirror)
+        monkeypatch.setattr(
+            transfer_module, "verify_push",
+            lambda *a, **k: SAMPLE_VERIFICATION,
+        )
+
+        vm.start_mirror_push("/tmp/Camera", "/sdcard/Backup", delete_extras=True, retry_count=3, verify=False)
+        vm.confirm_mirror(delete_extras_confirmed=True)
+
+        assert captured.get("delete_extras") is True
+
+    def test_mirror_history_entry_includes_deleted_files(self, qtbot, monkeypatch):
+        vm = TransferViewModel(_connected_context(), worker_factory=FakeWorker)
+
+        monkeypatch.setattr(
+            transfer_module, "plan_mirror_pull",
+            lambda *a, **k: transfer_module.TransferPlan(direction="pull", items=[]),
+        )
+        monkeypatch.setattr(
+            transfer_module, "execute_mirror",
+            lambda *a, **k: transfer_module.MirrorResult(
+                progress=SAMPLE_RESULT, deleted_files=5, deleted_bytes=5000,
+            ),
+        )
+        monkeypatch.setattr(transfer_module, "verify_pull", lambda p: SAMPLE_VERIFICATION)
+
+        history_events = []
+        vm.historyEntryAdded.connect(history_events.append)
+
+        vm.start_mirror_pull("/sdcard/Camera", "/tmp/out", delete_extras=True, retry_count=3, verify=True)
+        vm.confirm_mirror(delete_extras_confirmed=True)
+
+        assert history_events[0]["deleted_files"] == 5
