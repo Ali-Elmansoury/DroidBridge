@@ -19,7 +19,7 @@ from droidbridge.modules import search as search_module
 from droidbridge.modules import storage as storage_module
 from droidbridge.modules import transfer as transfer_module
 from droidbridge.modules import whatsapp as whatsapp_module
-from droidbridge.reports import backup_reports, deletion_reports, storage_reports, whatsapp_reports
+from droidbridge.reports import backup_reports, deletion_reports, storage_reports, transfer_reports, whatsapp_reports
 from droidbridge.reports.generators import Report, to_csv, to_html, to_json, to_txt
 from droidbridge.utils.format import format_bar, format_bytes, format_duration, format_size_kb, parse_size
 
@@ -480,6 +480,14 @@ def _write_report(report, filename_stem):
     out.write_text(content, encoding="utf-8")
 
 
+def _report_failed_items(failed):
+    if not failed:
+        return
+    click.echo(f"{len(failed)} file(s) failed:", err=True)
+    for f in failed:
+        click.echo(f"  {f.item.source} -> {f.item.dest}: {f.error}", err=True)
+
+
 def _slug(label):
     return label.lower().replace(" ", "_")
 
@@ -525,6 +533,12 @@ _CONFLICT_OPTION = click.option(
 _NO_VERIFY_OPTION = click.option(
     "--no-verify", is_flag=True, help="Skip post-transfer verification."
 )
+_RETRY_OPTION = click.option(
+    "--retry",
+    type=int,
+    default=3,
+    help="Retries for a failed file before giving up (default: 3, 0 to disable).",
+)
 _SERIAL_OPTION = click.option(
     "--serial",
     "-s",
@@ -539,7 +553,8 @@ _SERIAL_OPTION = click.option(
 @_SERIAL_OPTION
 @_CONFLICT_OPTION
 @_NO_VERIFY_OPTION
-def transfer_pull(remote_path, local_dir, serial, conflict, no_verify):
+@_RETRY_OPTION
+def transfer_pull(remote_path, local_dir, serial, conflict, no_verify, retry):
     """Pull REMOTE_PATH (a file or folder) from the device into LOCAL_DIR (default: current directory)."""
     try:
         client = _build_client()
@@ -568,13 +583,21 @@ def transfer_pull(remote_path, local_dir, serial, conflict, no_verify):
         click.echo(_format_progress_line(progress), nl=False)
 
     with get_sleep_inhibitor("DroidBridge file transfer"):
-        transfer_module.execute_plan(client, serial, plan, progress_callback=on_progress)
+        progress = transfer_module.execute_plan(client, serial, plan, progress_callback=on_progress, retry_count=retry)
     click.echo()
 
-    if no_verify:
-        return
+    _report_failed_items(progress.failed)
 
-    if not _report_verification(transfer_module.verify_pull(plan)):
+    verification = None
+    verified = True
+    if not no_verify:
+        verification = transfer_module.verify_pull(plan)
+        verified = _report_verification(verification)
+
+    report = transfer_reports.build_transfer_report("pull", plan, progress, verification=verification)
+    _write_report(report, f"transfer-pull_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+
+    if progress.failed or not verified:
         sys.exit(1)
 
 
@@ -584,7 +607,8 @@ def transfer_pull(remote_path, local_dir, serial, conflict, no_verify):
 @_SERIAL_OPTION
 @_CONFLICT_OPTION
 @_NO_VERIFY_OPTION
-def transfer_push(local_path, remote_dir, serial, conflict, no_verify):
+@_RETRY_OPTION
+def transfer_push(local_path, remote_dir, serial, conflict, no_verify, retry):
     """Push LOCAL_PATH (a file or folder) to REMOTE_DIR on the device."""
     try:
         client = _build_client()
@@ -613,13 +637,21 @@ def transfer_push(local_path, remote_dir, serial, conflict, no_verify):
         click.echo(_format_progress_line(progress), nl=False)
 
     with get_sleep_inhibitor("DroidBridge file transfer"):
-        transfer_module.execute_plan(client, serial, plan, progress_callback=on_progress)
+        progress = transfer_module.execute_plan(client, serial, plan, progress_callback=on_progress, retry_count=retry)
     click.echo()
 
-    if no_verify:
-        return
+    _report_failed_items(progress.failed)
 
-    if not _report_verification(transfer_module.verify_push(client, serial, plan, remote_dir)):
+    verification = None
+    verified = True
+    if not no_verify:
+        verification = transfer_module.verify_push(client, serial, plan, remote_dir)
+        verified = _report_verification(verification)
+
+    report = transfer_reports.build_transfer_report("push", plan, progress, verification=verification)
+    _write_report(report, f"transfer-push_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+
+    if progress.failed or not verified:
         sys.exit(1)
 
 

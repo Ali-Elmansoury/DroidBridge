@@ -114,6 +114,36 @@ class TestTransferPull:
         assert "Verified" not in result.output
         assert "Verification" not in result.output
 
+    def test_failed_items_printed_and_exits_1(self, monkeypatch, tmp_path):
+        from droidbridge.core.adb import AdbError
+        client = make_fake_client(READY_DEVICE, shell_side_effect=["1000"])
+        client.pull.side_effect = AdbError("timeout")
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
+
+        result = CliRunner().invoke(
+            main.cli, ["transfer", "pull", "/sdcard/photo.jpg", str(tmp_path), "--retry", "0"]
+        )
+
+        assert result.exit_code == 1
+        assert "file(s) failed" in result.output
+
+    def test_transfer_report_written(self, monkeypatch, tmp_path):
+        client = make_fake_client(READY_DEVICE, shell_side_effect=["1000"])
+        def fake_pull(serial, remote, local):
+            from pathlib import Path
+            Path(local).parent.mkdir(parents=True, exist_ok=True)
+            Path(local).write_bytes(b"x" * 1000)
+        client.pull.side_effect = fake_pull
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
+        monkeypatch.chdir(tmp_path)
+
+        CliRunner().invoke(main.cli, ["transfer", "pull", "/sdcard/photo.jpg", str(tmp_path)])
+
+        reports = list((tmp_path / "session_logs" / "reports").glob("transfer-pull_*.txt"))
+        assert len(reports) == 1
+
 
 class TestTransferPush:
     def test_no_device_shows_guidance_and_exits_nonzero(self, monkeypatch, tmp_path):
@@ -184,3 +214,34 @@ class TestTransferPush:
         assert result.exit_code == 0
         assert "conflict" in result.output.lower()
         assert "Nothing to transfer." in result.output
+
+    def test_failed_items_printed_and_exits_1(self, monkeypatch, tmp_path):
+        from droidbridge.core.adb import AdbError
+        local_file = tmp_path / "report.pdf"
+        local_file.write_bytes(b"x" * 100)
+        client = make_fake_client(READY_DEVICE, shell_side_effect=["NO\n", ""])
+        client.push.side_effect = AdbError("timeout")
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
+
+        result = CliRunner().invoke(
+            main.cli,
+            ["transfer", "push", str(local_file), "/sdcard/Download", "--retry", "0"],
+        )
+
+        assert result.exit_code == 1
+        assert "file(s) failed" in result.output
+
+    def test_transfer_report_written(self, monkeypatch, tmp_path):
+        local_file = tmp_path / "report.pdf"
+        local_file.write_bytes(b"x" * 100)
+        existing_after = "/sdcard/Download/report.pdf\t100\t1700000000.0\n"
+        client = make_fake_client(READY_DEVICE, shell_side_effect=["NO\n", "", "DIR\n", existing_after])
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
+        monkeypatch.chdir(tmp_path)
+
+        CliRunner().invoke(main.cli, ["transfer", "push", str(local_file), "/sdcard/Download"])
+
+        reports = list((tmp_path / "session_logs" / "reports").glob("transfer-push_*.txt"))
+        assert len(reports) == 1
