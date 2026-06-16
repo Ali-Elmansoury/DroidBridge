@@ -8,6 +8,7 @@ from PyQt6.QtCore import QObject, pyqtSignal
 
 from droidbridge.gui import transfer_ops
 from droidbridge.gui.workers import Worker
+from droidbridge.modules import transfer as transfer_module
 from droidbridge.modules.transfer import CONFLICT_SKIP
 from droidbridge.utils import format as format_utils
 
@@ -47,12 +48,14 @@ def _format_verification(result):
     return {"ok": result.ok, "message": message}
 
 
-def _format_history_entry(direction, result, verification):
+def _format_history_entry(direction, result, verification, mirror_result=None):
     return {
         "direction": direction,
         "total_files": result.done_files,
         "total_bytes": result.done_bytes,
         "verification_ok": verification.ok if verification is not None else None,
+        "failed": len(result.failed),
+        "deleted_files": mirror_result.deleted_files if mirror_result is not None else 0,
     }
 
 
@@ -85,7 +88,7 @@ class TransferViewModel(QObject):
             return True
         return False
 
-    def start_pull(self, remote_path, local_dir, conflict, verify):
+    def start_pull(self, remote_path, local_dir, conflict, verify, retry_count=3):
         """Plan, execute, and (if `verify`) verify a pull of a single remote path."""
         if self._reject_if_busy():
             return
@@ -98,6 +101,7 @@ class TransferViewModel(QObject):
             result = transfer_ops.execute_plans(
                 client, serial, plans, progress_callback=progress_callback,
                 should_cancel=lambda: self._cancel_requested,
+                retry_count=retry_count,
             )
             verification = transfer_ops.verify_plans(client, serial, plans, direction="pull") if verify else None
             return "pull", result, verification
@@ -105,7 +109,7 @@ class TransferViewModel(QObject):
         self.logMessage.emit(f"Pulling {remote_path}...", "INFO")
         self._run(do_transfer, self._on_transfer_finished, report_progress=True, on_progress=self._on_progress)
 
-    def start_push(self, local_path, remote_dir, conflict, verify):
+    def start_push(self, local_path, remote_dir, conflict, verify, retry_count=3):
         """Plan, execute, and (if `verify`) verify a push of a single local path."""
         if self._reject_if_busy():
             return
@@ -118,6 +122,7 @@ class TransferViewModel(QObject):
             result = transfer_ops.execute_plans(
                 client, serial, plans, progress_callback=progress_callback,
                 should_cancel=lambda: self._cancel_requested,
+                retry_count=retry_count,
             )
             verification = (
                 transfer_ops.verify_plans(client, serial, plans, direction="push", remote_dir=remote_dir)

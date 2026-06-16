@@ -39,7 +39,7 @@ class TestStartPull:
             calls["plan"] = (remote_paths, local_dir, conflict)
             return [SAMPLE_PLAN]
 
-        def fake_execute_plans(client, serial, plans, progress_callback=None, should_cancel=None):
+        def fake_execute_plans(client, serial, plans, progress_callback=None, should_cancel=None, **kwargs):
             progress_callback(SAMPLE_RESULT)
             return SAMPLE_RESULT
 
@@ -71,6 +71,7 @@ class TestStartPull:
         assert verification_events == [{"ok": True, "message": "Verified: 1 file(s), 100 B."}]
         assert history_events == [{
             "direction": "pull", "total_files": 1, "total_bytes": 100, "verification_ok": True,
+            "failed": 0, "deleted_files": 0,
         }]
 
     def test_verify_false_skips_verification(self, qtbot, monkeypatch):
@@ -93,6 +94,7 @@ class TestStartPull:
         assert verification_events == []
         assert history_events == [{
             "direction": "pull", "total_files": 1, "total_bytes": 100, "verification_ok": None,
+            "failed": 0, "deleted_files": 0,
         }]
 
 
@@ -145,7 +147,7 @@ class TestCancel:
         monkeypatch.setattr(transfer_ops, "plan_pull_many", lambda *a, **k: [SAMPLE_PLAN])
         monkeypatch.setattr(transfer_ops, "verify_plans", lambda *a, **k: SAMPLE_VERIFICATION)
 
-        def fake_execute_plans(client, serial, plans, progress_callback=None, should_cancel=None):
+        def fake_execute_plans(client, serial, plans, progress_callback=None, should_cancel=None, **kwargs):
             vm.cancel_transfer()
             captured["should_cancel"] = should_cancel()
             return SAMPLE_RESULT
@@ -164,7 +166,7 @@ class TestCancel:
         monkeypatch.setattr(transfer_ops, "plan_pull_many", lambda *a, **k: [SAMPLE_PLAN])
         monkeypatch.setattr(transfer_ops, "verify_plans", lambda *a, **k: SAMPLE_VERIFICATION)
 
-        def fake_execute_plans(client, serial, plans, progress_callback=None, should_cancel=None):
+        def fake_execute_plans(client, serial, plans, progress_callback=None, should_cancel=None, **kwargs):
             captured["should_cancel"] = should_cancel()
             return SAMPLE_RESULT
 
@@ -252,3 +254,69 @@ class TestBusyGuard:
         assert status_events == ["A transfer is already in progress."]
         assert log_events == [("A transfer is already in progress.", "WARNING")]
         assert len(vm._workers) == 1  # No new worker added
+
+
+class TestRetryCountForwarded:
+    def test_start_pull_passes_retry_count_to_execute_plans(self, qtbot, monkeypatch):
+        vm = TransferViewModel(_connected_context(), worker_factory=FakeWorker)
+        captured = {}
+
+        monkeypatch.setattr(transfer_ops, "plan_pull_many", lambda *a, **k: [SAMPLE_PLAN])
+        monkeypatch.setattr(transfer_ops, "verify_plans", lambda *a, **k: SAMPLE_VERIFICATION)
+
+        def fake_execute(client, serial, plans, progress_callback=None, should_cancel=None,
+                         retry_count=3, **kwargs):
+            captured["retry_count"] = retry_count
+            return SAMPLE_RESULT
+
+        monkeypatch.setattr(transfer_ops, "execute_plans", fake_execute)
+
+        vm.start_pull("/sdcard/DCIM", "/tmp/out", conflict=transfer_module.CONFLICT_SKIP,
+                      verify=False, retry_count=7)
+
+        assert captured.get("retry_count") == 7
+
+    def test_start_push_passes_retry_count(self, qtbot, monkeypatch):
+        vm = TransferViewModel(_connected_context(), worker_factory=FakeWorker)
+        captured = {}
+
+        monkeypatch.setattr(transfer_ops, "plan_push_many", lambda *a, **k: [SAMPLE_PLAN])
+        monkeypatch.setattr(transfer_ops, "verify_plans", lambda *a, **k: SAMPLE_VERIFICATION)
+
+        def fake_execute(client, serial, plans, progress_callback=None, should_cancel=None,
+                         retry_count=3, **kwargs):
+            captured["retry_count"] = retry_count
+            return SAMPLE_RESULT
+
+        monkeypatch.setattr(transfer_ops, "execute_plans", fake_execute)
+
+        vm.start_push("/tmp/a.jpg", "/sdcard/Pictures", conflict=transfer_module.CONFLICT_OVERWRITE,
+                      verify=False, retry_count=0)
+
+        assert captured.get("retry_count") == 0
+
+
+class TestHistoryFailedColumn:
+    def test_history_entry_includes_failed_count(self, qtbot, monkeypatch):
+        from droidbridge.modules.transfer import FailedTransferItem, TransferProgress
+        vm = TransferViewModel(_connected_context(), worker_factory=FakeWorker)
+
+        result_with_failure = TransferProgress(
+            total_files=2, total_bytes=200, done_files=1, done_bytes=100,
+            failed=[FailedTransferItem(
+                item=SAMPLE_PLAN.to_transfer[0], error="err",
+            )],
+        )
+
+        monkeypatch.setattr(transfer_ops, "plan_pull_many", lambda *a, **k: [SAMPLE_PLAN])
+        monkeypatch.setattr(transfer_ops, "execute_plans", lambda *a, **k: result_with_failure)
+        monkeypatch.setattr(transfer_ops, "verify_plans", lambda *a, **k: SAMPLE_VERIFICATION)
+
+        history_events = []
+        vm.historyEntryAdded.connect(history_events.append)
+
+        vm.start_pull("/sdcard/DCIM", "/tmp/out", conflict=transfer_module.CONFLICT_SKIP,
+                      verify=True, retry_count=3)
+
+        assert len(history_events) == 1
+        assert history_events[0]["failed"] == 1
