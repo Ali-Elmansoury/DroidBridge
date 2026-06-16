@@ -337,6 +337,51 @@ def plan_mirror_push(client, serial, local_path, remote_dir):
     return plan
 
 
+def execute_mirror(
+    client, serial, plan, progress_callback=None, should_cancel=None,
+    retry_count=3, retry_delay=1.0, sleep_fn=time.sleep, delete_extras=False,
+):
+    """Run execute_plan() for plan's add/update items (retry applies), then if
+    delete_extras is True, remove each extra_item: os.remove() for pull direction,
+    client.shell('rm ...') for push. Deletions are not retried; failures are
+    collected into MirrorResult.failed_deletions. Returns MirrorResult.
+    """
+    progress = execute_plan(
+        client, serial, plan,
+        progress_callback=progress_callback,
+        should_cancel=should_cancel,
+        retry_count=retry_count,
+        retry_delay=retry_delay,
+        sleep_fn=sleep_fn,
+    )
+
+    deleted_files = 0
+    deleted_bytes = 0
+    failed_deletions = []
+
+    if delete_extras:
+        for extra in plan.extra_items:
+            if should_cancel is not None and should_cancel():
+                break
+            try:
+                if plan.direction == "pull":
+                    os.remove(extra.path)
+                else:
+                    client.shell(serial, f"rm {shlex.quote(extra.path)}")
+            except (OSError, AdbError) as exc:
+                failed_deletions.append(FailedExtraItem(item=extra, error=str(exc)))
+            else:
+                deleted_files += 1
+                deleted_bytes += extra.size
+
+    return MirrorResult(
+        progress=progress,
+        deleted_files=deleted_files,
+        deleted_bytes=deleted_bytes,
+        failed_deletions=failed_deletions,
+    )
+
+
 def execute_plan(
     client, serial, plan, progress_callback=None, should_cancel=None,
     retry_count=3, retry_delay=1.0, sleep_fn=time.sleep,

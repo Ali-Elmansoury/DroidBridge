@@ -752,3 +752,58 @@ class TestPlanMirrorPush:
         extra_paths = [e.path for e in plan.extra_items]
         assert "/sdcard/Backup/Camera/extra.jpg" in extra_paths
         assert "/sdcard/Backup/Camera/photo.jpg" not in extra_paths
+
+
+class TestExecuteMirror:
+    def _make_plan(self, direction="pull", extra_items=None):
+        return transfer.TransferPlan(
+            direction=direction,
+            items=[],
+            extra_items=extra_items or [],
+        )
+
+    def test_delete_extras_false_does_not_delete(self, tmp_path):
+        extra_file = tmp_path / "extra.jpg"
+        extra_file.write_bytes(b"x" * 100)
+        plan = self._make_plan("pull", [transfer.ExtraItem(path=str(extra_file), size=100)])
+        client = MagicMock()
+
+        result = transfer.execute_mirror(client, "SERIAL", plan, delete_extras=False)
+
+        assert extra_file.exists()
+        assert result.deleted_files == 0
+        assert result.failed_deletions == []
+
+    def test_delete_extras_true_removes_local_file_for_pull(self, tmp_path):
+        extra_file = tmp_path / "extra.jpg"
+        extra_file.write_bytes(b"x" * 100)
+        plan = self._make_plan("pull", [transfer.ExtraItem(path=str(extra_file), size=100)])
+        client = MagicMock()
+
+        result = transfer.execute_mirror(client, "SERIAL", plan, delete_extras=True)
+
+        assert not extra_file.exists()
+        assert result.deleted_files == 1
+        assert result.deleted_bytes == 100
+        assert result.failed_deletions == []
+
+    def test_delete_extras_true_shells_rm_for_push(self):
+        plan = self._make_plan("push", [transfer.ExtraItem(path="/sdcard/extra.jpg", size=200)])
+        client = MagicMock()
+
+        result = transfer.execute_mirror(client, "SERIAL", plan, delete_extras=True)
+
+        client.shell.assert_called_once_with("SERIAL", "rm /sdcard/extra.jpg")
+        assert result.deleted_files == 1
+        assert result.deleted_bytes == 200
+
+    def test_failed_deletion_collected_not_raised(self, tmp_path):
+        missing_file = tmp_path / "gone.jpg"  # doesn't exist — os.remove will raise
+        plan = self._make_plan("pull", [transfer.ExtraItem(path=str(missing_file), size=50)])
+        client = MagicMock()
+
+        result = transfer.execute_mirror(client, "SERIAL", plan, delete_extras=True)
+
+        assert result.deleted_files == 0
+        assert len(result.failed_deletions) == 1
+        assert result.failed_deletions[0].item.path == str(missing_file)
