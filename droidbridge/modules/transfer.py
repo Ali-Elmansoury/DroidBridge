@@ -80,7 +80,7 @@ class TransferProgress:
     done_files: int = 0
     done_bytes: int = 0
     start_time: float = field(default_factory=time.monotonic)
-    failed: list = field(default_factory=list)  # list[FailedTransferItem]
+    failed: list["FailedTransferItem"] = field(default_factory=list)
 
     @property
     def percent(self):
@@ -293,7 +293,6 @@ def execute_plan(
                     break
                 attempt += 1
                 sleep_fn(retry_delay)
-                continue
             else:
                 progress.done_files += 1
                 progress.done_bytes += item.size
