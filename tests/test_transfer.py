@@ -6,6 +6,8 @@ import pytest
 
 from droidbridge.core.adb import AdbError
 from droidbridge.modules import transfer
+from droidbridge.modules import search as search_module
+from droidbridge.modules.search import SearchResult
 
 DIR_FIND_OUTPUT = (
     "/sdcard/Camera/photo1.jpg\t1000\t1700000000.0\n"
@@ -627,3 +629,103 @@ class TestLocalManifest:
         (tmp_path / "sub").mkdir()
         (tmp_path / "sub" / "a.jpg").write_bytes(b"x" * 500)
         assert transfer._local_manifest(str(tmp_path)) == {"sub/a.jpg": 500}
+
+
+class TestPlanMirrorPull:
+    def test_uses_conflict_overwrite(self, monkeypatch, tmp_path):
+        captured = []
+        original = transfer.plan_pull
+        monkeypatch.setattr(
+            transfer, "plan_pull",
+            lambda client, serial, rp, ld, conflict=None: (
+                captured.append(conflict) or original(client, serial, rp, ld, conflict=conflict)
+            ),
+        )
+        client = make_client("1000")  # stat → single file
+        transfer.plan_mirror_pull(client, "SERIAL", "/sdcard/photo.jpg", str(tmp_path))
+        assert captured == [transfer.CONFLICT_OVERWRITE]
+
+    def test_single_file_source_has_no_extra_items(self, tmp_path):
+        client = make_client("1000")
+        plan = transfer.plan_mirror_pull(client, "SERIAL", "/sdcard/photo.jpg", str(tmp_path))
+        assert plan.extra_items == []
+
+    def test_extra_items_are_local_only_files(self, monkeypatch, tmp_path):
+        local_camera = tmp_path / "Camera"
+        local_camera.mkdir()
+        (local_camera / "photo.jpg").write_bytes(b"x" * 1000)
+        (local_camera / "extra.jpg").write_bytes(b"x" * 500)
+
+        remote_files = [SearchResult(path="/sdcard/Camera/photo.jpg", size=1000, mtime=None)]
+        monkeypatch.setattr(search_module, "search_files", lambda *a, **k: remote_files)
+        # shell calls: _stat_remote_path ("DIR"), _remote_dir_exists in _remote_manifest ("DIR")
+        client = make_client("DIR\n", "DIR\n")
+
+        plan = transfer.plan_mirror_pull(client, "SERIAL", "/sdcard/Camera", str(tmp_path))
+
+        extra_paths = [e.path for e in plan.extra_items]
+        assert str(local_camera / "extra.jpg") in extra_paths
+        assert str(local_camera / "photo.jpg") not in extra_paths
+
+    def test_no_extras_when_local_matches_remote(self, monkeypatch, tmp_path):
+        local_camera = tmp_path / "Camera"
+        local_camera.mkdir()
+        (local_camera / "photo.jpg").write_bytes(b"x" * 1000)
+
+        remote_files = [SearchResult(path="/sdcard/Camera/photo.jpg", size=1000, mtime=None)]
+        monkeypatch.setattr(search_module, "search_files", lambda *a, **k: remote_files)
+        client = make_client("DIR\n", "DIR\n")
+
+        plan = transfer.plan_mirror_pull(client, "SERIAL", "/sdcard/Camera", str(tmp_path))
+
+        assert plan.extra_items == []
+
+
+class TestPlanMirrorPush:
+    def test_uses_conflict_overwrite(self, monkeypatch, tmp_path):
+        local_dir = tmp_path / "Camera"
+        local_dir.mkdir()
+        (local_dir / "photo.jpg").write_bytes(b"x" * 1000)
+
+        captured = []
+        original = transfer.plan_push
+        monkeypatch.setattr(
+            transfer, "plan_push",
+            lambda client, serial, lp, rd, conflict=None: (
+                captured.append(conflict) or original(client, serial, lp, rd, conflict=conflict)
+            ),
+        )
+        # shell: _remote_dir_exists for plan_push's _remote_manifest (NO → empty), then for remote_root (NO → empty)
+        client = make_client("NO\n", "NO\n")
+        transfer.plan_mirror_push(client, "SERIAL", str(local_dir), "/sdcard/Backup")
+        assert captured == [transfer.CONFLICT_OVERWRITE]
+
+    def test_single_file_source_has_no_extra_items(self, tmp_path):
+        local_file = tmp_path / "report.pdf"
+        local_file.write_bytes(b"x" * 100)
+        client = make_client("NO\n")  # plan_push's _remote_manifest: dir doesn't exist
+        plan = transfer.plan_mirror_push(client, "SERIAL", str(local_file), "/sdcard/Download")
+        assert plan.extra_items == []
+
+    def test_extra_items_are_remote_only_files(self, monkeypatch, tmp_path):
+        local_dir = tmp_path / "Camera"
+        local_dir.mkdir()
+        (local_dir / "photo.jpg").write_bytes(b"x" * 1000)
+
+        def fake_search_files(client, serial, path):
+            if path == "/sdcard/Backup/Camera":
+                return [
+                    SearchResult(path="/sdcard/Backup/Camera/photo.jpg", size=1000, mtime=None),
+                    SearchResult(path="/sdcard/Backup/Camera/extra.jpg", size=500, mtime=None),
+                ]
+            return []
+
+        # shell: _remote_dir_exists for plan_push (NO), then _remote_dir_exists for remote_root (DIR)
+        client = make_client("NO\n", "DIR\n")
+        monkeypatch.setattr(search_module, "search_files", fake_search_files)
+
+        plan = transfer.plan_mirror_push(client, "SERIAL", str(local_dir), "/sdcard/Backup")
+
+        extra_paths = [e.path for e in plan.extra_items]
+        assert "/sdcard/Backup/Camera/extra.jpg" in extra_paths
+        assert "/sdcard/Backup/Camera/photo.jpg" not in extra_paths

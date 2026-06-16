@@ -292,6 +292,52 @@ def _classify_remote(source, dest, size, conflict, existing):
     return TransferItem(source=source, dest=dest, size=size, action=ACTION_COPY)
 
 
+def plan_mirror_pull(client, serial, remote_path, local_dir):
+    """Mirror-pull: pull new/changed files from `remote_path` with conflict=overwrite,
+    then identify local files under the mirror root not present on the device as extra_items."""
+    remote_path = remote_path.rstrip("/") or "/"
+    plan = plan_pull(client, serial, remote_path, local_dir, conflict=CONFLICT_OVERWRITE)
+
+    # Only process extra items if this was a directory pull.
+    # For directory pulls, the dest includes local_dir/base_name/ as a prefix.
+    base_name = PurePosixPath(remote_path).name
+    local_root = os.path.join(local_dir, base_name)
+    if plan.items and plan.items[0].dest.startswith(local_root + os.sep):
+        remote_files = _remote_manifest(client, serial, remote_path)
+        remote_rels = {PurePosixPath(p).relative_to(remote_path).as_posix() for p in remote_files}
+        for rel, size in _local_manifest(local_root).items():
+            if rel not in remote_rels:
+                plan.extra_items.append(ExtraItem(path=os.path.join(local_root, rel), size=size))
+
+    return plan
+
+
+def plan_mirror_push(client, serial, local_path, remote_dir):
+    """Mirror-push: push new/changed files from `local_path` with conflict=overwrite,
+    then identify remote files under the mirror root not present locally as extra_items."""
+    remote_dir_clean = remote_dir.rstrip("/") or "/"
+    plan = plan_push(client, serial, local_path, remote_dir, conflict=CONFLICT_OVERWRITE)
+
+    if os.path.isdir(local_path):
+        local_root = local_path.rstrip("/")
+        base_name = os.path.basename(local_root)
+        remote_root = "/".join([remote_dir_clean, base_name])
+
+        local_rels = set()
+        for root, _, files in os.walk(local_root):
+            for fname in files:
+                full = os.path.join(root, fname)
+                rel = os.path.relpath(full, local_root)
+                local_rels.add(PurePosixPath(rel.replace(os.sep, "/")).as_posix())
+
+        for path, size in _remote_manifest(client, serial, remote_root).items():
+            rel = PurePosixPath(path).relative_to(remote_root).as_posix()
+            if rel not in local_rels:
+                plan.extra_items.append(ExtraItem(path=path, size=size))
+
+    return plan
+
+
 def execute_plan(
     client, serial, plan, progress_callback=None, should_cancel=None,
     retry_count=3, retry_delay=1.0, sleep_fn=time.sleep,
