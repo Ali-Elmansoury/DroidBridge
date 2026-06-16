@@ -21,7 +21,8 @@ def plan_push_many(client, serial, local_paths, remote_dir, conflict=CONFLICT_SK
     return [transfer_module.plan_push(client, serial, p, remote_dir, conflict=conflict) for p in local_paths]
 
 
-def execute_plans(client, serial, plans, progress_callback=None, should_cancel=None):
+def execute_plans(client, serial, plans, progress_callback=None, should_cancel=None,
+                   retry_count=3, retry_delay=1.0, sleep_fn=time.sleep):
     """Execute each plan in `plans` via execute_plan(), reporting one overall
     TransferProgress across all plans.
 
@@ -32,8 +33,9 @@ def execute_plans(client, serial, plans, progress_callback=None, should_cancel=N
     progress_callback - so progress updates remain per-item (smooth) across the
     whole multi-plan operation. should_cancel() is passed through to each
     execute_plan() call (per-item cancellation) and is also checked between
-    plans (skips remaining plans if True). Returns the final overall
-    TransferProgress.
+    plans (skips remaining plans if True). retry_count, retry_delay, and
+    sleep_fn are forwarded to each execute_plan() call. Returns the final overall
+    TransferProgress with all failed items from all plans concatenated.
     """
     total_files = sum(len(p.to_transfer) for p in plans)
     total_bytes = sum(sum(i.size for i in p.to_transfer) for p in plans)
@@ -43,6 +45,7 @@ def execute_plans(client, serial, plans, progress_callback=None, should_cancel=N
 
     done_files_offset = 0
     done_bytes_offset = 0
+    all_failed = []
 
     for plan in plans:
         if should_cancel is not None and should_cancel():
@@ -61,17 +64,20 @@ def execute_plans(client, serial, plans, progress_callback=None, should_cancel=N
                 progress_callback(overall)
 
         plan_result = transfer_module.execute_plan(
-            client, serial, plan, progress_callback=on_plan_progress, should_cancel=should_cancel
+            client, serial, plan, progress_callback=on_plan_progress, should_cancel=should_cancel,
+            retry_count=retry_count, retry_delay=retry_delay, sleep_fn=sleep_fn
         )
 
         done_files_offset += plan_result.done_files
         done_bytes_offset += plan_result.done_bytes
+        all_failed.extend(plan_result.failed)
         overall = TransferProgress(
             total_files=total_files,
             total_bytes=total_bytes,
             done_files=done_files_offset,
             done_bytes=done_bytes_offset,
             start_time=start_time,
+            failed=list(all_failed),
         )
 
     return overall

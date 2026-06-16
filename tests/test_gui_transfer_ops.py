@@ -1,6 +1,6 @@
 """Tests for droidbridge.gui.transfer_ops (Phase 6.2) — plain functions, no Qt."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from droidbridge.gui import transfer_ops
 from droidbridge.modules import transfer as transfer_module
@@ -155,3 +155,58 @@ class TestVerifyPlans:
         assert result.ok is True
         assert result.expected_files == 2
         assert result.expected_bytes == 300
+
+
+class TestExecutePlansRetry:
+    def test_retry_count_forwarded_to_execute_plan(self, tmp_path):
+        """Verify that retry_count parameter is forwarded to each execute_plan call."""
+        captured = {}
+
+        original_execute = transfer_module.execute_plan
+
+        def fake_execute(client, serial, plan, progress_callback=None, should_cancel=None,
+                         retry_count=3, retry_delay=1.0, sleep_fn=None):
+            captured["retry_count"] = retry_count
+            return original_execute(client, serial, plan, progress_callback=progress_callback,
+                                    should_cancel=should_cancel, retry_count=0, sleep_fn=lambda _: None)
+
+        with patch.object(transfer_module, "execute_plan", fake_execute):
+            client = MagicMock()
+            plan = transfer_module.TransferPlan(direction="pull", items=[])
+            transfer_ops.execute_plans(client, "SERIAL", [plan], retry_count=5)
+
+        assert captured.get("retry_count") == 5
+
+    def test_failed_lists_concatenated_across_plans(self, tmp_path):
+        """Verify that failed items from all plans are concatenated in the result."""
+        dest1 = tmp_path / "a.jpg"
+        dest2 = tmp_path / "b.jpg"
+
+        def fake_execute(client, serial, plan, progress_callback=None, should_cancel=None,
+                         retry_count=3, retry_delay=1.0, sleep_fn=None):
+            progress = transfer_module.TransferProgress(total_files=1, total_bytes=100)
+            progress.failed.append(transfer_module.FailedTransferItem(
+                item=plan.to_transfer[0], error="err",
+            ))
+            return progress
+
+        with patch.object(transfer_module, "execute_plan", fake_execute):
+            client = MagicMock()
+            plan_a = transfer_module.TransferPlan(
+                direction="pull",
+                items=[transfer_module.TransferItem(
+                    source="/sdcard/a.jpg", dest=str(dest1), size=100, action=transfer_module.ACTION_COPY,
+                )],
+            )
+            plan_b = transfer_module.TransferPlan(
+                direction="pull",
+                items=[transfer_module.TransferItem(
+                    source="/sdcard/b.jpg", dest=str(dest2), size=100, action=transfer_module.ACTION_COPY,
+                )],
+            )
+            overall = transfer_ops.execute_plans(client, "SERIAL", [plan_a, plan_b])
+
+        assert len(overall.failed) == 2
+        sources = [f.item.source for f in overall.failed]
+        assert "/sdcard/a.jpg" in sources
+        assert "/sdcard/b.jpg" in sources
