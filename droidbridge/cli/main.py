@@ -545,6 +545,52 @@ _SERIAL_OPTION = click.option(
     default=None,
     help="Device serial number (required if multiple devices are connected).",
 )
+_DELETE_EXTRAS_OPTION = click.option(
+    "--delete-extras",
+    is_flag=True,
+    help="Remove destination files not present on the source (requires confirmation unless --yes).",
+)
+_YES_OPTION = click.option(
+    "--yes", is_flag=True, help="Skip the 'YES DELETE' confirmation for --delete-extras.",
+)
+
+
+def _confirm_extras(plan, delete_extras, yes, dest_label):
+    """List extra_items in dest_label; if --delete-extras, prompt for YES DELETE (unless --yes).
+    Returns True if deletion should proceed, False otherwise."""
+    if not plan.extra_items:
+        return False
+
+    click.echo(
+        f"{plan.extra_files} extra file(s) ({format_bytes(plan.extra_bytes)}) in "
+        f"{dest_label} not present on the source:"
+    )
+    for item in plan.extra_items[:20]:
+        click.echo(f"  {item.path} ({format_bytes(item.size)})")
+    if plan.extra_files > 20:
+        click.echo(f"  ... and {plan.extra_files - 20} more")
+
+    if not delete_extras:
+        click.echo("(use --delete-extras to remove these)")
+        return False
+
+    if yes:
+        return True
+
+    confirm = click.prompt(
+        "Type 'YES DELETE' to remove these files, or press Enter to keep them",
+        default="",
+        show_default=False,
+    )
+    if confirm != "YES DELETE":
+        click.echo("Skipping deletion of extra files.")
+        return False
+    return True
+
+
+def _report_failed_deletions(failed_deletions):
+    for f in failed_deletions:
+        click.echo(f"  Failed to delete {f.item.path}: {f.error}", err=True)
 
 
 @transfer_cmd.command("pull")
@@ -652,6 +698,165 @@ def transfer_push(local_path, remote_dir, serial, conflict, no_verify, retry):
     _write_report(report, f"transfer-push_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
 
     if progress.failed or not verified:
+        sys.exit(1)
+
+
+@transfer_cmd.group("mirror")
+def transfer_mirror():
+    """Sync (mirror) a folder between this computer and the device."""
+
+
+@transfer_mirror.command("pull")
+@click.argument("remote_path")
+@click.argument("local_dir", default=".")
+@_SERIAL_OPTION
+@_RETRY_OPTION
+@_NO_VERIFY_OPTION
+@_DELETE_EXTRAS_OPTION
+@_YES_OPTION
+def transfer_mirror_pull(remote_path, local_dir, serial, retry, no_verify, delete_extras, yes):
+    """Mirror REMOTE_PATH (a device folder) into LOCAL_DIR (default: current directory).
+
+    Pulls new/changed files (always overwriting), and optionally removes local files
+    that no longer exist on the device (--delete-extras requires 'YES DELETE' confirmation).
+    """
+    try:
+        client = _build_client()
+    except AdbError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+
+    serial = _resolve_serial(client, serial)
+
+    try:
+        plan = transfer_module.plan_mirror_pull(client, serial, remote_path, local_dir)
+    except AdbError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+
+    _print_plan_summary(plan)
+    do_delete = _confirm_extras(plan, delete_extras, yes, local_dir)
+
+    if not plan.to_transfer and not plan.extra_items:
+        click.echo("Nothing to transfer or mirror.")
+        report = transfer_reports.build_transfer_report(
+            "mirror-pull", plan, transfer_module.TransferProgress(0, 0),
+        )
+        _write_report(report, f"transfer-mirror-pull_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+        return
+
+    if plan.to_transfer:
+        file_word = "file" if plan.total_files == 1 else "files"
+        click.echo(f"Pulling {plan.total_files} {file_word}, {format_bytes(plan.total_bytes)}...")
+
+    def on_progress(progress):
+        click.echo(_format_progress_line(progress), nl=False)
+
+    with get_sleep_inhibitor("DroidBridge file transfer"):
+        result = transfer_module.execute_mirror(
+            client, serial, plan,
+            progress_callback=on_progress if plan.to_transfer else None,
+            retry_count=retry,
+            delete_extras=do_delete,
+        )
+    if plan.to_transfer:
+        click.echo()
+
+    _report_failed_items(result.progress.failed)
+
+    if do_delete:
+        click.echo(f"Deleted {result.deleted_files} extra file(s), {format_bytes(result.deleted_bytes)}.")
+        _report_failed_deletions(result.failed_deletions)
+
+    verification = None
+    verified = True
+    if not no_verify:
+        verification = transfer_module.verify_pull(plan)
+        verified = _report_verification(verification)
+
+    report = transfer_reports.build_transfer_report(
+        "mirror-pull", plan, result.progress, verification=verification, mirror_result=result,
+    )
+    _write_report(report, f"transfer-mirror-pull_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+
+    if result.progress.failed or result.failed_deletions or not verified:
+        sys.exit(1)
+
+
+@transfer_mirror.command("push")
+@click.argument("local_path", type=click.Path(exists=True))
+@click.argument("remote_dir")
+@_SERIAL_OPTION
+@_RETRY_OPTION
+@_NO_VERIFY_OPTION
+@_DELETE_EXTRAS_OPTION
+@_YES_OPTION
+def transfer_mirror_push(local_path, remote_dir, serial, retry, no_verify, delete_extras, yes):
+    """Mirror LOCAL_PATH (a local folder) to REMOTE_DIR on the device.
+
+    Pushes new/changed files (always overwriting), and optionally removes device files
+    that no longer exist locally (--delete-extras requires 'YES DELETE' confirmation).
+    """
+    try:
+        client = _build_client()
+    except AdbError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+
+    serial = _resolve_serial(client, serial)
+
+    try:
+        plan = transfer_module.plan_mirror_push(client, serial, local_path, remote_dir)
+    except AdbError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+
+    _print_plan_summary(plan)
+    do_delete = _confirm_extras(plan, delete_extras, yes, remote_dir)
+
+    if not plan.to_transfer and not plan.extra_items:
+        click.echo("Nothing to transfer or mirror.")
+        report = transfer_reports.build_transfer_report(
+            "mirror-push", plan, transfer_module.TransferProgress(0, 0),
+        )
+        _write_report(report, f"transfer-mirror-push_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+        return
+
+    if plan.to_transfer:
+        file_word = "file" if plan.total_files == 1 else "files"
+        click.echo(f"Pushing {plan.total_files} {file_word}, {format_bytes(plan.total_bytes)}...")
+
+    def on_progress(progress):
+        click.echo(_format_progress_line(progress), nl=False)
+
+    with get_sleep_inhibitor("DroidBridge file transfer"):
+        result = transfer_module.execute_mirror(
+            client, serial, plan,
+            progress_callback=on_progress if plan.to_transfer else None,
+            retry_count=retry,
+            delete_extras=do_delete,
+        )
+    if plan.to_transfer:
+        click.echo()
+
+    _report_failed_items(result.progress.failed)
+
+    if do_delete:
+        click.echo(f"Deleted {result.deleted_files} extra file(s), {format_bytes(result.deleted_bytes)}.")
+        _report_failed_deletions(result.failed_deletions)
+
+    verification = None
+    verified = True
+    if not no_verify:
+        verification = transfer_module.verify_push(client, serial, plan, remote_dir)
+        verified = _report_verification(verification)
+
+    report = transfer_reports.build_transfer_report(
+        "mirror-push", plan, result.progress, verification=verification, mirror_result=result,
+    )
+    _write_report(report, f"transfer-mirror-push_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+
+    if result.progress.failed or result.failed_deletions or not verified:
         sys.exit(1)
 
 

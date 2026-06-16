@@ -245,3 +245,156 @@ class TestTransferPush:
 
         reports = list((tmp_path / "session_logs" / "reports").glob("transfer-push_*.txt"))
         assert len(reports) == 1
+
+
+class TestTransferMirrorPull:
+    def test_mirror_pull_happy_path(self, monkeypatch, tmp_path):
+        from droidbridge.modules import transfer as transfer_module
+
+        client = make_fake_client(READY_DEVICE)
+        local_camera = tmp_path / "Camera"
+
+        def fake_plan_mirror_pull(client_, serial, remote_path, local_dir):
+            local_camera.mkdir(exist_ok=True)
+            (local_camera / "photo.jpg").write_bytes(b"x" * 1000)
+            return transfer_module.TransferPlan(
+                direction="pull",
+                items=[transfer_module.TransferItem(
+                    source="/sdcard/Camera/photo.jpg",
+                    dest=str(local_camera / "photo.jpg"),
+                    size=1000, action=transfer_module.ACTION_COPY,
+                )],
+            )
+
+        def fake_execute_mirror(client_, serial, plan, **kwargs):
+            return transfer_module.MirrorResult(
+                progress=transfer_module.TransferProgress(1, 1000, 1, 1000),
+            )
+
+        def fake_verify_pull(plan):
+            return transfer_module.VerificationResult(1, 1000, 1, 1000)
+
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
+        monkeypatch.setattr(transfer_module, "plan_mirror_pull", fake_plan_mirror_pull)
+        monkeypatch.setattr(transfer_module, "execute_mirror", fake_execute_mirror)
+        monkeypatch.setattr(transfer_module, "verify_pull", fake_verify_pull)
+        monkeypatch.chdir(tmp_path)
+
+        result = CliRunner().invoke(
+            main.cli, ["transfer", "mirror", "pull", "/sdcard/Camera", str(tmp_path)]
+        )
+
+        assert result.exit_code == 0
+        assert "Verified" in result.output
+        reports = list((tmp_path / "session_logs" / "reports").glob("transfer-mirror-pull_*.txt"))
+        assert len(reports) == 1
+
+    def test_delete_extras_confirmed(self, monkeypatch, tmp_path):
+        from droidbridge.modules import transfer as transfer_module
+
+        extra_file = tmp_path / "extra.jpg"
+        extra_file.write_bytes(b"x" * 100)
+
+        client = make_fake_client(READY_DEVICE)
+
+        def fake_plan_mirror_pull(client_, serial, remote_path, local_dir):
+            return transfer_module.TransferPlan(
+                direction="pull",
+                items=[],
+                extra_items=[transfer_module.ExtraItem(path=str(extra_file), size=100)],
+            )
+
+        captured_delete_extras = []
+
+        def fake_execute_mirror(client_, serial, plan, delete_extras=False, **kwargs):
+            captured_delete_extras.append(delete_extras)
+            return transfer_module.MirrorResult(
+                progress=transfer_module.TransferProgress(0, 0),
+                deleted_files=1 if delete_extras else 0,
+                deleted_bytes=100 if delete_extras else 0,
+            )
+
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
+        monkeypatch.setattr(transfer_module, "plan_mirror_pull", fake_plan_mirror_pull)
+        monkeypatch.setattr(transfer_module, "execute_mirror", fake_execute_mirror)
+        monkeypatch.setattr(transfer_module, "verify_pull", lambda p: transfer_module.VerificationResult(0, 0, 0, 0))
+        monkeypatch.chdir(tmp_path)
+
+        result = CliRunner().invoke(
+            main.cli,
+            ["transfer", "mirror", "pull", "/sdcard/Camera", str(tmp_path), "--delete-extras", "--yes"],
+        )
+
+        assert result.exit_code == 0
+        assert captured_delete_extras == [True]
+
+    def test_no_delete_extras_by_default(self, monkeypatch, tmp_path):
+        from droidbridge.modules import transfer as transfer_module
+
+        extra_file = tmp_path / "extra.jpg"
+        extra_file.write_bytes(b"x" * 100)
+        client = make_fake_client(READY_DEVICE)
+
+        def fake_plan_mirror_pull(client_, serial, remote_path, local_dir):
+            return transfer_module.TransferPlan(
+                direction="pull",
+                items=[],
+                extra_items=[transfer_module.ExtraItem(path=str(extra_file), size=100)],
+            )
+
+        captured_delete_extras = []
+
+        def fake_execute_mirror(client_, serial, plan, delete_extras=False, **kwargs):
+            captured_delete_extras.append(delete_extras)
+            return transfer_module.MirrorResult(progress=transfer_module.TransferProgress(0, 0))
+
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
+        monkeypatch.setattr(transfer_module, "plan_mirror_pull", fake_plan_mirror_pull)
+        monkeypatch.setattr(transfer_module, "execute_mirror", fake_execute_mirror)
+        monkeypatch.setattr(transfer_module, "verify_pull", lambda p: transfer_module.VerificationResult(0, 0, 0, 0))
+        monkeypatch.chdir(tmp_path)
+
+        result = CliRunner().invoke(
+            main.cli, ["transfer", "mirror", "pull", "/sdcard/Camera", str(tmp_path)]
+        )
+
+        assert result.exit_code == 0
+        assert captured_delete_extras == [False]
+        assert "use --delete-extras" in result.output
+
+
+class TestTransferMirrorPush:
+    def test_mirror_push_happy_path(self, monkeypatch, tmp_path):
+        from droidbridge.modules import transfer as transfer_module
+
+        local_dir = tmp_path / "Camera"
+        local_dir.mkdir()
+        (local_dir / "photo.jpg").write_bytes(b"x" * 1000)
+        client = make_fake_client(READY_DEVICE)
+
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
+        monkeypatch.setattr(
+            transfer_module, "plan_mirror_push",
+            lambda *a, **k: transfer_module.TransferPlan(direction="push", items=[]),
+        )
+        monkeypatch.setattr(
+            transfer_module, "execute_mirror",
+            lambda *a, **k: transfer_module.MirrorResult(progress=transfer_module.TransferProgress(0, 0)),
+        )
+        monkeypatch.setattr(
+            transfer_module, "verify_push",
+            lambda *a, **k: transfer_module.VerificationResult(0, 0, 0, 0),
+        )
+        monkeypatch.chdir(tmp_path)
+
+        result = CliRunner().invoke(
+            main.cli, ["transfer", "mirror", "push", str(local_dir), "/sdcard/Backup"]
+        )
+
+        assert result.exit_code == 0
+        reports = list((tmp_path / "session_logs" / "reports").glob("transfer-mirror-push_*.txt"))
+        assert len(reports) == 1
