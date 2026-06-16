@@ -44,11 +44,28 @@ class FailedTransferItem:
 
 
 @dataclass
+class ExtraItem:
+    """A file on the destination but not on the source — mirror-mode deletion candidate."""
+
+    path: str
+    size: int
+
+
+@dataclass
+class FailedExtraItem:
+    """An ExtraItem that could not be deleted."""
+
+    item: ExtraItem
+    error: str
+
+
+@dataclass
 class TransferPlan:
     """The full set of items considered for a pull or push, with their actions."""
 
     direction: str
     items: list
+    extra_items: list["ExtraItem"] = field(default_factory=list)
 
     @property
     def to_transfer(self):
@@ -69,6 +86,14 @@ class TransferPlan:
     @property
     def conflicts_skipped(self):
         return [i for i in self.items if i.action == ACTION_SKIP_CONFLICT]
+
+    @property
+    def extra_files(self):
+        return len(self.extra_items)
+
+    @property
+    def extra_bytes(self):
+        return sum(i.size for i in self.extra_items)
 
 
 @dataclass
@@ -105,6 +130,16 @@ class TransferProgress:
         if speed <= 0:
             return None
         return (self.total_bytes - self.done_bytes) / speed
+
+
+@dataclass
+class MirrorResult:
+    """Result of execute_mirror: the underlying transfer progress plus extras handling."""
+
+    progress: TransferProgress
+    deleted_files: int = 0
+    deleted_bytes: int = 0
+    failed_deletions: list["FailedExtraItem"] = field(default_factory=list)
 
 
 @dataclass
@@ -161,6 +196,19 @@ def _remote_manifest(client, serial, remote_dir):
         return {}
     results = search_module.search_files(client, serial, remote_dir)
     return {r.path: r.size for r in results}
+
+
+def _local_manifest(local_root):
+    """Return {relative_posix_path: size} for files under `local_root`, or {} if it doesn't exist."""
+    if not os.path.isdir(local_root):
+        return {}
+    manifest = {}
+    for root, _, files in os.walk(local_root):
+        for fname in files:
+            full = os.path.join(root, fname)
+            rel = os.path.relpath(full, local_root)
+            manifest[PurePosixPath(rel.replace(os.sep, "/")).as_posix()] = os.path.getsize(full)
+    return manifest
 
 
 def _classify(source, dest, size, conflict, exists_fn, size_fn):

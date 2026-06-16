@@ -589,3 +589,41 @@ class TestExecutePlanCancellation:
         progress = transfer.execute_plan(client, "SERIAL", plan)
 
         assert progress.done_files == 1
+
+
+class TestTransferPlanExtras:
+    def test_extra_items_defaults_to_empty(self):
+        plan = transfer.TransferPlan(direction="pull", items=[])
+        assert plan.extra_items == []
+        assert plan.extra_files == 0
+        assert plan.extra_bytes == 0
+
+    def test_extra_files_and_bytes_properties(self):
+        plan = transfer.TransferPlan(
+            direction="pull",
+            items=[],
+            extra_items=[
+                transfer.ExtraItem(path="/tmp/a.jpg", size=100),
+                transfer.ExtraItem(path="/tmp/b.jpg", size=200),
+            ],
+        )
+        assert plan.extra_files == 2
+        assert plan.extra_bytes == 300
+
+
+class TestLocalManifest:
+    def test_non_existent_dir_returns_empty(self, tmp_path):
+        assert transfer._local_manifest(str(tmp_path / "missing")) == {}
+
+    def test_empty_dir_returns_empty(self, tmp_path):
+        (tmp_path / "empty").mkdir()
+        assert transfer._local_manifest(str(tmp_path / "empty")) == {}
+
+    def test_single_file(self, tmp_path):
+        (tmp_path / "photo.jpg").write_bytes(b"x" * 1000)
+        assert transfer._local_manifest(str(tmp_path)) == {"photo.jpg": 1000}
+
+    def test_nested_files_use_posix_paths(self, tmp_path):
+        (tmp_path / "sub").mkdir()
+        (tmp_path / "sub" / "a.jpg").write_bytes(b"x" * 500)
+        assert transfer._local_manifest(str(tmp_path)) == {"sub/a.jpg": 500}
