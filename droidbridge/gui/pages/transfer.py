@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
     QProgressBar,
     QPushButton,
     QRadioButton,
+    QSpinBox,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -29,7 +30,7 @@ from droidbridge.gui.widgets.remote_browse_dialog import RemoteBrowseDialog
 from droidbridge.modules import transfer as transfer_module
 from droidbridge.utils.format import format_bytes
 
-_HISTORY_COLUMNS = ("Direction", "Files", "Bytes", "Verified")
+_HISTORY_COLUMNS = ("Direction", "Files", "Bytes", "Verified", "Failed")
 
 
 class TransferPage(QWidget):
@@ -110,10 +111,21 @@ class TransferPage(QWidget):
         self.verify_checkbox = QCheckBox("Verify after transfer")
         self.verify_checkbox.setChecked(True)
 
+        self.retry_spin = QSpinBox()
+        self.retry_spin.setRange(0, 10)
+        self.retry_spin.setValue(3)
+        self.retry_spin.setToolTip("Number of retries for a failed file (0 to disable).")
+
+        self.mirror_checkbox = QCheckBox("Mirror mode (sync, always overwrite changed files)")
+        self.delete_extras_checkbox = QCheckBox("Delete extra files on destination")
+        self.delete_extras_checkbox.setVisible(False)
+
         options_row = QHBoxLayout()
         options_row.addWidget(QLabel("On conflict:"))
         options_row.addWidget(self.conflict_combo)
         options_row.addWidget(self.verify_checkbox)
+        options_row.addWidget(QLabel("Retries:"))
+        options_row.addWidget(self.retry_spin)
         options_row.addStretch()
 
         self.start_button = QPushButton("Start Transfer")
@@ -144,6 +156,8 @@ class TransferPage(QWidget):
         layout.addLayout(mode_bar)
         layout.addWidget(self.pull_group)
         layout.addWidget(self.push_group)
+        layout.addWidget(self.mirror_checkbox)
+        layout.addWidget(self.delete_extras_checkbox)
         layout.addLayout(options_row)
         layout.addLayout(action_row)
         layout.addWidget(self.plan_label)
@@ -165,11 +179,13 @@ class TransferPage(QWidget):
         self.cancel_button.clicked.connect(self.viewmodel.cancel_transfer)
         self.clear_history_button.clicked.connect(self._on_clear_history)
 
+        self.mirror_checkbox.toggled.connect(self._on_mirror_toggled)
         self.viewmodel.planChanged.connect(self._on_plan_changed)
         self.viewmodel.progressChanged.connect(self._on_progress_changed)
         self.viewmodel.verificationChanged.connect(self._on_verification_changed)
         self.viewmodel.historyEntryAdded.connect(self._on_history_entry_added)
         self.viewmodel.busyChanged.connect(self._on_busy_changed)
+        self.viewmodel.mirrorPlanReady.connect(self._on_mirror_plan_ready)
 
     def _on_browse_local_dir(self):
         path = QFileDialog.getExistingDirectory(self, "Select destination folder")
@@ -227,16 +243,54 @@ class TransferPage(QWidget):
     def _on_start_clicked(self):
         conflict = self.conflict_combo.currentText()
         verify = self.verify_checkbox.isChecked()
-        if self.pull_radio.isChecked():
+        retry = self.retry_spin.value()
+
+        if self.mirror_checkbox.isChecked():
+            delete_extras = self.delete_extras_checkbox.isChecked()
+            if self.pull_radio.isChecked():
+                self.viewmodel.start_mirror_pull(
+                    self.remote_path_edit.text().strip(),
+                    self.local_dir_edit.text().strip(),
+                    delete_extras=delete_extras,
+                    retry_count=retry,
+                    verify=verify,
+                )
+            else:
+                self.viewmodel.start_mirror_push(
+                    self.local_path_edit.text().strip(),
+                    self.remote_dir_edit.text().strip(),
+                    delete_extras=delete_extras,
+                    retry_count=retry,
+                    verify=verify,
+                )
+        elif self.pull_radio.isChecked():
             self.viewmodel.start_pull(
                 self.remote_path_edit.text().strip(), self.local_dir_edit.text().strip(),
-                conflict=conflict, verify=verify,
+                conflict=conflict, verify=verify, retry_count=retry,
             )
         else:
             self.viewmodel.start_push(
                 self.local_path_edit.text().strip(), self.remote_dir_edit.text().strip(),
-                conflict=conflict, verify=verify,
+                conflict=conflict, verify=verify, retry_count=retry,
             )
+
+    def _on_mirror_toggled(self, checked):
+        self.conflict_combo.setEnabled(not checked)
+        self.delete_extras_checkbox.setVisible(checked)
+
+    def _on_mirror_plan_ready(self, info):
+        confirmed = False
+        if info["delete_extras_requested"] and info["extra_files"] > 0:
+            message = (
+                f"{info['extra_files']} extra file(s) ({format_bytes(info['extra_bytes'])}) "
+                "will be permanently deleted:\n\n" + "\n".join(info["extra_paths"][:20])
+            )
+            if info["extra_files"] > 20:
+                message += f"\n... and {info['extra_files'] - 20} more"
+            QMessageBox.warning(self, "Mirror — Extra Files", message)
+            text, ok = QInputDialog.getText(self, "Mirror", "Type 'YES DELETE' to remove these files:")
+            confirmed = ok and text == "YES DELETE"
+        self.viewmodel.confirm_mirror(confirmed)
 
     def _on_plan_changed(self, plan):
         lines = [f"Plan: {plan['total_files']} file(s), {format_bytes(plan['total_bytes'])}."]
@@ -270,6 +324,7 @@ class TransferPage(QWidget):
         self.history_table.setItem(row, 2, QTableWidgetItem(format_bytes(entry["total_bytes"])))
         verified = "-" if entry["verification_ok"] is None else ("Yes" if entry["verification_ok"] else "No")
         self.history_table.setItem(row, 3, QTableWidgetItem(verified))
+        self.history_table.setItem(row, 4, QTableWidgetItem(str(entry.get("failed", 0))))
 
     def _on_clear_history(self):
         self.history_table.setRowCount(0)

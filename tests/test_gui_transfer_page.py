@@ -71,7 +71,7 @@ class TestStartTransfer:
         qtbot.mouseClick(page.start_button, Qt.MouseButton.LeftButton)
 
         assert calls == [(("/sdcard/DCIM", "/tmp/out"), {
-            "conflict": transfer_module.CONFLICT_OVERWRITE, "verify": False,
+            "conflict": transfer_module.CONFLICT_OVERWRITE, "verify": False, "retry_count": 3,
         })]
 
     def test_push_calls_start_push_with_form_fields(self, qtbot, monkeypatch):
@@ -88,7 +88,7 @@ class TestStartTransfer:
         qtbot.mouseClick(page.start_button, Qt.MouseButton.LeftButton)
 
         assert calls == [(("/tmp/photo.jpg", "/sdcard/Pictures"), {
-            "conflict": transfer_module.CONFLICT_SKIP, "verify": True,
+            "conflict": transfer_module.CONFLICT_SKIP, "verify": True, "retry_count": 3,
         })]
 
 
@@ -408,3 +408,160 @@ class TestNewRemoteFolderButton:
 
         assert len(warnings) == 1
         assert page.remote_dir_edit.text() == ""
+
+
+class TestRetrySpinbox:
+    def _make_page(self, qtbot):
+        from droidbridge.gui.pages.transfer import TransferPage
+        from droidbridge.gui.viewmodels.transfer import TransferViewModel
+        from droidbridge.gui.device_context import DeviceContext
+        from unittest.mock import MagicMock
+        context = DeviceContext()
+        context.set_connected(MagicMock(), "S", "Pixel")
+        vm = TransferViewModel(context, worker_factory=lambda fn, **kw: MagicMock())
+        page = TransferPage(vm)
+        qtbot.addWidget(page)
+        return page, vm
+
+    def test_retry_spin_present_with_default_3(self, qtbot):
+        page, _ = self._make_page(qtbot)
+        assert hasattr(page, "retry_spin")
+        assert page.retry_spin.value() == 3
+        assert page.retry_spin.minimum() == 0
+        assert page.retry_spin.maximum() == 10
+
+    def test_pull_passes_retry_count_from_spin(self, qtbot, monkeypatch):
+        page, vm = self._make_page(qtbot)
+        calls = []
+        monkeypatch.setattr(vm, "start_pull", lambda *a, **k: calls.append(k))
+        page.retry_spin.setValue(7)
+        page._on_start_clicked()
+        assert calls[0].get("retry_count") == 7
+
+
+class TestMirrorCheckboxes:
+    def _make_page(self, qtbot):
+        from droidbridge.gui.pages.transfer import TransferPage
+        from droidbridge.gui.viewmodels.transfer import TransferViewModel
+        from droidbridge.gui.device_context import DeviceContext
+        from unittest.mock import MagicMock
+        context = DeviceContext()
+        context.set_connected(MagicMock(), "S", "Pixel")
+        vm = TransferViewModel(context, worker_factory=lambda fn, **kw: MagicMock())
+        page = TransferPage(vm)
+        qtbot.addWidget(page)
+        return page, vm
+
+    def test_mirror_checkbox_present(self, qtbot):
+        page, _ = self._make_page(qtbot)
+        assert hasattr(page, "mirror_checkbox")
+
+    def test_delete_extras_checkbox_present(self, qtbot):
+        page, _ = self._make_page(qtbot)
+        assert hasattr(page, "delete_extras_checkbox")
+
+    def test_mirror_pull_calls_start_mirror_pull(self, qtbot, monkeypatch):
+        page, vm = self._make_page(qtbot)
+        calls = []
+        monkeypatch.setattr(vm, "start_mirror_pull", lambda *a, **k: calls.append(k))
+        page.mirror_checkbox.setChecked(True)
+        page.pull_radio.setChecked(True)
+        page._on_start_clicked()
+        assert len(calls) == 1
+        assert "delete_extras" in calls[0]
+        assert "retry_count" in calls[0]
+
+    def test_mirror_push_calls_start_mirror_push(self, qtbot, monkeypatch):
+        page, vm = self._make_page(qtbot)
+        calls = []
+        monkeypatch.setattr(vm, "start_mirror_push", lambda *a, **k: calls.append(k))
+        page.mirror_checkbox.setChecked(True)
+        page.push_radio.setChecked(True)
+        page._on_start_clicked()
+        assert len(calls) == 1
+
+
+class TestMirrorPlanReadySlot:
+    def _make_page_with_vm(self, qtbot):
+        from droidbridge.gui.pages.transfer import TransferPage
+        from droidbridge.gui.viewmodels.transfer import TransferViewModel
+        from droidbridge.gui.device_context import DeviceContext
+        from unittest.mock import MagicMock
+        context = DeviceContext()
+        context.set_connected(MagicMock(), "S", "Pixel")
+        vm = TransferViewModel(context, worker_factory=lambda fn, **kw: MagicMock())
+        page = TransferPage(vm)
+        qtbot.addWidget(page)
+        return page, vm
+
+    def test_no_dialog_when_no_extras_or_delete_not_requested(self, qtbot, monkeypatch):
+        page, vm = self._make_page_with_vm(qtbot)
+        confirmed = []
+        monkeypatch.setattr(vm, "confirm_mirror", lambda dc: confirmed.append(dc))
+
+        page._on_mirror_plan_ready({"extra_files": 0, "extra_bytes": 0, "extra_paths": [],
+                                    "delete_extras_requested": True})
+
+        assert confirmed == [False]
+
+    def test_dialog_shown_when_extras_and_delete_requested(self, qtbot, monkeypatch):
+        from PyQt6.QtWidgets import QMessageBox, QInputDialog
+        page, vm = self._make_page_with_vm(qtbot)
+        confirmed = []
+        monkeypatch.setattr(vm, "confirm_mirror", lambda dc: confirmed.append(dc))
+        monkeypatch.setattr(QMessageBox, "warning", staticmethod(lambda *a, **k: None))
+        monkeypatch.setattr(QInputDialog, "getText",
+                            staticmethod(lambda *a, **k: ("YES DELETE", True)))
+
+        page._on_mirror_plan_ready({
+            "extra_files": 1, "extra_bytes": 100,
+            "extra_paths": ["/tmp/extra.jpg"],
+            "delete_extras_requested": True,
+        })
+
+        assert confirmed == [True]
+
+    def test_dialog_declined_passes_false(self, qtbot, monkeypatch):
+        from PyQt6.QtWidgets import QMessageBox, QInputDialog
+        page, vm = self._make_page_with_vm(qtbot)
+        confirmed = []
+        monkeypatch.setattr(vm, "confirm_mirror", lambda dc: confirmed.append(dc))
+        monkeypatch.setattr(QMessageBox, "warning", staticmethod(lambda *a, **k: None))
+        monkeypatch.setattr(QInputDialog, "getText",
+                            staticmethod(lambda *a, **k: ("NOPE", True)))
+
+        page._on_mirror_plan_ready({
+            "extra_files": 1, "extra_bytes": 100,
+            "extra_paths": ["/tmp/extra.jpg"],
+            "delete_extras_requested": True,
+        })
+
+        assert confirmed == [False]
+
+
+class TestHistoryFailedColumnInPage:
+    def _make_page(self, qtbot):
+        from droidbridge.gui.pages.transfer import TransferPage, _HISTORY_COLUMNS
+        from droidbridge.gui.viewmodels.transfer import TransferViewModel
+        from droidbridge.gui.device_context import DeviceContext
+        from unittest.mock import MagicMock
+        context = DeviceContext()
+        context.set_connected(MagicMock(), "S", "Pixel")
+        vm = TransferViewModel(context, worker_factory=lambda fn, **kw: MagicMock())
+        page = TransferPage(vm)
+        qtbot.addWidget(page)
+        return page, vm
+
+    def test_five_columns_in_history_table(self, qtbot):
+        page, _ = self._make_page(qtbot)
+        from droidbridge.gui.pages.transfer import _HISTORY_COLUMNS
+        assert page.history_table.columnCount() == 5
+        assert "Failed" in _HISTORY_COLUMNS
+
+    def test_failed_column_shows_count(self, qtbot):
+        page, vm = self._make_page(qtbot)
+        vm.historyEntryAdded.emit({
+            "direction": "pull", "total_files": 2, "total_bytes": 2000,
+            "verification_ok": True, "failed": 1, "deleted_files": 0,
+        })
+        assert page.history_table.item(0, 4).text() == "1"
