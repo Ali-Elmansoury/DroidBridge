@@ -641,12 +641,14 @@ class TestPlanMirrorPull:
                 captured.append(conflict) or original(client, serial, rp, ld, conflict=conflict)
             ),
         )
-        client = make_client("1000")  # stat → single file
+        # Shell calls: explicit _stat_remote_path → "1000", plan_pull's _stat_remote_path → "1000"
+        client = make_client("1000", "1000")  # stat → single file
         transfer.plan_mirror_pull(client, "SERIAL", "/sdcard/photo.jpg", str(tmp_path))
         assert captured == [transfer.CONFLICT_OVERWRITE]
 
     def test_single_file_source_has_no_extra_items(self, tmp_path):
-        client = make_client("1000")
+        # Shell calls: explicit _stat_remote_path → "1000", plan_pull's _stat_remote_path → "1000"
+        client = make_client("1000", "1000")
         plan = transfer.plan_mirror_pull(client, "SERIAL", "/sdcard/photo.jpg", str(tmp_path))
         assert plan.extra_items == []
 
@@ -658,8 +660,8 @@ class TestPlanMirrorPull:
 
         remote_files = [SearchResult(path="/sdcard/Camera/photo.jpg", size=1000, mtime=None)]
         monkeypatch.setattr(search_module, "search_files", lambda *a, **k: remote_files)
-        # shell calls: _stat_remote_path ("DIR"), _remote_dir_exists in _remote_manifest ("DIR")
-        client = make_client("DIR\n", "DIR\n")
+        # shell calls: explicit _stat_remote_path ("DIR"), plan_pull's _stat_remote_path ("DIR"), _remote_dir_exists in _remote_manifest ("DIR")
+        client = make_client("DIR\n", "DIR\n", "DIR\n")
 
         plan = transfer.plan_mirror_pull(client, "SERIAL", "/sdcard/Camera", str(tmp_path))
 
@@ -674,11 +676,32 @@ class TestPlanMirrorPull:
 
         remote_files = [SearchResult(path="/sdcard/Camera/photo.jpg", size=1000, mtime=None)]
         monkeypatch.setattr(search_module, "search_files", lambda *a, **k: remote_files)
-        client = make_client("DIR\n", "DIR\n")
+        # Shell calls: explicit _stat_remote_path ("DIR"), plan_pull's _stat_remote_path ("DIR"), _remote_dir_exists in _remote_manifest ("DIR")
+        client = make_client("DIR\n", "DIR\n", "DIR\n")
 
         plan = transfer.plan_mirror_pull(client, "SERIAL", "/sdcard/Camera", str(tmp_path))
 
         assert plan.extra_items == []
+
+    def test_extra_items_when_remote_dir_empty(self, monkeypatch, tmp_path):
+        """When remote dir has zero files, local-only files must still appear in extra_items."""
+        local_camera = tmp_path / "Camera"
+        local_camera.mkdir()
+        (local_camera / "photo.jpg").write_bytes(b"x" * 1000)
+
+        # Remote dir exists but is empty
+        # Shell calls:
+        #   1. plan_mirror_pull explicit _stat_remote_path → "DIR\n"
+        #   2. plan_pull calls _stat_remote_path → "DIR\n"
+        #   3. _remote_manifest calls _remote_dir_exists → "DIR\n"
+        # search_files returns [] (empty remote dir)
+        client = make_client("DIR\n", "DIR\n", "DIR\n")
+        monkeypatch.setattr(search_module, "search_files", lambda *a, **k: [])
+
+        plan = transfer.plan_mirror_pull(client, "SERIAL", "/sdcard/Camera", str(tmp_path))
+
+        extra_paths = [e.path for e in plan.extra_items]
+        assert str(local_camera / "photo.jpg") in extra_paths
 
 
 class TestPlanMirrorPush:

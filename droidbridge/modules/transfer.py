@@ -296,13 +296,12 @@ def plan_mirror_pull(client, serial, remote_path, local_dir):
     """Mirror-pull: pull new/changed files from `remote_path` with conflict=overwrite,
     then identify local files under the mirror root not present on the device as extra_items."""
     remote_path = remote_path.rstrip("/") or "/"
+    kind, _ = _stat_remote_path(client, serial, remote_path)
     plan = plan_pull(client, serial, remote_path, local_dir, conflict=CONFLICT_OVERWRITE)
 
-    # Only process extra items if this was a directory pull.
-    # For directory pulls, the dest includes local_dir/base_name/ as a prefix.
-    base_name = PurePosixPath(remote_path).name
-    local_root = os.path.join(local_dir, base_name)
-    if plan.items and plan.items[0].dest.startswith(local_root + os.sep):
+    if kind == "dir":
+        base_name = PurePosixPath(remote_path).name
+        local_root = os.path.join(local_dir, base_name)
         remote_files = _remote_manifest(client, serial, remote_path)
         remote_rels = {PurePosixPath(p).relative_to(remote_path).as_posix() for p in remote_files}
         for rel, size in _local_manifest(local_root).items():
