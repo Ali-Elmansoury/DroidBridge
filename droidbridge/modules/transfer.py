@@ -8,6 +8,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 
+from droidbridge.core.adb import AdbError
 from droidbridge.modules import search as search_module
 
 CONFLICT_SKIP = "skip"
@@ -32,6 +33,14 @@ class TransferItem:
     dest: str
     size: int
     action: str
+
+
+@dataclass
+class FailedTransferItem:
+    """A transfer item that failed even after all retries."""
+
+    item: TransferItem
+    error: str
 
 
 @dataclass
@@ -71,6 +80,7 @@ class TransferProgress:
     done_files: int = 0
     done_bytes: int = 0
     start_time: float = field(default_factory=time.monotonic)
+    failed: list = field(default_factory=list)  # list[FailedTransferItem]
 
     @property
     def percent(self):
@@ -234,8 +244,17 @@ def _classify_remote(source, dest, size, conflict, existing):
     return TransferItem(source=source, dest=dest, size=size, action=ACTION_COPY)
 
 
-def execute_plan(client, serial, plan, progress_callback=None, should_cancel=None):
+def execute_plan(
+    client, serial, plan, progress_callback=None, should_cancel=None,
+    retry_count=3, retry_delay=1.0, sleep_fn=time.sleep,
+):
     """Execute `plan`, pulling/pushing each transferable item.
+
+    Each item is attempted up to retry_count+1 times. Between attempts,
+    sleep_fn(retry_delay) is called (tests pass a no-op). If every attempt
+    raises AdbError, a FailedTransferItem is appended to progress.failed,
+    progress_callback is still called, and the loop continues to the next
+    item. retry_count=0 disables retries.
 
     Calls `progress_callback(progress)` after each file (if given). If
     `should_cancel` is given, it's called with no arguments before each item;
@@ -254,20 +273,33 @@ def execute_plan(client, serial, plan, progress_callback=None, should_cancel=Non
         if should_cancel is not None and should_cancel():
             break
 
-        if plan.direction == "pull":
-            local_dir = os.path.dirname(item.dest)
-            if local_dir:
-                os.makedirs(local_dir, exist_ok=True)
-            client.pull(serial, item.source, item.dest)
-        else:
-            remote_dir = item.dest.rsplit("/", 1)[0] or "/"
-            client.shell(serial, f"mkdir -p {shlex.quote(remote_dir)}")
-            client.push(serial, item.source, item.dest)
-
-        progress.done_files += 1
-        progress.done_bytes += item.size
-        if progress_callback:
-            progress_callback(progress)
+        attempt = 0
+        while True:
+            try:
+                if plan.direction == "pull":
+                    local_dir = os.path.dirname(item.dest)
+                    if local_dir:
+                        os.makedirs(local_dir, exist_ok=True)
+                    client.pull(serial, item.source, item.dest)
+                else:
+                    remote_dir = item.dest.rsplit("/", 1)[0] or "/"
+                    client.shell(serial, f"mkdir -p {shlex.quote(remote_dir)}")
+                    client.push(serial, item.source, item.dest)
+            except AdbError as exc:
+                if attempt >= retry_count:
+                    progress.failed.append(FailedTransferItem(item=item, error=str(exc)))
+                    if progress_callback:
+                        progress_callback(progress)
+                    break
+                attempt += 1
+                sleep_fn(retry_delay)
+                continue
+            else:
+                progress.done_files += 1
+                progress.done_bytes += item.size
+                if progress_callback:
+                    progress_callback(progress)
+                break
 
     return progress
 

@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from droidbridge.core.adb import AdbError
 from droidbridge.modules import transfer
 
 DIR_FIND_OUTPUT = (
@@ -56,6 +57,121 @@ class TestResolveConflictPath:
     def test_increments_suffix_until_free(self):
         existing = {"/tmp/photo.jpg", "/tmp/photo_1.jpg", "/tmp/photo_2.jpg"}
         assert transfer.resolve_conflict_path("/tmp/photo.jpg", lambda p: p in existing) == "/tmp/photo_3.jpg"
+
+
+class TestExecutePlanRetry:
+    def test_success_on_second_attempt(self, tmp_path):
+        dest = tmp_path / "photo.jpg"
+        call_count = [0]
+
+        def fake_pull(serial, remote, local):
+            call_count[0] += 1
+            if call_count[0] < 2:
+                raise AdbError("timeout")
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(b"x" * 1000)
+
+        client = MagicMock()
+        client.pull.side_effect = fake_pull
+        plan = transfer.TransferPlan(
+            direction="pull",
+            items=[transfer.TransferItem(
+                source="/sdcard/photo.jpg", dest=str(dest), size=1000, action=transfer.ACTION_COPY,
+            )],
+        )
+        sleep_calls = []
+        progress = transfer.execute_plan(client, "SERIAL", plan, sleep_fn=sleep_calls.append)
+
+        assert progress.done_files == 1
+        assert progress.failed == []
+        assert sleep_calls == [1.0]
+
+    def test_all_attempts_fail_item_goes_to_failed(self):
+        client = MagicMock()
+        client.pull.side_effect = AdbError("connection reset")
+        plan = transfer.TransferPlan(
+            direction="pull",
+            items=[transfer.TransferItem(
+                source="/sdcard/photo.jpg", dest="/tmp/photo.jpg", size=1000,
+                action=transfer.ACTION_COPY,
+            )],
+        )
+        progress = transfer.execute_plan(
+            client, "SERIAL", plan, retry_count=2, sleep_fn=lambda _: None,
+        )
+
+        assert progress.done_files == 0
+        assert len(progress.failed) == 1
+        assert progress.failed[0].item.source == "/sdcard/photo.jpg"
+        assert "connection reset" in progress.failed[0].error
+
+    def test_failed_item_does_not_halt_transfer(self, tmp_path):
+        dest2 = tmp_path / "photo2.jpg"
+        call_count = [0]
+
+        def fake_pull(serial, remote, local):
+            call_count[0] += 1
+            if "photo1" in remote:
+                raise AdbError("permission denied")
+            dest2.parent.mkdir(parents=True, exist_ok=True)
+            dest2.write_bytes(b"x" * 500)
+
+        client = MagicMock()
+        client.pull.side_effect = fake_pull
+        plan = transfer.TransferPlan(
+            direction="pull",
+            items=[
+                transfer.TransferItem(
+                    source="/sdcard/photo1.jpg", dest=str(tmp_path / "photo1.jpg"),
+                    size=1000, action=transfer.ACTION_COPY,
+                ),
+                transfer.TransferItem(
+                    source="/sdcard/photo2.jpg", dest=str(dest2),
+                    size=500, action=transfer.ACTION_COPY,
+                ),
+            ],
+        )
+        progress = transfer.execute_plan(
+            client, "SERIAL", plan, retry_count=0, sleep_fn=lambda _: None,
+        )
+
+        assert progress.done_files == 1
+        assert len(progress.failed) == 1
+        assert progress.failed[0].item.source == "/sdcard/photo1.jpg"
+
+    def test_retry_count_zero_no_sleep(self):
+        client = MagicMock()
+        client.pull.side_effect = AdbError("timeout")
+        plan = transfer.TransferPlan(
+            direction="pull",
+            items=[transfer.TransferItem(
+                source="/sdcard/a.jpg", dest="/tmp/a.jpg", size=100, action=transfer.ACTION_COPY,
+            )],
+        )
+        sleep_calls = []
+        transfer.execute_plan(
+            client, "SERIAL", plan, retry_count=0, sleep_fn=sleep_calls.append,
+        )
+
+        assert sleep_calls == []
+
+    def test_progress_callback_fires_after_failed_item(self):
+        client = MagicMock()
+        client.pull.side_effect = AdbError("error")
+        plan = transfer.TransferPlan(
+            direction="pull",
+            items=[transfer.TransferItem(
+                source="/sdcard/a.jpg", dest="/tmp/a.jpg", size=100, action=transfer.ACTION_COPY,
+            )],
+        )
+        callbacks = []
+        transfer.execute_plan(
+            client, "SERIAL", plan, retry_count=0, sleep_fn=lambda _: None,
+            progress_callback=callbacks.append,
+        )
+
+        assert len(callbacks) == 1
+        assert len(callbacks[0].failed) == 1
 
 
 class TestPlanPull:
