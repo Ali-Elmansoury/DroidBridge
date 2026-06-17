@@ -3,7 +3,8 @@ info`. Purely declarative — binds to DeviceViewModel signals/slots, no formatt
 AdbClient calls of its own.
 """
 
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QCheckBox,
     QFormLayout,
@@ -28,6 +29,19 @@ class DevicePage(QWidget):
 
         self.auto_refresh_checkbox = QCheckBox("Auto-refresh")
         self.auto_refresh_checkbox.setChecked(True)
+
+        self.refresh_button.setToolTip(
+            "Reload device info, battery, and storage from the connected device. Shortcut: F5."
+        )
+        self.auto_refresh_checkbox.setToolTip(
+            "Automatically reload device info every 15 seconds while a device is connected."
+        )
+
+        # F5 shortcut: both QShortcut (for when child widgets have focus) and
+        # keyPressEvent (ensures qtbot.keyClick works in tests).
+        _f5 = QShortcut(QKeySequence("F5"), self)
+        _f5.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        _f5.activated.connect(lambda: self.viewmodel.refresh())
 
         self._busy = False
         self._refresh_timer = QTimer(self)
@@ -100,3 +114,10 @@ class DevicePage(QWidget):
     def _on_connection_changed(self, connected, _serial, _model):
         self.refresh_button.setEnabled(connected)
         self._update_timer_state()
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_F5:
+            self.viewmodel.refresh()
+            event.accept()
+        else:
+            super().keyPressEvent(event)

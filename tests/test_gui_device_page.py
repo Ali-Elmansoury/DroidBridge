@@ -2,6 +2,9 @@
 
 from unittest.mock import MagicMock
 
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QKeySequence
+
 from droidbridge.gui.device_context import DeviceContext
 from droidbridge.gui.pages.device import DevicePage
 from droidbridge.gui.viewmodels.device import DeviceViewModel
@@ -120,3 +123,28 @@ class TestAutoRefresh:
         page._on_refresh_timer()
 
         assert calls == []
+
+
+class TestDevicePageTooltipsAndShortcuts:
+    def test_refresh_button_has_tooltip(self, qtbot):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+        assert page.refresh_button.toolTip() != ""
+
+    def test_auto_refresh_checkbox_has_tooltip(self, qtbot):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+        assert page.auto_refresh_checkbox.toolTip() != ""
+
+    def test_f5_triggers_refresh(self, qtbot, monkeypatch):
+        page, vm, context = _make_page()
+        context.set_connected(MagicMock(), "SERIAL", "Model")
+        qtbot.addWidget(page)
+        page.show()
+
+        calls = []
+        monkeypatch.setattr(vm, "refresh", lambda: calls.append(1))
+
+        qtbot.keyClick(page, Qt.Key.Key_F5)
+
+        assert calls == [1]
