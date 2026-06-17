@@ -1,5 +1,8 @@
 """Tests for `droidbridge files search` (Module 7 CLI)."""
 
+import csv as _csv
+import os
+import tempfile
 from unittest.mock import MagicMock, patch
 
 from click.testing import CliRunner
@@ -246,3 +249,55 @@ class TestSearchExtensionInOutput:
             result = runner.invoke(cli, ["files", "search"])
         assert result.exit_code == 0
         assert "(none)" in result.output
+
+
+class TestSearchExportCLI:
+    def test_output_csv_writes_file(self, runner):
+        client = make_fake_client(READY_DEVICE)
+        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
+            path = tmp.name
+        try:
+            with patch("droidbridge.cli.main._build_client", return_value=client):
+                result = runner.invoke(
+                    cli, ["files", "search", "--output", path, "--format", "csv"]
+                )
+            assert result.exit_code == 0, result.output
+            assert "exported" in result.output.lower()
+            with open(path, newline="") as f:
+                rows = list(_csv.reader(f))
+            assert rows[0] == ["path", "size", "date", "extension"]
+            assert rows[1][0] == "/sdcard/DCIM/Bills/Bills-05-08-2023_10_56.png"
+        finally:
+            os.unlink(path)
+
+    def test_output_txt_writes_file(self, runner):
+        client = make_fake_client(READY_DEVICE)
+        with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as tmp:
+            path = tmp.name
+        try:
+            with patch("droidbridge.cli.main._build_client", return_value=client):
+                result = runner.invoke(
+                    cli, ["files", "search", "--output", path, "--format", "txt"]
+                )
+            assert result.exit_code == 0, result.output
+            with open(path) as f:
+                content = f.read()
+            assert "Bills-11-07-2023_12_50.png" in content
+        finally:
+            os.unlink(path)
+
+    def test_output_without_format_exits_1(self, runner):
+        client = make_fake_client(READY_DEVICE)
+        with patch("droidbridge.cli.main._build_client", return_value=client):
+            result = runner.invoke(
+                cli, ["files", "search", "--output", "/tmp/out_test.csv"]
+            )
+        assert result.exit_code == 1
+        assert "--format" in result.output
+
+    def test_format_without_output_exits_1(self, runner):
+        client = make_fake_client(READY_DEVICE)
+        with patch("droidbridge.cli.main._build_client", return_value=client):
+            result = runner.invoke(cli, ["files", "search", "--format", "csv"])
+        assert result.exit_code == 1
+        assert "--output" in result.output

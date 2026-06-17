@@ -1,5 +1,6 @@
 """Click-based CLI entry point for DroidBridge."""
 
+import csv
 import importlib.util
 import os
 import sys
@@ -239,6 +240,21 @@ def _format_result_line(result):
     return f"{size:>10}  {date}  {ext:<10}  {result.path}"
 
 
+def _write_search_export(results, fmt, path):
+    """Write search results to a file in 'csv' or 'txt' format."""
+    if fmt == "csv":
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["path", "size", "date", "extension"])
+            for r in results:
+                writer.writerow([r.path, r.size, r.mtime.strftime("%Y-%m-%d %H:%M"), r.extension or ""])
+    else:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("      size  date                ext         path\n")
+            for r in results:
+                f.write(_format_result_line(r) + "\n")
+
+
 @files_cmd.command("search")
 @click.argument("path", default=None, required=False)
 @click.option(
@@ -288,7 +304,14 @@ def _format_result_line(result):
 @click.option("--regex", "name_regex", default=None, help="Regex filename match (cannot combine with --name).")
 @click.option("--mime", default=None, help="MIME category filter: image|video|audio|document|archive (cannot combine with --ext/--type).")
 @click.option("--limit", type=int, default=None, help="Cap results at N entries (applied after sorting).")
-def files_search(path, serial, name, extensions, min_size, max_size, after, before, preset, sort_by, reverse, name_regex, mime, limit):
+@click.option("--output", "output_path", default=None, help="Write results to FILE.")
+@click.option(
+    "--format", "output_format",
+    type=click.Choice(["csv", "txt"]),
+    default=None,
+    help="Output format for --output: csv or txt.",
+)
+def files_search(path, serial, name, extensions, min_size, max_size, after, before, preset, sort_by, reverse, name_regex, mime, limit, output_path, output_format):
     """Search for files on the device (default root: /sdcard)."""
     try:
         client = _build_client()
@@ -303,6 +326,10 @@ def files_search(path, serial, name, extensions, min_size, max_size, after, befo
         sys.exit(1)
     if extensions and mime:
         click.echo("Error: --ext/--type and --mime are mutually exclusive.", err=True)
+        sys.exit(1)
+    if (output_path is None) != (output_format is None):
+        missing = "--format" if output_path is not None else "--output"
+        click.echo(f"Error: {missing} is required when using --output/--format together.", err=True)
         sys.exit(1)
 
     kwargs = {}
@@ -363,6 +390,10 @@ def files_search(path, serial, name, extensions, min_size, max_size, after, befo
 
     for result in results:
         click.echo(_format_result_line(result))
+
+    if output_path:
+        _write_search_export(results, output_format, output_path)
+        click.echo(f"Results exported to {output_path}.")
 
 
 @files_cmd.command("rename")
