@@ -528,6 +528,107 @@ class TestFilesPageBreadcrumb:
         assert "DCIM" in texts
 
 
+class TestFilesPageShortcuts:
+    def test_f5_refreshes_directory(self, qtbot, monkeypatch):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+        page.show()
+        vm.current_path = "/sdcard/DCIM"
+
+        calls = []
+        monkeypatch.setattr(files_ops, "list_path", lambda *a, **k: calls.append(True) or [])
+
+        qtbot.keyClick(page, Qt.Key.Key_F5)
+
+        assert calls
+
+    def test_escape_clears_selection(self, qtbot):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+        page.show()
+        vm.entriesChanged.emit(SAMPLE_ROWS)
+        page.table.selectRow(0)
+        assert page.table.selectedIndexes()
+
+        qtbot.keyClick(page, Qt.Key.Key_Escape)
+
+        assert not page.table.selectedIndexes()
+
+    def test_backspace_navigates_up(self, qtbot, monkeypatch):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+        page.show()
+        vm.current_path = "/sdcard/DCIM"
+
+        calls = []
+        monkeypatch.setattr(files_ops, "list_path", lambda *a, **k: calls.append(True) or [])
+
+        page.table.setFocus()
+        qtbot.keyClick(page.table, Qt.Key.Key_Backspace)
+
+        assert calls
+
+    def test_f2_triggers_rename(self, qtbot, monkeypatch):
+        from droidbridge.gui.widgets import delete_flow
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+        page.show()
+        vm.entriesChanged.emit(SAMPLE_ROWS)
+        page.table.selectRow(0)
+
+        calls = []
+        monkeypatch.setattr(delete_flow, "run_rename_flow", lambda *a, **k: calls.append(1) or None)
+
+        page.table.setFocus()
+        qtbot.keyClick(page.table, Qt.Key.Key_F2)
+
+        assert calls
+
+    def test_delete_key_triggers_delete(self, qtbot, monkeypatch):
+        from droidbridge.gui.widgets import delete_flow
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+        page.show()
+        vm.entriesChanged.emit(SAMPLE_ROWS)
+        page.table.selectRow(0)
+
+        calls = []
+        monkeypatch.setattr(delete_flow, "run_delete_flow", lambda *a, **k: calls.append(1) or set())
+
+        page.table.setFocus()
+        qtbot.keyClick(page.table, Qt.Key.Key_Delete)
+
+        assert calls
+
+    def test_return_navigates_into_directory(self, qtbot, monkeypatch):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+        page.show()
+        vm.entriesChanged.emit(SAMPLE_ROWS)
+        page.table.selectRow(0)  # row 0 = Camera (dir)
+
+        calls = []
+        monkeypatch.setattr(files_ops, "list_path", lambda *a, **k: calls.append(True) or [])
+
+        page.table.setFocus()
+        qtbot.keyClick(page.table, Qt.Key.Key_Return)
+
+        assert calls
+
+    def test_ctrl_shift_c_copies_path(self, qtbot):
+        from PyQt6.QtWidgets import QApplication
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+        page.show()
+        vm.entriesChanged.emit(SAMPLE_ROWS)
+        page.table.selectRow(1)  # photo.jpg → /sdcard/photo.jpg
+
+        qtbot.keyClick(page, Qt.Key.Key_C,
+                       Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier)
+
+        assert QApplication.clipboard().text() == "/sdcard/photo.jpg"
+
+
 class TestFilesPageTooltips:
     def test_go_button_has_tooltip(self, qtbot):
         page, _vm, _context = _make_page()

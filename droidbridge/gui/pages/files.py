@@ -3,8 +3,8 @@ toolbar, multi-select table, and an on-demand preview panel. Purely declarative 
 binds to FilesViewModel signals/slots, no ADB calls or business logic of its own.
 """
 
-from PyQt6.QtCore import QItemSelectionModel, Qt, pyqtSignal
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtCore import QEvent, QItemSelectionModel, Qt, pyqtSignal
+from PyQt6.QtGui import QKeySequence, QPixmap, QShortcut
 from PyQt6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -183,6 +183,23 @@ class FilesPage(QWidget):
         self.viewmodel.pathChanged.connect(self._on_path_changed)
         self.viewmodel.previewChanged.connect(self._on_preview_changed)
 
+        # QShortcut registrations (for real app when child widgets have focus)
+        def _sc(key, slot, *, target=None, ctx=Qt.ShortcutContext.WidgetWithChildrenShortcut):
+            s = QShortcut(QKeySequence(key), target or self)
+            s.setContext(ctx)
+            s.activated.connect(slot)
+
+        _sc("F5", self._refresh)
+        _sc("Escape", self.table.clearSelection)
+        _sc("Ctrl+Shift+C", self._copy_path_shortcut)
+        _sc("Backspace", self.viewmodel.go_up, target=self.table, ctx=Qt.ShortcutContext.WidgetShortcut)
+        _sc("Return", self._on_table_return, target=self.table, ctx=Qt.ShortcutContext.WidgetShortcut)
+        _sc("F2", self._on_rename, target=self.table, ctx=Qt.ShortcutContext.WidgetShortcut)
+        _sc("Delete", self._on_delete, target=self.table, ctx=Qt.ShortcutContext.WidgetShortcut)
+
+        # Event filter on table for test harness (qtbot.keyClick doesn't trigger QShortcut)
+        self.table.installEventFilter(self)
+
     def _on_path_entered(self):
         self.viewmodel.navigate(self.path_edit.text())
 
@@ -328,3 +345,67 @@ class FilesPage(QWidget):
         )
         if deleted:
             self.viewmodel.navigate(self.viewmodel.current_path)
+
+    # ------------------------------------------------------------------
+    # Shortcut helpers
+    # ------------------------------------------------------------------
+
+    def _refresh(self):
+        self.viewmodel.navigate(self.viewmodel.current_path)
+
+    def _on_table_return(self):
+        selected = sorted({index.row() for index in self.table.selectedIndexes()})
+        if len(selected) == 1:
+            item = self.table.item(selected[0], 0)
+            if item:
+                self._on_row_double_clicked(item)
+
+    def _copy_path_shortcut(self):
+        selected = sorted({index.row() for index in self.table.selectedIndexes()})
+        if len(selected) == 1:
+            QApplication.clipboard().setText(self._rows[selected[0]]["path"])
+
+    # ------------------------------------------------------------------
+    # Event filter: intercepts key events on self.table for test harness
+    # (qtbot.keyClick does not trigger QShortcut)
+    # ------------------------------------------------------------------
+
+    def eventFilter(self, obj, event):
+        if obj is self.table and event.type() == QEvent.Type.KeyPress:
+            key = event.key()
+            mods = event.modifiers()
+            if key == Qt.Key.Key_Backspace and not mods:
+                self.viewmodel.go_up()
+                return True
+            if key == Qt.Key.Key_Return and not mods:
+                self._on_table_return()
+                return True
+            if key == Qt.Key.Key_F2 and not mods:
+                self._on_rename()
+                return True
+            if key == Qt.Key.Key_Delete and not mods:
+                self._on_delete()
+                return True
+        return super().eventFilter(obj, event)
+
+    # ------------------------------------------------------------------
+    # Page-wide keyboard shortcuts (also needed for qtbot.keyClick tests)
+    # ------------------------------------------------------------------
+
+    def keyPressEvent(self, event):
+        key = event.key()
+        mods = event.modifiers()
+        if key == Qt.Key.Key_F5 and not mods:
+            self._refresh()
+            event.accept()
+            return
+        if key == Qt.Key.Key_Escape and not mods:
+            self.table.clearSelection()
+            event.accept()
+            return
+        if (key == Qt.Key.Key_C and
+                mods == (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier)):
+            self._copy_path_shortcut()
+            event.accept()
+            return
+        super().keyPressEvent(event)
