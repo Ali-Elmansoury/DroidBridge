@@ -22,6 +22,28 @@ PRESET_NAMES = ("whatsapp", "photos", "videos", "documents", "apks", "large", "o
 LARGE_FILE_THRESHOLD = 50 * 1024 * 1024
 OLD_FILE_AGE = timedelta(days=365)
 
+MIME_GROUPS: dict = {
+    "image":    ["jpg", "jpeg", "png", "heic", "raw", "bmp", "tiff", "gif", "webp", "svg"],
+    "video":    ["mp4", "mov", "mkv", "avi", "webm", "3gp", "flv", "wmv", "m4v"],
+    "audio":    ["mp3", "aac", "ogg", "opus", "flac", "wav", "m4a", "wma", "amr"],
+    "document": ["pdf", "docx", "doc", "pptx", "ppt", "xlsx", "xls", "txt", "csv", "html", "epub"],
+    "archive":  ["zip", "tar", "gz", "bz2", "xz", "7z", "rar"],
+}
+
+
+def mime_to_extensions(mime_type: str) -> list:
+    """Return file extensions for a MIME category or full MIME string.
+
+    Accepts category names ("image") or full MIME strings ("image/jpeg") —
+    only the category prefix is used. Raises ValueError for unknown categories.
+    """
+    category = mime_type.split("/")[0].lower().strip()
+    if category not in MIME_GROUPS:
+        raise ValueError(
+            f"Unknown MIME category {category!r}; supported: {', '.join(MIME_GROUPS)}"
+        )
+    return MIME_GROUPS[category]
+
 
 @dataclass
 class SearchResult:

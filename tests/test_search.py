@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from droidbridge.modules.search import _build_find_command, search_files
+from droidbridge.modules.search import _build_find_command, search_files, MIME_GROUPS, mime_to_extensions
 from droidbridge.modules import search
 
 FIND_OUTPUT = (
@@ -235,3 +235,29 @@ class TestRegexSearch:
         cmd = client.shell.call_args[0][1]
         assert "-regextype" not in cmd
         assert "-iregex" not in cmd
+
+
+class TestMimeGroups:
+    def test_category_name_returns_extension_list(self):
+        exts = mime_to_extensions("image")
+        assert "jpg" in exts
+        assert "png" in exts
+        assert "heic" in exts
+
+    def test_full_mime_string_uses_category_only(self):
+        exts = mime_to_extensions("video/mp4")
+        assert "mp4" in exts
+        assert "mkv" in exts
+
+    def test_case_insensitive(self):
+        exts = mime_to_extensions("AUDIO")
+        assert "mp3" in exts
+
+    def test_unknown_mime_raises(self):
+        with pytest.raises(ValueError, match="Unknown MIME category"):
+            mime_to_extensions("font/woff")
+
+    def test_all_categories_present(self):
+        for cat in ("image", "video", "audio", "document", "archive"):
+            assert cat in MIME_GROUPS
+            assert len(MIME_GROUPS[cat]) > 0
