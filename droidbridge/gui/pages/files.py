@@ -46,7 +46,11 @@ class FilesPage(QWidget):
 
         self.path_edit = QLineEdit(viewmodel.current_path)
         self.go_button = QPushButton("Go")
+        self.go_button.setToolTip("Navigate to the path typed in the address bar. Shortcut: Return.")
         self.up_button = QPushButton("Up")
+        self.up_button.setToolTip(
+            "Navigate to the parent directory. Shortcut: Backspace (file list focused)."
+        )
 
         path_bar = QHBoxLayout()
         path_bar.addWidget(self.path_edit)
@@ -57,6 +61,7 @@ class FilesPage(QWidget):
         quick_jump_bar = QHBoxLayout()
         for label, path in files_ops.QUICK_JUMP_PATHS.items():
             button = QPushButton(label)
+            button.setToolTip(f"Jump to {path}.")
             button.clicked.connect(lambda checked=False, p=path: self.viewmodel.navigate(p))
             self.quick_jump_buttons[label] = button
             quick_jump_bar.addWidget(button)
@@ -68,15 +73,27 @@ class FilesPage(QWidget):
 
         self.sort_combo = QComboBox()
         self.sort_combo.addItems(files_module.SORT_KEYS)
+        self.sort_combo.setToolTip("Sort the file list by this field.")
         self.reverse_checkbox = QCheckBox("Reverse")
+        self.reverse_checkbox.setToolTip("Sort in descending order.")
         self.show_hidden_checkbox = QCheckBox("Show hidden")
+        self.show_hidden_checkbox.setToolTip(
+            "Include files and folders whose names begin with '.' (hidden files)."
+        )
         self.extension_edit = QLineEdit()
         self.extension_edit.setPlaceholderText("Extensions (comma-separated)")
+        self.extension_edit.setToolTip(
+            "Show only files with these extensions, e.g. jpg, png. "
+            "Folders are always shown (unless unchecked below)."
+        )
         self.extension_edit.setMinimumWidth(
             self.extension_edit.fontMetrics().horizontalAdvance(self.extension_edit.placeholderText()) + 20
         )
         self.dirs_pass_filter_checkbox = QCheckBox("Show folders when filtering")
         self.dirs_pass_filter_checkbox.setChecked(True)
+        self.dirs_pass_filter_checkbox.setToolTip(
+            "When an extension filter is active, also show folders alongside matching files."
+        )
 
         toolbar = QHBoxLayout()
         toolbar.addWidget(QLabel("Sort by:"))
@@ -93,14 +110,29 @@ class FilesPage(QWidget):
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
 
         self.select_all_button = QPushButton("Select All")
+        self.select_all_button.setToolTip("Select all visible files and folders. Shortcut: Ctrl+A.")
         self.deselect_all_button = QPushButton("Deselect All")
+        self.deselect_all_button.setToolTip("Clear the current selection. Shortcut: Escape.")
         self.invert_selection_button = QPushButton("Invert Selection")
+        self.invert_selection_button.setToolTip(
+            "Select unselected items and deselect currently selected items."
+        )
         self.rename_button = QPushButton("Rename")
         self.rename_button.setEnabled(False)
+        self.rename_button.setToolTip(
+            "Rename the selected file or folder (single selection only). Shortcut: F2."
+        )
         self.delete_button = QPushButton("Delete...")
         self.delete_button.setEnabled(False)
+        self.delete_button.setToolTip(
+            "Delete selected files and folders. Offers a backup option and requires "
+            "'YES DELETE' confirmation. Shortcut: Delete."
+        )
         self.pull_selected_button = QPushButton("Pull Selected...")
         self.pull_selected_button.setEnabled(False)
+        self.pull_selected_button.setToolTip(
+            "Download the selected files and folders to your computer."
+        )
 
         selection_bar = QHBoxLayout()
         selection_bar.addWidget(self.select_all_button)

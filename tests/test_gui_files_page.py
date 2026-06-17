@@ -526,3 +526,76 @@ class TestFilesPageBreadcrumb:
                    if isinstance(bar._layout.itemAt(i).widget(), QPushButton)]
         texts = [b.text() for b in buttons]
         assert "DCIM" in texts
+
+
+class TestFilesPageTooltips:
+    def test_go_button_has_tooltip(self, qtbot):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+        assert page.go_button.toolTip() != ""
+
+    def test_up_button_has_tooltip(self, qtbot):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+        assert page.up_button.toolTip() != ""
+
+    def test_quick_jump_buttons_have_tooltips(self, qtbot):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+        for label, btn in page.quick_jump_buttons.items():
+            assert btn.toolTip() != "", f"Quick-jump button {label!r} has no tooltip"
+
+    def test_sort_combo_has_tooltip(self, qtbot):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+        assert page.sort_combo.toolTip() != ""
+
+    def test_reverse_checkbox_has_tooltip(self, qtbot):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+        assert page.reverse_checkbox.toolTip() != ""
+
+    def test_show_hidden_checkbox_has_tooltip(self, qtbot):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+        assert page.show_hidden_checkbox.toolTip() != ""
+
+    def test_extension_edit_has_tooltip(self, qtbot):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+        assert page.extension_edit.toolTip() != ""
+
+    def test_dirs_pass_filter_checkbox_has_tooltip(self, qtbot):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+        assert page.dirs_pass_filter_checkbox.toolTip() != ""
+
+    def test_select_all_button_has_tooltip(self, qtbot):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+        assert page.select_all_button.toolTip() != ""
+
+    def test_deselect_all_button_has_tooltip(self, qtbot):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+        assert page.deselect_all_button.toolTip() != ""
+
+    def test_invert_selection_button_has_tooltip(self, qtbot):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+        assert page.invert_selection_button.toolTip() != ""
+
+    def test_rename_button_has_tooltip(self, qtbot):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+        assert page.rename_button.toolTip() != ""
+
+    def test_delete_button_has_tooltip(self, qtbot):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+        assert page.delete_button.toolTip() != ""
+
+    def test_pull_selected_button_has_tooltip(self, qtbot):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+        assert page.pull_selected_button.toolTip() != ""
