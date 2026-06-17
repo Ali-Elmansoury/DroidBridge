@@ -483,3 +483,23 @@ class TestFilesPagePreviewPath:
         page._on_preview_changed({"kind": "entry", "entry": entry})
         first_line = page.preview_info_label.text().split("\n")[0]
         assert first_line.startswith("Path:")
+
+
+class TestFilesPageBreadcrumb:
+    def test_breadcrumb_bar_exists_on_page(self, qapp, qtbot):
+        from droidbridge.gui.widgets.breadcrumb_bar import BreadcrumbBar
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+        assert hasattr(page, "breadcrumb")
+        assert isinstance(page.breadcrumb, BreadcrumbBar)
+
+    def test_path_change_updates_breadcrumb(self, qapp, qtbot):
+        from PyQt6.QtWidgets import QPushButton
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+        page._on_path_changed("/sdcard/DCIM")
+        bar = page.breadcrumb
+        buttons = [bar._layout.itemAt(i).widget() for i in range(bar._layout.count())
+                   if isinstance(bar._layout.itemAt(i).widget(), QPushButton)]
+        texts = [b.text() for b in buttons]
+        assert "DCIM" in texts

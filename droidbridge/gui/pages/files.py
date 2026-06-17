@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
 
 from droidbridge.gui import files_ops
 from droidbridge.gui.widgets import delete_flow
+from droidbridge.gui.widgets.breadcrumb_bar import BreadcrumbBar
 from droidbridge.gui.widgets.deselectable_table import DeselectableTableWidget
 from droidbridge.modules import files as files_module
 from droidbridge.utils.format import format_bytes
@@ -60,6 +61,10 @@ class FilesPage(QWidget):
             self.quick_jump_buttons[label] = button
             quick_jump_bar.addWidget(button)
         quick_jump_bar.addStretch()
+
+        self.breadcrumb = BreadcrumbBar()
+        self.breadcrumb.set_path(viewmodel.current_path)
+        self.breadcrumb.pathRequested.connect(viewmodel.navigate)
 
         self.sort_combo = QComboBox()
         self.sort_combo.addItems(files_module.SORT_KEYS)
@@ -116,6 +121,7 @@ class FilesPage(QWidget):
 
         layout = QVBoxLayout(self)
         layout.addLayout(path_bar)
+        layout.addWidget(self.breadcrumb)
         layout.addLayout(quick_jump_bar)
         layout.addLayout(toolbar)
         layout.addWidget(self.table)
@@ -167,6 +173,7 @@ class FilesPage(QWidget):
 
     def _on_path_changed(self, path):
         self.path_edit.setText(path)
+        self.breadcrumb.set_path(path)
 
     def _on_selection_changed(self):
         selected_rows = sorted({index.row() for index in self.table.selectedIndexes()})
