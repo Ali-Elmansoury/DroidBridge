@@ -429,6 +429,178 @@ class TestExtensionColumn:
         assert page.table.item(0, ext_col).text() == "(none)"
 
 
+class TestSearchPageTooltips:
+    def test_name_edit_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.name_edit.toolTip() != ""
+
+    def test_extensions_edit_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.extensions_edit.toolTip() != ""
+
+    def test_min_size_edit_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.min_size_edit.toolTip() != ""
+
+    def test_max_size_edit_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.max_size_edit.toolTip() != ""
+
+    def test_after_checkbox_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.after_checkbox.toolTip() != ""
+
+    def test_after_date_edit_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.after_date_edit.toolTip() != ""
+
+    def test_before_checkbox_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.before_checkbox.toolTip() != ""
+
+    def test_before_date_edit_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.before_date_edit.toolTip() != ""
+
+    def test_preset_combo_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.preset_combo.toolTip() != ""
+
+    def test_sort_combo_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.sort_combo.toolTip() != ""
+
+    def test_reverse_checkbox_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.reverse_checkbox.toolTip() != ""
+
+    def test_search_button_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.search_button.toolTip() != ""
+
+    def test_select_all_button_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.select_all_button.toolTip() != ""
+
+    def test_deselect_all_button_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.deselect_all_button.toolTip() != ""
+
+    def test_invert_selection_button_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.invert_selection_button.toolTip() != ""
+
+    def test_clear_results_button_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.clear_results_button.toolTip() != ""
+
+    def test_rename_button_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.rename_button.toolTip() != ""
+
+    def test_delete_button_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.delete_button.toolTip() != ""
+
+    def test_pull_selected_button_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.pull_selected_button.toolTip() != ""
+
+    def test_export_button_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.export_button.toolTip() != ""
+
+
+class TestSearchPageShortcuts:
+    def test_f5_runs_search(self, qtbot, monkeypatch):
+        page, vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        page.show()
+
+        calls = []
+        monkeypatch.setattr(vm, "search", lambda **k: calls.append(1))
+
+        qtbot.keyClick(page, Qt.Key.Key_F5)
+
+        assert calls
+
+    def test_escape_clears_selection(self, qtbot):
+        page, vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        page.show()
+        vm.resultsChanged.emit(SAMPLE_ROWS)
+        page.table.selectRow(0)
+        assert page.table.selectedIndexes()
+
+        qtbot.keyClick(page, Qt.Key.Key_Escape)
+
+        assert page.table.selectedIndexes() == []
+
+    def test_ctrl_shift_c_copies_path(self, qtbot):
+        from PyQt6.QtWidgets import QApplication
+        page, vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        page.show()
+        vm.resultsChanged.emit(SAMPLE_ROWS)
+        page.table.selectRow(0)
+
+        qtbot.keyClick(
+            page,
+            Qt.Key.Key_C,
+            Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier,
+        )
+
+        assert QApplication.clipboard().text() == "/sdcard/DCIM/a.jpg"
+
+    def test_f2_triggers_rename(self, qtbot, monkeypatch):
+        page, vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        page.show()
+        vm.resultsChanged.emit(SAMPLE_ROWS)
+
+        calls = []
+        monkeypatch.setattr(page, "_on_rename", lambda: calls.append(1))
+
+        page.table.setFocus()
+        qtbot.keyClick(page.table, Qt.Key.Key_F2)
+
+        assert calls
+
+    def test_delete_key_triggers_delete(self, qtbot, monkeypatch):
+        page, vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        page.show()
+        vm.resultsChanged.emit(SAMPLE_ROWS)
+        page.table.selectRow(0)
+
+        calls = []
+        monkeypatch.setattr(delete_flow, "run_delete_flow", lambda *a, **k: calls.append(1) or set())
+
+        qtbot.keyClick(page.table, Qt.Key.Key_Delete)
+
+        assert calls
+
+
 class TestExportButton:
     def test_export_button_exists_and_disabled_initially(self, qtbot):
         page, _vm, _context = _make_page()

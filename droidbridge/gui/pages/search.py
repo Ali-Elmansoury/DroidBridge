@@ -3,8 +3,10 @@ results table, and pull-selected. Purely declarative - binds to SearchViewModel
 signals/slots, no ADB calls or business logic of its own.
 """
 
-from PyQt6.QtCore import QDate, QItemSelectionModel, pyqtSignal
+from PyQt6.QtCore import QDate, QEvent, QItemSelectionModel, Qt, pyqtSignal
+from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QComboBox,
     QDateEdit,
@@ -50,31 +52,53 @@ class SearchPage(QWidget):
             "or '..' to go up a level."
         )
         self.name_edit = QLineEdit()
+        self.name_edit.setToolTip(
+            "Filename pattern to search for. Supports glob wildcards (* matches anything). "
+            "Leave blank to match all names."
+        )
         self.extensions_edit = QLineEdit()
         self.extensions_edit.setPlaceholderText("Extensions (comma-separated)")
+        self.extensions_edit.setToolTip(
+            "Filter by file extension(s), e.g. jpg, png. Leave blank for all types."
+        )
         self.min_size_edit = QLineEdit()
         self.min_size_edit.setPlaceholderText("e.g. 10MB")
+        self.min_size_edit.setToolTip(
+            "Minimum file size, e.g. 10MB, 1.5GB. Leave blank for no minimum."
+        )
         self.max_size_edit = QLineEdit()
         self.max_size_edit.setPlaceholderText("e.g. 1GB")
+        self.max_size_edit.setToolTip("Maximum file size, e.g. 500MB. Leave blank for no maximum.")
 
         self.after_checkbox = QCheckBox("After")
+        self.after_checkbox.setToolTip("Include only files modified after the date on the right.")
         self.after_date_edit = QDateEdit(QDate.currentDate())
         self.after_date_edit.setCalendarPopup(True)
         self.after_date_edit.setEnabled(False)
+        self.after_date_edit.setToolTip("Earliest modification date to include in results.")
 
         self.before_checkbox = QCheckBox("Before")
+        self.before_checkbox.setToolTip("Include only files modified before the date on the right.")
         self.before_date_edit = QDateEdit(QDate.currentDate())
         self.before_date_edit.setCalendarPopup(True)
         self.before_date_edit.setEnabled(False)
+        self.before_date_edit.setToolTip("Latest modification date to include in results.")
 
         self.preset_combo = QComboBox()
         self.preset_combo.addItems(["None"] + list(search_module.PRESET_NAMES))
+        self.preset_combo.setToolTip(
+            "Load a predefined search configuration (e.g. Large Files, WhatsApp Images). "
+            "Overwrites the current fields."
+        )
 
         self.sort_combo = QComboBox()
         self.sort_combo.addItems(search_module.SORT_KEYS)
+        self.sort_combo.setToolTip("Sort search results by this field.")
         self.reverse_checkbox = QCheckBox("Reverse")
+        self.reverse_checkbox.setToolTip("Sort results in descending order.")
 
         self.search_button = QPushButton("Search")
+        self.search_button.setToolTip("Run the search with the current filters. Shortcut: F5.")
 
         form = QFormLayout()
         root_row = QHBoxLayout()
@@ -118,17 +142,34 @@ class SearchPage(QWidget):
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
 
         self.select_all_button = QPushButton("Select All")
+        self.select_all_button.setToolTip("Select all search results. Shortcut: Ctrl+A.")
         self.deselect_all_button = QPushButton("Deselect All")
+        self.deselect_all_button.setToolTip("Clear the selection. Shortcut: Escape.")
         self.invert_selection_button = QPushButton("Invert Selection")
+        self.invert_selection_button.setToolTip(
+            "Select unselected results and deselect selected ones."
+        )
         self.clear_results_button = QPushButton("Clear Results")
+        self.clear_results_button.setToolTip("Clear the results table.")
         self.rename_button = QPushButton("Rename")
         self.rename_button.setEnabled(False)
+        self.rename_button.setToolTip(
+            "Rename the selected file or folder (single selection only). Shortcut: F2."
+        )
         self.delete_button = QPushButton("Delete...")
         self.delete_button.setEnabled(False)
+        self.delete_button.setToolTip(
+            "Delete selected items with backup option and 'YES DELETE' confirmation. "
+            "Shortcut: Delete."
+        )
         self.pull_selected_button = QPushButton("Pull Selected...")
         self.pull_selected_button.setEnabled(False)
+        self.pull_selected_button.setToolTip(
+            "Download selected files and folders to your computer."
+        )
         self.export_button = QPushButton("Export...")
         self.export_button.setEnabled(False)
+        self.export_button.setToolTip("Export the search results to CSV or TXT format.")
 
         selection_bar = QHBoxLayout()
         selection_bar.addWidget(self.select_all_button)
@@ -169,6 +210,56 @@ class SearchPage(QWidget):
         self.viewmodel.rootSubdirsChanged.connect(self._on_root_subdirs_changed)
 
         self.viewmodel.browse_root(self.root_edit.text().strip())
+
+        def _sc(key, slot, *, target=None, ctx=Qt.ShortcutContext.WidgetWithChildrenShortcut):
+            s = QShortcut(QKeySequence(key), target or self)
+            s.setContext(ctx)
+            s.activated.connect(slot)
+
+        _sc("F5", self.search_button.click)
+        _sc("Escape", self.table.clearSelection)
+        _sc("Ctrl+Shift+C", self._copy_path_shortcut)
+        _sc("F2", self._on_rename, target=self.table, ctx=Qt.ShortcutContext.WidgetShortcut)
+        _sc("Delete", self._on_delete, target=self.table, ctx=Qt.ShortcutContext.WidgetShortcut)
+
+        self.table.installEventFilter(self)
+        self.table.viewport().installEventFilter(self)
+
+    def _copy_path_shortcut(self):
+        selected = sorted({index.row() for index in self.table.selectedIndexes()})
+        if len(selected) == 1:
+            QApplication.clipboard().setText(self._rows[selected[0]]["path"])
+
+    def keyPressEvent(self, event):
+        key = event.key()
+        mods = event.modifiers()
+        if key == Qt.Key.Key_F5 and not mods:
+            self.search_button.click()
+            event.accept()
+            return
+        if key == Qt.Key.Key_Escape and not mods:
+            self.table.clearSelection()
+            event.accept()
+            return
+        if (key == Qt.Key.Key_C and
+                mods == (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier)):
+            self._copy_path_shortcut()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    def eventFilter(self, obj, event):
+        if (obj is self.table or obj is self.table.viewport()) and \
+                event.type() == QEvent.Type.KeyPress:
+            key = event.key()
+            mods = event.modifiers()
+            if key == Qt.Key.Key_F2 and not mods:
+                self._on_rename()
+                return True
+            if key == Qt.Key.Key_Delete and not mods:
+                self._on_delete()
+                return True
+        return super().eventFilter(obj, event)
 
     def _on_search_clicked(self):
         preset = self.preset_combo.currentText()
