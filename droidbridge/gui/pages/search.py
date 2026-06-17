@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
@@ -27,7 +28,7 @@ from droidbridge.gui.widgets.deselectable_table import DeselectableTableWidget
 from droidbridge.modules import search as search_module
 from droidbridge.utils.format import format_bytes
 
-_COLUMNS = ("Path", "Size", "Date Modified")
+_COLUMNS = ("Path", "Size", "Date Modified", "Extension")
 
 
 class SearchPage(QWidget):
@@ -114,6 +115,7 @@ class SearchPage(QWidget):
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
 
         self.select_all_button = QPushButton("Select All")
         self.deselect_all_button = QPushButton("Deselect All")
@@ -125,6 +127,8 @@ class SearchPage(QWidget):
         self.delete_button.setEnabled(False)
         self.pull_selected_button = QPushButton("Pull Selected...")
         self.pull_selected_button.setEnabled(False)
+        self.export_button = QPushButton("Export...")
+        self.export_button.setEnabled(False)
 
         selection_bar = QHBoxLayout()
         selection_bar.addWidget(self.select_all_button)
@@ -135,6 +139,7 @@ class SearchPage(QWidget):
         selection_bar.addWidget(self.rename_button)
         selection_bar.addWidget(self.delete_button)
         selection_bar.addWidget(self.pull_selected_button)
+        selection_bar.addWidget(self.export_button)
 
         layout = QVBoxLayout(self)
         layout.addLayout(form)
@@ -152,6 +157,7 @@ class SearchPage(QWidget):
         self.clear_results_button.clicked.connect(self._on_clear_results)
         self.table.itemSelectionChanged.connect(self._on_selection_changed)
         self.pull_selected_button.clicked.connect(self._on_pull_selected)
+        self.export_button.clicked.connect(self._on_export_clicked)
         self.rename_button.clicked.connect(self._on_rename)
         self.delete_button.clicked.connect(self._on_delete)
 
@@ -228,6 +234,7 @@ class SearchPage(QWidget):
         self.pull_selected_button.setEnabled(False)
         self.rename_button.setEnabled(False)
         self.delete_button.setEnabled(False)
+        self.export_button.setEnabled(bool(rows))
 
     def _populate_table(self):
         self.table.setRowCount(len(self._rows))
@@ -237,6 +244,7 @@ class SearchPage(QWidget):
             self.table.setItem(i, 0, path_item)
             self.table.setItem(i, 1, QTableWidgetItem(format_bytes(row["size"])))
             self.table.setItem(i, 2, QTableWidgetItem(row["mtime"].strftime("%Y-%m-%d %H:%M")))
+            self.table.setItem(i, 3, QTableWidgetItem(row.get("extension") or "(none)"))
 
     def _on_selection_changed(self):
         selected_rows = sorted({index.row() for index in self.table.selectedIndexes()})
@@ -250,6 +258,7 @@ class SearchPage(QWidget):
         self.pull_selected_button.setEnabled(False)
         self.rename_button.setEnabled(False)
         self.delete_button.setEnabled(False)
+        self.export_button.setEnabled(False)
 
     def _on_invert_selection(self):
         selection_model = self.table.selectionModel()
@@ -302,3 +311,39 @@ class SearchPage(QWidget):
         self.pull_selected_button.setEnabled(False)
         self.rename_button.setEnabled(False)
         self.delete_button.setEnabled(False)
+
+    def _on_export_clicked(self):
+        if not self._rows:
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export Search Results", "", "CSV (*.csv);;Text (*.txt)"
+        )
+        if not path:
+            return
+        fmt = "csv" if path.lower().endswith(".csv") else "txt"
+        try:
+            if fmt == "csv":
+                import csv
+                with open(path, "w", newline="", encoding="utf-8") as f:
+                    writer = csv.writer(f)
+                    writer.writerow(["path", "size", "date", "extension"])
+                    for row in self._rows:
+                        writer.writerow([
+                            row["path"],
+                            row["size"],
+                            row["mtime"].strftime("%Y-%m-%d %H:%M"),
+                            row.get("extension") or "",
+                        ])
+            else:
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write("      size  date                ext         path\n")
+                    for row in self._rows:
+                        size = format_bytes(row["size"])
+                        date = row["mtime"].strftime("%Y-%m-%d %H:%M")
+                        ext = row.get("extension") or "(none)"
+                        f.write(f"{size:>10}  {date}  {ext:<10}  {row['path']}\n")
+            QMessageBox.information(
+                self, "Export Complete", f"Exported {len(self._rows)} result(s) to {path}."
+            )
+        except OSError as exc:
+            QMessageBox.critical(self, "Export Failed", str(exc))

@@ -399,3 +399,78 @@ class TestDelete:
 
         assert len(page._rows) == 2
         assert page.table.rowCount() == 2
+
+
+class TestExtensionColumn:
+    def test_columns_include_extension(self):
+        from droidbridge.gui.pages.search import _COLUMNS
+        assert "Extension" in _COLUMNS
+
+    def test_populate_table_sets_extension_cell(self, qtbot):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+        from droidbridge.gui.pages.search import _COLUMNS
+        rows = [{"path": "/sdcard/photo.jpg", "name": "photo.jpg", "size": 1000,
+                 "mtime": datetime(2024, 1, 1), "extension": "jpg",
+                 "result": MagicMock()}]
+        vm.resultsChanged.emit(rows)
+        ext_col = list(_COLUMNS).index("Extension")
+        assert page.table.item(0, ext_col).text() == "jpg"
+
+    def test_no_extension_shows_none_label(self, qtbot):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+        from droidbridge.gui.pages.search import _COLUMNS
+        rows = [{"path": "/sdcard/noext", "name": "noext", "size": 100,
+                 "mtime": datetime(2024, 1, 1), "extension": "",
+                 "result": MagicMock()}]
+        vm.resultsChanged.emit(rows)
+        ext_col = list(_COLUMNS).index("Extension")
+        assert page.table.item(0, ext_col).text() == "(none)"
+
+
+class TestExportButton:
+    def test_export_button_exists_and_disabled_initially(self, qtbot):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+        assert hasattr(page, "export_button")
+        assert not page.export_button.isEnabled()
+
+    def test_export_button_enabled_after_results(self, qtbot):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+        vm.resultsChanged.emit(SAMPLE_ROWS)
+        assert page.export_button.isEnabled()
+
+    def test_export_button_disabled_after_clear(self, qtbot):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+        vm.resultsChanged.emit(SAMPLE_ROWS)
+        page._on_clear_results()
+        assert not page.export_button.isEnabled()
+
+    def test_export_csv_writes_file(self, qtbot, tmp_path):
+        import csv
+        from unittest.mock import patch
+        from PyQt6.QtWidgets import QMessageBox
+
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+        rows = [{"path": "/sdcard/photo.jpg", "name": "photo.jpg", "size": 1000,
+                 "mtime": datetime(2024, 6, 1, 12, 0), "extension": "jpg",
+                 "result": MagicMock()}]
+        vm.resultsChanged.emit(rows)
+
+        out_path = str(tmp_path / "results.csv")
+        with patch("droidbridge.gui.pages.search.QFileDialog.getSaveFileName",
+                   return_value=(out_path, "CSV (*.csv)")):
+            with patch("droidbridge.gui.pages.search.QMessageBox.information"):
+                page._on_export_clicked()
+
+        with open(out_path, newline="") as f:
+            reader = csv.reader(f)
+            header = next(reader)
+            data = next(reader)
+        assert header == ["path", "size", "date", "extension"]
+        assert data[0] == "/sdcard/photo.jpg"
+        assert data[3] == "jpg"

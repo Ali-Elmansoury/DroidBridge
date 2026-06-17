@@ -124,6 +124,53 @@ class TestSetSort:
         assert [r["size"] for r in rows] == [200, 100]
 
 
+class TestFormatResultIncludesExtension:
+    def test_emitted_row_has_extension_key(self, qtbot, monkeypatch):
+        """_format_result must include 'extension' from SearchResult.extension."""
+        vm = SearchViewModel(_connected_context(), worker_factory=FakeWorker)
+
+        monkeypatch.setattr(
+            search_ops,
+            "run_search",
+            lambda client, serial, root, **kwargs: [
+                SearchResult(path="/sdcard/DCIM/photo.jpg", size=500, mtime=datetime(2024, 1, 1)),
+            ],
+        )
+
+        events = []
+        vm.resultsChanged.connect(events.append)
+
+        vm.search(root="/sdcard", name=None, extensions=None, min_size_str="", max_size_str="",
+                  after=None, before=None, preset=None, sort_by="path", reverse=False)
+
+        assert events, "resultsChanged was not emitted"
+        rows = events[0]
+        assert len(rows) == 1
+        assert "extension" in rows[0]
+        assert rows[0]["extension"] == "jpg"
+
+    def test_file_without_extension_emits_empty_string(self, qtbot, monkeypatch):
+        """_format_result must emit extension='' for files with no extension."""
+        vm = SearchViewModel(_connected_context(), worker_factory=FakeWorker)
+
+        monkeypatch.setattr(
+            search_ops,
+            "run_search",
+            lambda client, serial, root, **kwargs: [
+                SearchResult(path="/sdcard/README", size=200, mtime=datetime(2024, 1, 1)),
+            ],
+        )
+
+        events = []
+        vm.resultsChanged.connect(events.append)
+
+        vm.search(root="/sdcard", name=None, extensions=None, min_size_str="", max_size_str="",
+                  after=None, before=None, preset=None, sort_by="path", reverse=False)
+
+        rows = events[0]
+        assert rows[0]["extension"] == ""
+
+
 class TestBrowseRoot:
     def test_browse_root_emits_subdirs_only(self, qtbot, monkeypatch):
         vm = SearchViewModel(_connected_context(), worker_factory=FakeWorker)
