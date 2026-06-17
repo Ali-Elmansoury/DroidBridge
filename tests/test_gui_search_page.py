@@ -4,7 +4,7 @@ from datetime import date, datetime
 from unittest.mock import MagicMock
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QFileDialog, QHeaderView
+from PyQt6.QtWidgets import QApplication, QFileDialog, QHeaderView
 
 from droidbridge.gui import files_ops
 from droidbridge.gui.device_context import DeviceContext
@@ -557,7 +557,6 @@ class TestSearchPageShortcuts:
         assert page.table.selectedIndexes() == []
 
     def test_ctrl_shift_c_copies_path(self, qtbot):
-        from PyQt6.QtWidgets import QApplication
         page, vm, _ctx = _make_page()
         qtbot.addWidget(page)
         page.show()
