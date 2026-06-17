@@ -1887,6 +1887,37 @@ def apps_trim_cache(serial, target):
     click.echo(f"Requested up to {format_bytes(desired_free_bytes)} of cache to be trimmed.")
 
 
+@apps_cmd.command("clear-cache")
+@_SERIAL_OPTION
+@click.option("--all", "clear_all", is_flag=True, default=False, help="Free as much cache space as possible.")
+@click.option("--target", type=int, default=None, help="Trim until this many bytes are free.")
+def apps_clear_cache(serial, clear_all, target):
+    """Clear app caches system-wide via Android's cache-trim mechanism.
+
+    Note: Android does not support clearing a single app's cache without root.
+    Use --all to free as much cache space as possible, or --target BYTES to trim
+    until the specified free space is reached.
+    """
+    if not clear_all and target is None:
+        raise click.UsageError("Specify --all to clear all caches, or --target BYTES for a specific target.")
+
+    try:
+        client = _build_client()
+    except AdbError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+
+    serial = _resolve_serial(client, serial)
+
+    if clear_all:
+        desired = 2 ** 62
+    else:
+        desired = target
+
+    apps_module.trim_caches(client, serial, desired)
+    click.echo("Cache trim requested.")
+
+
 @apps_cmd.command("reset")
 @click.argument("package")
 @_SERIAL_OPTION

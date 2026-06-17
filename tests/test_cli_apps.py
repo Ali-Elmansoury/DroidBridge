@@ -384,6 +384,66 @@ class TestAppsDisable:
         assert calls == [["pm", "disable-user", "--user", "0", "com.whatsapp"]]
 
 
+class TestAppsClearCache:
+    def test_no_flags_gives_usage_error(self, monkeypatch):
+        client = make_fake_client(READY_DEVICE, _apps_fake_shell)
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(main.cli, ["apps", "clear-cache"])
+
+        assert result.exit_code != 0
+        assert "error" in result.output.lower() or "usage" in result.output.lower()
+
+    def test_all_flag_calls_trim_caches_with_large_number(self, monkeypatch):
+        calls = []
+
+        def fake_shell(serial, command, timeout=None):
+            if command[:2] == ["pm", "trim-caches"]:
+                calls.append(command)
+                return ""
+            return _apps_fake_shell(serial, command, timeout)
+
+        client = make_fake_client(READY_DEVICE, fake_shell)
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(main.cli, ["apps", "clear-cache", "--all"])
+
+        assert result.exit_code == 0
+        assert len(calls) == 1
+        assert int(calls[0][2]) > 1_000_000_000
+
+    def test_target_flag_calls_trim_caches_with_exact_bytes(self, monkeypatch):
+        calls = []
+
+        def fake_shell(serial, command, timeout=None):
+            if command[:2] == ["pm", "trim-caches"]:
+                calls.append(command)
+                return ""
+            return _apps_fake_shell(serial, command, timeout)
+
+        client = make_fake_client(READY_DEVICE, fake_shell)
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(main.cli, ["apps", "clear-cache", "--target", "500000000"])
+
+        assert result.exit_code == 0
+        assert calls == [["pm", "trim-caches", "500000000"]]
+
+    def test_all_flag_prints_confirmation_message(self, monkeypatch):
+        def fake_shell(serial, command, timeout=None):
+            if command[:2] == ["pm", "trim-caches"]:
+                return ""
+            return _apps_fake_shell(serial, command, timeout)
+
+        client = make_fake_client(READY_DEVICE, fake_shell)
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(main.cli, ["apps", "clear-cache", "--all"])
+
+        assert result.exit_code == 0
+        assert "cache trim requested" in result.output.lower()
+
+
 class TestAppsEnable:
     def test_no_device_shows_guidance_and_exits_nonzero(self, monkeypatch):
         client = make_fake_client([], "")
