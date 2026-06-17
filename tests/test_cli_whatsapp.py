@@ -838,6 +838,16 @@ class TestAnalyzeReportSaved:
             result = runner.invoke(cli, ["whatsapp", "analyze", "--cutoff", "2024-01-01"])
         assert "Report saved to session_logs/reports/" in result.output
 
+    def test_analyze_no_report_when_no_media(self, runner, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        with patch("droidbridge.cli.main._build_client"), \
+             patch("droidbridge.cli.main._resolve_serial", return_value="SERIAL"), \
+             patch("droidbridge.cli.main.whatsapp_module.detect_installs", return_value=[_WA_INSTALL]), \
+             patch("droidbridge.cli.main.whatsapp_module.scan_media", return_value=[]):
+            result = runner.invoke(cli, ["whatsapp", "analyze", "--cutoff", "2024-01-01"])
+        assert result.exit_code == 0
+        assert not (tmp_path / "session_logs" / "reports").exists()
+
 
 _WA_BACKUP_INSTALL = WhatsAppInstall(
     "com.whatsapp", "WhatsApp", "/sdcard/Android/media/com.whatsapp/WhatsApp"
