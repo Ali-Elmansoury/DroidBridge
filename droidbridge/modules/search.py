@@ -120,6 +120,10 @@ def search_files(
     """Recursively search `root_path` for files matching the given filters."""
     if name_pattern and name_regex:
         raise ValueError("Cannot use both name_pattern and name_regex")
+    # find -iregex matches the full path. Prepend .* so callers can write
+    # filename-only patterns without worrying about path prefix.
+    if name_regex is not None and not name_regex.startswith(".*"):
+        name_regex = ".*" + name_regex
     cmd = _build_find_command(root_path, name_pattern=name_pattern, name_regex=name_regex)
     # No timeout: a recursive search of /sdcard can take well over 30s.
     output = client.shell(serial, cmd, timeout=None)

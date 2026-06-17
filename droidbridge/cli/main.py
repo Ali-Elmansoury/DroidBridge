@@ -235,7 +235,8 @@ def files_browse(path, serial, sort_by, reverse, show_hidden, extensions):
 def _format_result_line(result):
     size = format_bytes(result.size)
     date = result.mtime.strftime("%Y-%m-%d %H:%M")
-    return f"{size:>10}  {date}  {result.path}"
+    ext = result.extension or "(none)"
+    return f"{size:>10}  {date}  {ext:<10}  {result.path}"
 
 
 @files_cmd.command("search")
@@ -284,7 +285,10 @@ def _format_result_line(result):
     help="Sort by name, size, date, or path.",
 )
 @click.option("--reverse", "-r", is_flag=True, help="Reverse the sort order.")
-def files_search(path, serial, name, extensions, min_size, max_size, after, before, preset, sort_by, reverse):
+@click.option("--regex", "name_regex", default=None, help="Regex filename match (cannot combine with --name).")
+@click.option("--mime", default=None, help="MIME category filter: image|video|audio|document|archive (cannot combine with --ext/--type).")
+@click.option("--limit", type=int, default=None, help="Cap results at N entries (applied after sorting).")
+def files_search(path, serial, name, extensions, min_size, max_size, after, before, preset, sort_by, reverse, name_regex, mime, limit):
     """Search for files on the device (default root: /sdcard)."""
     try:
         client = _build_client()
@@ -293,6 +297,13 @@ def files_search(path, serial, name, extensions, min_size, max_size, after, befo
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
+
+    if name and name_regex:
+        click.echo("Error: --name and --regex are mutually exclusive.", err=True)
+        sys.exit(1)
+    if extensions and mime:
+        click.echo("Error: --ext/--type and --mime are mutually exclusive.", err=True)
+        sys.exit(1)
 
     kwargs = {}
     root = path
@@ -313,6 +324,16 @@ def files_search(path, serial, name, extensions, min_size, max_size, after, befo
     if extensions:
         kwargs["extensions"] = [e.lower().lstrip(".") for e in extensions]
 
+    if name_regex:
+        kwargs["name_regex"] = name_regex
+
+    if mime:
+        try:
+            kwargs["extensions"] = search_module.mime_to_extensions(mime)
+        except ValueError as exc:
+            click.echo(f"Error: {exc}", err=True)
+            sys.exit(1)
+
     if min_size:
         kwargs["min_size"] = parse_size(min_size)
 
@@ -332,6 +353,9 @@ def files_search(path, serial, name, extensions, min_size, max_size, after, befo
         sys.exit(1)
 
     results = search_module.sort_results(results, by=sort_by, reverse=reverse)
+
+    if limit is not None:
+        results = results[:limit]
 
     if not results:
         click.echo("No files found.")

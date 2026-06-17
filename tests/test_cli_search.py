@@ -1,9 +1,10 @@
 """Tests for `droidbridge files search` (Module 7 CLI)."""
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from click.testing import CliRunner
 
+from droidbridge.cli.main import cli
 from droidbridge.cli import main
 from droidbridge.core.adb import Device
 from droidbridge.modules import search as search_module
@@ -163,3 +164,85 @@ class TestFilesSearch:
 
         assert result.exit_code == 0
         assert "no files found" in result.output.lower()
+
+
+class TestSearchRegexCLI:
+    def test_regex_flag_passed_to_search_files(self, runner):
+        client = make_fake_client(
+            READY_DEVICE,
+            shell_result="/sdcard/photo.jpg\t1000\t1700000000.0\n",
+        )
+        with patch("droidbridge.cli.main._build_client", return_value=client):
+            result = runner.invoke(cli, ["files", "search", "--regex", ".*\\.jpg"])
+        assert result.exit_code == 0
+        assert "photo.jpg" in result.output
+
+    def test_regex_and_name_mutually_exclusive(self, runner):
+        client = make_fake_client(READY_DEVICE, shell_result="")
+        with patch("droidbridge.cli.main._build_client", return_value=client):
+            result = runner.invoke(
+                cli, ["files", "search", "--name", "foo", "--regex", ".*foo.*"]
+            )
+        assert result.exit_code == 1
+        assert "mutually exclusive" in result.output.lower()
+
+
+class TestSearchMimeCLI:
+    def test_mime_expands_to_extensions(self, runner):
+        client = make_fake_client(
+            READY_DEVICE,
+            shell_result="/sdcard/img.jpg\t500\t1700000000.0\n",
+        )
+        with patch("droidbridge.cli.main._build_client", return_value=client):
+            result = runner.invoke(cli, ["files", "search", "--mime", "image"])
+        assert result.exit_code == 0
+        assert "img.jpg" in result.output
+
+    def test_unknown_mime_exits_1(self, runner):
+        client = make_fake_client(READY_DEVICE, shell_result="")
+        with patch("droidbridge.cli.main._build_client", return_value=client):
+            result = runner.invoke(cli, ["files", "search", "--mime", "font"])
+        assert result.exit_code == 1
+        assert "Unknown MIME category" in result.output
+
+    def test_mime_and_ext_mutually_exclusive(self, runner):
+        client = make_fake_client(READY_DEVICE, shell_result="")
+        with patch("droidbridge.cli.main._build_client", return_value=client):
+            result = runner.invoke(
+                cli, ["files", "search", "--ext", "jpg", "--mime", "image"]
+            )
+        assert result.exit_code == 1
+
+
+class TestSearchLimitCLI:
+    def test_limit_clips_results(self, runner):
+        lines = "\n".join(
+            f"/sdcard/file{i}.jpg\t100\t1700000000.0" for i in range(10)
+        )
+        client = make_fake_client(READY_DEVICE, shell_result=lines)
+        with patch("droidbridge.cli.main._build_client", return_value=client):
+            result = runner.invoke(cli, ["files", "search", "--limit", "3"])
+        assert result.exit_code == 0
+        assert result.output.count("/sdcard/file") == 3
+
+
+class TestSearchExtensionInOutput:
+    def test_extension_column_present_in_output(self, runner):
+        client = make_fake_client(
+            READY_DEVICE,
+            shell_result="/sdcard/photo.jpg\t1000\t1700000000.0\n",
+        )
+        with patch("droidbridge.cli.main._build_client", return_value=client):
+            result = runner.invoke(cli, ["files", "search"])
+        assert result.exit_code == 0
+        assert "jpg" in result.output
+
+    def test_no_extension_shows_none_label(self, runner):
+        client = make_fake_client(
+            READY_DEVICE,
+            shell_result="/sdcard/noext\t100\t1700000000.0\n",
+        )
+        with patch("droidbridge.cli.main._build_client", return_value=client):
+            result = runner.invoke(cli, ["files", "search"])
+        assert result.exit_code == 0
+        assert "(none)" in result.output
