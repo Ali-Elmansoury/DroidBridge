@@ -616,6 +616,9 @@ def _write_report(report, filename_stem):
     out = Path("session_logs") / "reports" / f"{filename_stem}.txt"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(content, encoding="utf-8")
+    logger = _get_session_logger()
+    if logger:
+        logger.log(f"Report written: {out}")
 
 
 def _report_failed_items(failed):
@@ -748,6 +751,10 @@ def transfer_pull(remote_path, local_dir, serial, conflict, no_verify, retry):
 
     serial = _resolve_serial(client, serial)
 
+    _logger = _get_session_logger()
+    if _logger:
+        _logger.log(f"transfer pull {remote_path} → {local_dir}")
+
     try:
         plan = transfer_module.plan_pull(client, serial, remote_path, local_dir, conflict=conflict)
     except AdbError as exc:
@@ -781,6 +788,12 @@ def transfer_pull(remote_path, local_dir, serial, conflict, no_verify, retry):
     report = transfer_reports.build_transfer_report("pull", plan, progress, verification=verification)
     _write_report(report, f"transfer-pull_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
 
+    if _logger:
+        _logger.log(
+            f"Pull complete: {progress.done_files} files, "
+            f"{format_bytes(progress.done_bytes)}, {len(progress.failed)} failed"
+        )
+
     if progress.failed or not verified:
         sys.exit(1)
 
@@ -801,6 +814,10 @@ def transfer_push(local_path, remote_dir, serial, conflict, no_verify, retry):
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
+
+    _logger = _get_session_logger()
+    if _logger:
+        _logger.log(f"transfer push {local_path} → {remote_dir}")
 
     try:
         plan = transfer_module.plan_push(client, serial, local_path, remote_dir, conflict=conflict)
@@ -835,6 +852,12 @@ def transfer_push(local_path, remote_dir, serial, conflict, no_verify, retry):
     report = transfer_reports.build_transfer_report("push", plan, progress, verification=verification)
     _write_report(report, f"transfer-push_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
 
+    if _logger:
+        _logger.log(
+            f"Push complete: {progress.done_files} files, "
+            f"{format_bytes(progress.done_bytes)}, {len(progress.failed)} failed"
+        )
+
     if progress.failed or not verified:
         sys.exit(1)
 
@@ -866,6 +889,10 @@ def transfer_mirror_pull(remote_path, local_dir, serial, retry, no_verify, delet
 
     serial = _resolve_serial(client, serial)
 
+    _logger = _get_session_logger()
+    if _logger:
+        _logger.log(f"transfer mirror pull {remote_path} → {local_dir}")
+
     try:
         plan = transfer_module.plan_mirror_pull(client, serial, remote_path, local_dir)
     except AdbError as exc:
@@ -881,6 +908,8 @@ def transfer_mirror_pull(remote_path, local_dir, serial, retry, no_verify, delet
             "mirror-pull", plan, transfer_module.TransferProgress(0, 0),
         )
         _write_report(report, f"transfer-mirror-pull_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+        if _logger:
+            _logger.log("Mirror complete: 0 files, nothing to transfer")
         return
 
     if plan.to_transfer:
@@ -917,6 +946,12 @@ def transfer_mirror_pull(remote_path, local_dir, serial, retry, no_verify, delet
     )
     _write_report(report, f"transfer-mirror-pull_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
 
+    if _logger:
+        _logger.log(
+            f"Mirror complete: {result.progress.done_files} files, "
+            f"{format_bytes(result.progress.done_bytes)}, {len(result.progress.failed)} failed"
+        )
+
     if result.progress.failed or result.failed_deletions or not verified:
         sys.exit(1)
 
@@ -943,6 +978,10 @@ def transfer_mirror_push(local_path, remote_dir, serial, retry, no_verify, delet
 
     serial = _resolve_serial(client, serial)
 
+    _logger = _get_session_logger()
+    if _logger:
+        _logger.log(f"transfer mirror push {local_path} → {remote_dir}")
+
     try:
         plan = transfer_module.plan_mirror_push(client, serial, local_path, remote_dir)
     except AdbError as exc:
@@ -958,6 +997,8 @@ def transfer_mirror_push(local_path, remote_dir, serial, retry, no_verify, delet
             "mirror-push", plan, transfer_module.TransferProgress(0, 0),
         )
         _write_report(report, f"transfer-mirror-push_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+        if _logger:
+            _logger.log("Mirror complete: 0 files, nothing to transfer")
         return
 
     if plan.to_transfer:
@@ -993,6 +1034,12 @@ def transfer_mirror_push(local_path, remote_dir, serial, retry, no_verify, delet
         "mirror-push", plan, result.progress, verification=verification, mirror_result=result,
     )
     _write_report(report, f"transfer-mirror-push_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+
+    if _logger:
+        _logger.log(
+            f"Mirror complete: {result.progress.done_files} files, "
+            f"{format_bytes(result.progress.done_bytes)}, {len(result.progress.failed)} failed"
+        )
 
     if result.progress.failed or result.failed_deletions or not verified:
         sys.exit(1)
@@ -1040,6 +1087,10 @@ def whatsapp_scan(serial, app, group_by):
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
+
+    _logger = _get_session_logger()
+    if _logger:
+        _logger.log(f"whatsapp scan app={app}")
 
     installs = whatsapp_module.detect_installs(client, serial)
     installs = _select_installs(installs, app)
@@ -1096,6 +1147,10 @@ def whatsapp_scan(serial, app, group_by):
         report = whatsapp_reports.build_media_inventory_report(media_files)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         _write_report(report, f"whatsapp-scan_{_slug(install.label)}_{timestamp}")
+        if _logger:
+            _logger.log(
+                f"Scan complete: {install.label} {total_files} files, {format_bytes(total_size)}"
+            )
         click.echo("Report saved to session_logs/reports/")
         click.echo()
 
@@ -1127,6 +1182,10 @@ def whatsapp_analyze(serial, app, cutoff):
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
+
+    _logger = _get_session_logger()
+    if _logger:
+        _logger.log(f"whatsapp analyze app={app} cutoff={cutoff}")
 
     installs = whatsapp_module.detect_installs(client, serial)
     installs = _select_installs(installs, app)
@@ -1175,6 +1234,8 @@ def whatsapp_analyze(serial, app, cutoff):
         report = whatsapp_reports.build_cutoff_comparison_report(media_files, cutoff_date)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         _write_report(report, f"whatsapp-analyze_{_slug(install.label)}_{timestamp}")
+        if _logger:
+            _logger.log(f"Analysis complete: {install.label}")
         click.echo("Report saved to session_logs/reports/")
         click.echo()
 
@@ -1273,6 +1334,10 @@ def whatsapp_backup(dest, serial, app, types, conflict, no_verify):
 
     serial = _resolve_serial(client, serial)
 
+    _logger = _get_session_logger()
+    if _logger:
+        _logger.log(f"whatsapp backup app={app} dest={dest}")
+
     installs = whatsapp_module.detect_installs(client, serial)
     installs = _select_installs(installs, app)
 
@@ -1307,6 +1372,13 @@ def whatsapp_backup(dest, serial, app, types, conflict, no_verify):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     report = transfer_reports.build_transfer_report("pull", plan, progress, verification=verification)
     _write_report(report, f"whatsapp-backup_{timestamp}")
+
+    if _logger:
+        _logger.log(
+            f"Backup complete: {progress.done_files} files, "
+            f"{format_bytes(progress.done_bytes)}, {len(progress.failed)} failed"
+        )
+
     click.echo("Report saved to session_logs/reports/")
 
     if verification is not None and not _report_verification(verification):
@@ -1487,6 +1559,10 @@ def whatsapp_delete(serial, app, before, keep_types, backup_dir):
 
     serial = _resolve_serial(client, serial)
 
+    _logger = _get_session_logger()
+    if _logger:
+        _logger.log(f"whatsapp delete app={app} before={before}")
+
     installs = whatsapp_module.detect_installs(client, serial)
     installs = _select_installs(installs, app)
 
@@ -1572,6 +1648,12 @@ def whatsapp_delete(serial, app, before, keep_types, backup_dir):
     after_storage = device_module.get_storage_breakdown(client, serial)
     storage_report = deletion_reports.build_storage_comparison_report(before_storage, after_storage)
     _write_report(storage_report, f"whatsapp-storage-comparison_{timestamp}")
+
+    if _logger:
+        total_deleted = sum(
+            len(p.to_delete) for _, p, _ in plans if p.total_files > 0
+        )
+        _logger.log(f"Deletion complete: {total_deleted} deleted")
 
     click.echo("Reports saved to session_logs/reports/")
 
@@ -2216,6 +2298,10 @@ def backup_run(profile_name, no_verify, serial):
 
     serial = _resolve_serial(client, serial)
 
+    _logger = _get_session_logger()
+    if _logger:
+        _logger.log(f"backup run profile={profile_name}")
+
     plan = backup_module.plan_backup(client, serial, profile)
     _print_plan_summary(plan)
 
@@ -2258,6 +2344,11 @@ def backup_run(profile_name, no_verify, serial):
             verified=verified,
         ),
     )
+
+    if _logger:
+        _logger.log(
+            f"Backup complete: {file_count} files, {format_bytes(total_bytes)}"
+        )
 
     if not no_verify and not verified:
         sys.exit(1)
@@ -2350,11 +2441,20 @@ def backup_restore(profile_name, sources, after, before, conflict, no_verify, se
 def backup_verify(profile_name):
     """Verify a backup's integrity against its last recorded run (spec §6.3)."""
     report, result = _build_backup_verification(profile_name)
+
+    _logger = _get_session_logger()
+    if _logger:
+        _logger.log(f"backup verify profile={profile_name}")
+
     click.echo(to_txt(report))
 
     stem = f"backup-verification_{profile_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     _write_report(report, stem)
     click.echo(f"Report written to session_logs/reports/{stem}.txt")
+
+    if _logger:
+        status = "PASSED" if result.ok else "FAILED"
+        _logger.log(f"Verification {status}: profile={profile_name}")
 
     if not result.ok:
         sys.exit(1)
@@ -2511,6 +2611,10 @@ def report_generate(serial, app, report_type, report_format, output_path, top_n,
     """Generate a report and write it to a file, e.g. `droidbridge report generate --format html` (spec §9)."""
     needs_device = report_type not in ("storage-trend", "backup-history", "backup-summary", "backup-verification")
 
+    _logger = _get_session_logger()
+    if _logger:
+        _logger.log(f"report generate --type {report_type} --format {report_format}")
+
     client = None
     if needs_device:
         try:
@@ -2597,6 +2701,10 @@ def report_generate(serial, app, report_type, report_format, output_path, top_n,
 
     if report_format == "txt":
         click.echo(content)
+
+    if _logger:
+        _logger.log(f"Report complete: {out}")
+
     click.echo(f"Report written to {out}")
 
 
