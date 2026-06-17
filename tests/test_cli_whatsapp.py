@@ -2,12 +2,14 @@
 
 from contextlib import contextmanager
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from click.testing import CliRunner
 
 from droidbridge.cli import main
+from droidbridge.cli.main import cli
 from droidbridge.core.adb import Device
+from droidbridge.modules.whatsapp import MediaFile, WhatsAppInstall
 from tests.test_device import DF_OUTPUT
 
 
@@ -764,3 +766,67 @@ class TestWhatsAppBackupDb:
         assert "msgstore.db.crypt*" in result.output
         assert (tmp_path / "WhatsApp" / "Databases" / "msgstore.db.crypt14").exists()
         assert (tmp_path / "WhatsApp" / "Backups" / "wa.db.crypt14").exists()
+
+
+_WA_INSTALL = WhatsAppInstall("com.whatsapp", "WhatsApp", "/sdcard/Android/media/com.whatsapp/WhatsApp")
+_WA_MEDIA_FILE = MediaFile(
+    "/sdcard/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Images/IMG-20240101-WA0001.jpg",
+    1024,
+    1704067200.0,
+    "Images",
+    "Received",
+)
+
+
+class TestScanReportSaved:
+    def test_scan_writes_report_file(self, runner, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        with patch("droidbridge.cli.main._build_client"), \
+             patch("droidbridge.cli.main._resolve_serial", return_value="SERIAL"), \
+             patch("droidbridge.cli.main.whatsapp_module.detect_installs", return_value=[_WA_INSTALL]), \
+             patch("droidbridge.cli.main.whatsapp_module.scan_media", return_value=[_WA_MEDIA_FILE]):
+            result = runner.invoke(cli, ["whatsapp", "scan"])
+        assert result.exit_code == 0
+        reports = list((tmp_path / "session_logs" / "reports").glob("whatsapp-scan_whatsapp_*.txt"))
+        assert len(reports) == 1
+
+    def test_scan_prints_report_saved(self, runner, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        with patch("droidbridge.cli.main._build_client"), \
+             patch("droidbridge.cli.main._resolve_serial", return_value="SERIAL"), \
+             patch("droidbridge.cli.main.whatsapp_module.detect_installs", return_value=[_WA_INSTALL]), \
+             patch("droidbridge.cli.main.whatsapp_module.scan_media", return_value=[_WA_MEDIA_FILE]):
+            result = runner.invoke(cli, ["whatsapp", "scan"])
+        assert "Report saved to session_logs/reports/" in result.output
+
+    def test_scan_no_report_when_no_media(self, runner, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        with patch("droidbridge.cli.main._build_client"), \
+             patch("droidbridge.cli.main._resolve_serial", return_value="SERIAL"), \
+             patch("droidbridge.cli.main.whatsapp_module.detect_installs", return_value=[_WA_INSTALL]), \
+             patch("droidbridge.cli.main.whatsapp_module.scan_media", return_value=[]):
+            result = runner.invoke(cli, ["whatsapp", "scan"])
+        assert result.exit_code == 0
+        assert not (tmp_path / "session_logs" / "reports").exists()
+
+
+class TestAnalyzeReportSaved:
+    def test_analyze_writes_report_file(self, runner, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        with patch("droidbridge.cli.main._build_client"), \
+             patch("droidbridge.cli.main._resolve_serial", return_value="SERIAL"), \
+             patch("droidbridge.cli.main.whatsapp_module.detect_installs", return_value=[_WA_INSTALL]), \
+             patch("droidbridge.cli.main.whatsapp_module.scan_media", return_value=[_WA_MEDIA_FILE]):
+            result = runner.invoke(cli, ["whatsapp", "analyze", "--cutoff", "2024-01-01"])
+        assert result.exit_code == 0
+        reports = list((tmp_path / "session_logs" / "reports").glob("whatsapp-analyze_whatsapp_*.txt"))
+        assert len(reports) == 1
+
+    def test_analyze_prints_report_saved(self, runner, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        with patch("droidbridge.cli.main._build_client"), \
+             patch("droidbridge.cli.main._resolve_serial", return_value="SERIAL"), \
+             patch("droidbridge.cli.main.whatsapp_module.detect_installs", return_value=[_WA_INSTALL]), \
+             patch("droidbridge.cli.main.whatsapp_module.scan_media", return_value=[_WA_MEDIA_FILE]):
+            result = runner.invoke(cli, ["whatsapp", "analyze", "--cutoff", "2024-01-01"])
+        assert "Report saved to session_logs/reports/" in result.output

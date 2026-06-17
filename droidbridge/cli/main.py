@@ -1078,6 +1078,10 @@ def whatsapp_scan(serial, app, group_by):
                 f"  {'TOTAL':<28} {'':<10} {total_files:>6} files  {format_bytes(total_size):>10}"
             )
 
+        report = whatsapp_reports.build_media_inventory_report(media_files)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        _write_report(report, f"whatsapp-scan_{_slug(install.label)}_{timestamp}")
+        click.echo("Report saved to session_logs/reports/")
         click.echo()
 
 
@@ -1152,6 +1156,11 @@ def whatsapp_analyze(serial, app, cutoff):
         )
         click.echo()
         click.echo(f"  Deletable (pre-cutoff): {total_pre_count} files, {format_bytes(total_pre_size)}")
+        click.echo()
+        report = whatsapp_reports.build_cutoff_comparison_report(media_files, cutoff_date)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        _write_report(report, f"whatsapp-analyze_{_slug(install.label)}_{timestamp}")
+        click.echo("Report saved to session_logs/reports/")
         click.echo()
 
 
