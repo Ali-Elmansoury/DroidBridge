@@ -14,7 +14,7 @@ def _now_iso():
 
 
 def _new_session_id():
-    return datetime.now().strftime("%Y%m%d_%H%M%S")
+    return datetime.now().strftime("%Y%m%d_%H%M%S_%f")
 
 
 @dataclass

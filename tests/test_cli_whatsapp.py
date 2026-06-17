@@ -606,7 +606,7 @@ class TestWhatsAppDelete:
 
         assert result.exit_code == 0
         assert "nothing to delete" in result.output.lower()
-        assert not (tmp_path / "session_logs" / "reports").exists()
+        assert list((tmp_path / "session_logs" / "reports").glob("*")) == []
 
     def test_blocks_when_backup_missing(self, monkeypatch, tmp_path):
         monkeypatch.chdir(tmp_path)
@@ -814,7 +814,7 @@ class TestScanReportSaved:
              patch("droidbridge.cli.main.whatsapp_module.scan_media", return_value=[]):
             result = runner.invoke(cli, ["whatsapp", "scan"])
         assert result.exit_code == 0
-        assert not (tmp_path / "session_logs" / "reports").exists()
+        assert list((tmp_path / "session_logs" / "reports").glob("*")) == []
 
 
 class TestAnalyzeReportSaved:
@@ -846,7 +846,7 @@ class TestAnalyzeReportSaved:
              patch("droidbridge.cli.main.whatsapp_module.scan_media", return_value=[]):
             result = runner.invoke(cli, ["whatsapp", "analyze", "--cutoff", "2024-01-01"])
         assert result.exit_code == 0
-        assert not (tmp_path / "session_logs" / "reports").exists()
+        assert list((tmp_path / "session_logs" / "reports").glob("*")) == []
 
 
 _WA_BACKUP_INSTALL = WhatsAppInstall(
@@ -903,7 +903,7 @@ class TestBackupReportSaved:
             result = runner.invoke(cli, ["whatsapp", "backup", "--dest", str(tmp_path / "backup")])
         assert result.exit_code == 0
         assert "nothing to transfer" in result.output.lower()
-        assert not (tmp_path / "session_logs" / "reports").exists()
+        assert list((tmp_path / "session_logs" / "reports").glob("*")) == []
 
     def test_backup_writes_report_without_verify_when_no_verify_flag(self, runner, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)

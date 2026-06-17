@@ -29,7 +29,7 @@ class TestSessionStart:
 
         logger = session.SessionLogger.start(base_dir=base_dir)
 
-        assert len(logger.session_id) == 15  # YYYYMMDD_HHMMSS
+        assert len(logger.session_id) == 22  # YYYYMMDD_HHMMSS_ffffff
         assert "_" in logger.session_id
 
 

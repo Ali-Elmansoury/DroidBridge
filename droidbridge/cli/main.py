@@ -11,6 +11,7 @@ from pathlib import Path
 import click
 
 from droidbridge.core.adb import AdbClient, AdbError, AdbTimeoutError
+from droidbridge.core.session import SessionLogger
 from droidbridge.core.platform import get_sleep_inhibitor
 from droidbridge.modules import apps as apps_module
 from droidbridge.modules import backup_manager as backup_module
@@ -39,9 +40,23 @@ def _resolve_serial(client, serial):
         sys.exit(1)
 
 
+def _get_session_logger():
+    """Return the active SessionLogger, or None when called outside a Click context."""
+    try:
+        ctx = click.get_current_context()
+        return (ctx.obj or {}).get("session_logger")
+    except RuntimeError:
+        return None
+
+
 @click.group()
-def cli():
+@click.pass_context
+def cli(ctx):
     """DroidBridge - ADB-powered Android device management tool."""
+    ctx.ensure_object(dict)
+    logger = SessionLogger.start()
+    ctx.obj["session_logger"] = logger
+    ctx.call_on_close(logger.write_summary)
 
 
 @cli.group("device")
