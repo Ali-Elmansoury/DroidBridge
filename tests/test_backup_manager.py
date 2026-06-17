@@ -415,3 +415,57 @@ class TestPlanBackupExcludes:
             result = plan_backup(MagicMock(), "SERIAL", profile)
 
         assert len(result.items) == 0
+
+    def test_plan_backup_exclude_does_not_match_path_prefix(self):
+        """Exclude '/sdcard/DCIM/thumb' must NOT exclude '/sdcard/DCIM/thumbnails/...'."""
+        from droidbridge.modules.transfer import TransferPlan, TransferItem, ACTION_COPY
+
+        thumbnails_item = TransferItem(
+            source="/sdcard/DCIM/thumbnails/t.jpg",
+            dest="/tmp/t.jpg",
+            size=1,
+            action=ACTION_COPY,
+        )
+        thumb_item = TransferItem(
+            source="/sdcard/DCIM/thumb.jpg",
+            dest="/tmp/thumb.jpg",
+            size=1,
+            action=ACTION_COPY,
+        )
+        fake_plan = TransferPlan(direction="pull", items=[thumbnails_item, thumb_item])
+        profile = BackupProfile(
+            name="test",
+            sources=["/sdcard/DCIM"],
+            dest="/tmp/backup",
+            excludes=["/sdcard/DCIM/thumb.jpg"],  # exact file, not a prefix
+        )
+
+        with patch("droidbridge.modules.backup_manager.transfer_module.plan_pull", return_value=fake_plan):
+            result = plan_backup(MagicMock(), "SERIAL", profile)
+
+        # Only the exact file should be excluded, not the thumbnails/ directory
+        assert len(result.items) == 1
+        assert result.items[0].source == "/sdcard/DCIM/thumbnails/t.jpg"
+
+    def test_plan_backup_exclude_slash_root_does_not_exclude_everything(self):
+        """Exclude '/' must not silently wipe the entire backup."""
+        from droidbridge.modules.transfer import TransferPlan, TransferItem, ACTION_COPY
+
+        item = TransferItem(
+            source="/sdcard/DCIM/photo.jpg",
+            dest="/tmp/photo.jpg",
+            size=1,
+            action=ACTION_COPY,
+        )
+        fake_plan = TransferPlan(direction="pull", items=[item])
+        profile = BackupProfile(
+            name="test",
+            sources=["/sdcard/DCIM"],
+            dest="/tmp/backup",
+            excludes=["/"],  # slash root — must be ignored
+        )
+
+        with patch("droidbridge.modules.backup_manager.transfer_module.plan_pull", return_value=fake_plan):
+            result = plan_backup(MagicMock(), "SERIAL", profile)
+
+        assert len(result.items) == 1

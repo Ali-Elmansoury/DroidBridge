@@ -77,11 +77,14 @@ def plan_backup(client, serial, profile):
     Items whose device-side source path starts with any of `profile.excludes` are filtered out.
     """
     items = []
-    excludes = [e.rstrip("/") for e in (profile.excludes or [])]
+    excludes = [e.rstrip("/") for e in (profile.excludes or []) if e.rstrip("/")]
     for source in profile.sources:
         plan = transfer_module.plan_pull(client, serial, source, profile.dest, conflict=profile.conflict)
         for item in plan.items:
-            if not any(item.source.startswith(exc) for exc in excludes):
+            if not any(
+                item.source.startswith(exc + "/") or item.source == exc
+                for exc in excludes
+            ):
                 items.append(item)
     return transfer_module.TransferPlan(direction="pull", items=items)
 
