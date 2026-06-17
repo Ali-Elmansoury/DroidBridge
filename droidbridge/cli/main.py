@@ -2083,9 +2083,18 @@ def backup_profile_cmd():
 )
 @click.option("--dest", required=True, type=click.Path(file_okay=False), help="Local backup destination folder.")
 @_CONFLICT_OPTION
-def backup_profile_add(name, sources, dest, conflict):
+@click.option(
+    "--exclude",
+    "excludes",
+    multiple=True,
+    default=(),
+    help="Device paths to exclude from backup (can be repeated).",
+)
+def backup_profile_add(name, sources, dest, conflict, excludes):
     """Create or update a backup profile."""
-    profile = backup_module.BackupProfile(name=name, sources=list(sources), dest=dest, conflict=conflict)
+    profile = backup_module.BackupProfile(
+        name=name, sources=list(sources), dest=dest, conflict=conflict, excludes=list(excludes)
+    )
     backup_module.save_profile(backup_module.DEFAULT_PROFILES_PATH, profile)
     click.echo(f"Saved profile {name!r}.")
 

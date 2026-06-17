@@ -401,6 +401,62 @@ class TestBackupProfileRemove:
         assert "not found" in result.output.lower()
 
 
+class TestBackupProfileCreateExclude:
+    def test_single_exclude_saved(self, tmp_path, monkeypatch):
+        path = tmp_path / "profiles.json"
+        monkeypatch.setattr(backup_manager, "DEFAULT_PROFILES_PATH", path)
+
+        result = CliRunner().invoke(
+            main.cli,
+            [
+                "backup", "profile", "add", "myprofile",
+                "--source", "/sdcard/DCIM",
+                "--dest", "/tmp/backup",
+                "--exclude", "/sdcard/DCIM/thumbnails",
+            ],
+        )
+
+        assert result.exit_code == 0
+        profiles = backup_manager.load_profiles(path)
+        assert profiles["myprofile"].excludes == ["/sdcard/DCIM/thumbnails"]
+
+    def test_multiple_excludes_saved(self, tmp_path, monkeypatch):
+        path = tmp_path / "profiles.json"
+        monkeypatch.setattr(backup_manager, "DEFAULT_PROFILES_PATH", path)
+
+        result = CliRunner().invoke(
+            main.cli,
+            [
+                "backup", "profile", "add", "myprofile",
+                "--source", "/sdcard/DCIM",
+                "--dest", "/tmp/backup",
+                "--exclude", "/sdcard/DCIM/thumbnails",
+                "--exclude", "/sdcard/DCIM/.trashed",
+            ],
+        )
+
+        assert result.exit_code == 0
+        profiles = backup_manager.load_profiles(path)
+        assert profiles["myprofile"].excludes == ["/sdcard/DCIM/thumbnails", "/sdcard/DCIM/.trashed"]
+
+    def test_no_exclude_defaults_to_empty(self, tmp_path, monkeypatch):
+        path = tmp_path / "profiles.json"
+        monkeypatch.setattr(backup_manager, "DEFAULT_PROFILES_PATH", path)
+
+        result = CliRunner().invoke(
+            main.cli,
+            [
+                "backup", "profile", "add", "myprofile",
+                "--source", "/sdcard/DCIM",
+                "--dest", "/tmp/backup",
+            ],
+        )
+
+        assert result.exit_code == 0
+        profiles = backup_manager.load_profiles(path)
+        assert profiles["myprofile"].excludes == []
+
+
 class TestBackupVerify:
     def test_unknown_profile_errors(self, tmp_path, monkeypatch):
         profiles_path = tmp_path / "profiles.json"

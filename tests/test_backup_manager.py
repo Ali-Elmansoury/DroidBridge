@@ -1,9 +1,10 @@
 """Tests for droidbridge.modules.backup_manager - Module 6: Backup Manager."""
 
 import os
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from droidbridge.modules import backup_manager
+from droidbridge.modules.backup_manager import BackupProfile, load_profiles, save_profile, plan_backup
 from droidbridge.modules import transfer as transfer_module
 
 
@@ -304,3 +305,113 @@ class TestFindFailedPullItems:
         plan = transfer_module.TransferPlan(direction="pull", items=[item_skipped])
 
         assert backup_manager.find_failed_pull_items(plan) == []
+
+
+class TestBackupProfileExcludes:
+    def test_profile_stores_excludes(self):
+        profile = BackupProfile(
+            name="test",
+            sources=["/sdcard/DCIM"],
+            dest="/tmp/backup",
+            excludes=["/sdcard/DCIM/thumbnails"],
+        )
+        assert profile.excludes == ["/sdcard/DCIM/thumbnails"]
+
+    def test_profile_excludes_defaults_to_empty(self):
+        profile = BackupProfile(name="test", sources=["/sdcard/DCIM"], dest="/tmp/backup")
+        assert profile.excludes == []
+
+    def test_load_profile_without_excludes_key(self, tmp_path):
+        """Old profile files without 'excludes' key load without error."""
+        profiles_path = tmp_path / "profiles.json"
+        profiles_path.write_text(
+            '{"test": {"name": "test", "sources": ["/sdcard/DCIM"], "dest": "/tmp/b", "conflict": "skip"}}',
+            encoding="utf-8",
+        )
+        profiles = load_profiles(profiles_path)
+        assert "test" in profiles
+        assert profiles["test"].excludes == []
+
+    def test_save_and_load_profile_with_excludes(self, tmp_path):
+        profiles_path = tmp_path / "profiles.json"
+        profile = BackupProfile(
+            name="test",
+            sources=["/sdcard/DCIM"],
+            dest="/tmp/backup",
+            excludes=["/sdcard/DCIM/thumbnails"],
+        )
+        save_profile(profiles_path, profile)
+        loaded = load_profiles(profiles_path)
+        assert loaded["test"].excludes == ["/sdcard/DCIM/thumbnails"]
+
+
+class TestPlanBackupExcludes:
+    def test_plan_backup_excludes_paths(self):
+        """Items whose source starts with an excluded path are dropped from the plan."""
+        from droidbridge.modules.transfer import TransferPlan, TransferItem, ACTION_COPY
+
+        thumb_item = TransferItem(
+            source="/sdcard/DCIM/thumbnails/thumb.jpg",
+            dest="/tmp/backup/thumbnails/thumb.jpg",
+            size=512,
+            action=ACTION_COPY,
+        )
+        regular_item = TransferItem(
+            source="/sdcard/DCIM/photo.jpg",
+            dest="/tmp/backup/photo.jpg",
+            size=2048,
+            action=ACTION_COPY,
+        )
+        fake_plan = TransferPlan(direction="pull", items=[thumb_item, regular_item])
+
+        profile = BackupProfile(
+            name="test",
+            sources=["/sdcard/DCIM"],
+            dest="/tmp/backup",
+            excludes=["/sdcard/DCIM/thumbnails"],
+        )
+
+        with patch("droidbridge.modules.backup_manager.transfer_module.plan_pull", return_value=fake_plan):
+            result = plan_backup(MagicMock(), "SERIAL", profile)
+
+        assert len(result.items) == 1
+        assert result.items[0].source == "/sdcard/DCIM/photo.jpg"
+
+    def test_plan_backup_no_excludes_includes_all(self):
+        """With empty excludes, all items pass through."""
+        from droidbridge.modules.transfer import TransferPlan, TransferItem, ACTION_COPY
+
+        items = [
+            TransferItem(source="/sdcard/DCIM/a.jpg", dest="/tmp/a.jpg", size=1, action=ACTION_COPY),
+            TransferItem(source="/sdcard/DCIM/b.jpg", dest="/tmp/b.jpg", size=1, action=ACTION_COPY),
+        ]
+        fake_plan = TransferPlan(direction="pull", items=items)
+        profile = BackupProfile(name="test", sources=["/sdcard/DCIM"], dest="/tmp/backup")
+
+        with patch("droidbridge.modules.backup_manager.transfer_module.plan_pull", return_value=fake_plan):
+            result = plan_backup(MagicMock(), "SERIAL", profile)
+
+        assert len(result.items) == 2
+
+    def test_plan_backup_exclude_trailing_slash_normalized(self):
+        """Excludes with trailing slash still match correctly."""
+        from droidbridge.modules.transfer import TransferPlan, TransferItem, ACTION_COPY
+
+        thumb_item = TransferItem(
+            source="/sdcard/DCIM/thumbnails/t.jpg",
+            dest="/tmp/t.jpg",
+            size=1,
+            action=ACTION_COPY,
+        )
+        fake_plan = TransferPlan(direction="pull", items=[thumb_item])
+        profile = BackupProfile(
+            name="test",
+            sources=["/sdcard/DCIM"],
+            dest="/tmp/backup",
+            excludes=["/sdcard/DCIM/thumbnails/"],  # trailing slash
+        )
+
+        with patch("droidbridge.modules.backup_manager.transfer_module.plan_pull", return_value=fake_plan):
+            result = plan_backup(MagicMock(), "SERIAL", profile)
+
+        assert len(result.items) == 0

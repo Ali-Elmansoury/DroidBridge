@@ -2,7 +2,7 @@
 
 import json
 import os
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path, PurePosixPath
 
@@ -21,6 +21,7 @@ class BackupProfile:
     sources: list
     dest: str
     conflict: str = transfer_module.CONFLICT_SKIP
+    excludes: list = field(default_factory=list)
 
 
 def load_profiles(path=DEFAULT_PROFILES_PATH):
@@ -30,7 +31,10 @@ def load_profiles(path=DEFAULT_PROFILES_PATH):
         return {}
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
-    return {name: BackupProfile(**fields) for name, fields in data.items()}
+    return {
+        name: BackupProfile(**{**{"excludes": []}, **fields})
+        for name, fields in data.items()
+    }
 
 
 def _write_profiles(path, profiles):
@@ -70,11 +74,15 @@ def plan_backup(client, serial, profile):
 
     Reuses `transfer_module.plan_pull`'s same-size skip-existing classification
     for incremental backups (only new/changed files are transferred).
+    Items whose device-side source path starts with any of `profile.excludes` are filtered out.
     """
     items = []
+    excludes = [e.rstrip("/") for e in (profile.excludes or [])]
     for source in profile.sources:
         plan = transfer_module.plan_pull(client, serial, source, profile.dest, conflict=profile.conflict)
-        items.extend(plan.items)
+        for item in plan.items:
+            if not any(item.source.startswith(exc) for exc in excludes):
+                items.append(item)
     return transfer_module.TransferPlan(direction="pull", items=items)
 
 
