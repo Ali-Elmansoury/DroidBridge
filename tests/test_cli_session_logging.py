@@ -126,7 +126,7 @@ class TestTransferCommandsLog:
 
 
 class TestWhatsappCommandsLog:
-    def test_whatsapp_scan_logs_start_and_end(self, monkeypatch, tmp_path):
+    def test_whatsapp_scan_logs_start(self, monkeypatch, tmp_path):
         client = _make_client(
             shell_side_effect=[
                 "package:com.whatsapp",                         # pm list packages
@@ -161,7 +161,8 @@ class TestBackupCommandsLog:
         monkeypatch.setattr(bm, "DEFAULT_PROFILES_PATH", str(profiles_path))
         monkeypatch.setattr(bm, "DEFAULT_HISTORY_PATH", str(tmp_path / "history.json"))
 
-        client = _make_client(shell_side_effect=[""])
+        # shell calls: stat /sdcard/DCIM to get source dir size, then verify_pull
+        client = _make_client(shell_side_effect=["0", ""])
         monkeypatch.setattr(main, "_build_client", lambda: client)
         monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
         monkeypatch.chdir(tmp_path)
@@ -170,6 +171,7 @@ class TestBackupCommandsLog:
 
         log_text = next((tmp_path / "session_logs").glob("session_*.log")).read_text()
         assert "backup run" in log_text
+        assert "Backup complete" in log_text
 
 
 class TestReportGenerateLog:
@@ -183,3 +185,4 @@ class TestReportGenerateLog:
 
         log_text = next((tmp_path / "session_logs").glob("session_*.log")).read_text()
         assert "report generate" in log_text
+        assert "Report complete" in log_text
