@@ -2,6 +2,7 @@
 
 from unittest.mock import MagicMock
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QCloseEvent
 
 from droidbridge.gui import theme
@@ -228,3 +229,95 @@ class TestStatusBarLayout:
 
         assert window.busy_bar.minimumWidth() == window.busy_bar.maximumWidth()
         assert window.busy_bar.maximumWidth() < 16777215  # not Qt's "unbounded" default
+
+
+class TestMainWindowTooltips:
+    def test_connect_button_has_tooltip(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+        assert window.connect_button.toolTip() != ""
+
+    def test_status_dot_has_tooltip(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+        assert window.status_dot.toolTip() != ""
+
+    def test_sidebar_items_have_tooltips(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+        for i in range(window.sidebar.count()):
+            assert window.sidebar.item(i).toolTip() != "", \
+                f"Sidebar item {i} ({window.sidebar.item(i).text()!r}) has no tooltip"
+
+
+class TestMainWindowShortcuts:
+    def test_ctrl_1_switches_to_device_page(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+        window.show()
+        window.sidebar.setCurrentRow(2)
+
+        qtbot.keyClick(window, Qt.Key.Key_1, Qt.KeyboardModifier.ControlModifier)
+
+        assert window.sidebar.currentRow() == 0
+
+    def test_ctrl_2_switches_to_files_page(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+        window.show()
+
+        qtbot.keyClick(window, Qt.Key.Key_2, Qt.KeyboardModifier.ControlModifier)
+
+        assert window.sidebar.currentRow() == 1
+
+    def test_ctrl_3_switches_to_transfer_page(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+        window.show()
+
+        qtbot.keyClick(window, Qt.Key.Key_3, Qt.KeyboardModifier.ControlModifier)
+
+        assert window.sidebar.currentRow() == 2
+
+    def test_ctrl_4_switches_to_search_page(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+        window.show()
+
+        qtbot.keyClick(window, Qt.Key.Key_4, Qt.KeyboardModifier.ControlModifier)
+
+        assert window.sidebar.currentRow() == 3
+
+
+class TestStatusBarColorCoding:
+    def test_error_log_colors_status_bar_red(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        window._on_log_message("Something failed", "ERROR")
+
+        assert "red" in window.status_label.styleSheet()
+
+    def test_warning_log_colors_status_bar_orange(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        window._on_log_message("Something warned", "WARNING")
+
+        assert "orange" in window.status_label.styleSheet()
+
+    def test_info_log_does_not_color_status_bar(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        window._on_log_message("Normal operation", "INFO")
+
+        assert window.status_label.styleSheet() == ""
+
+    def test_error_sets_status_bar_text(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        window._on_log_message("Disk full", "ERROR")
+
+        assert "Disk full" in window.status_label.text()

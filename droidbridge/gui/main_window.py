@@ -2,6 +2,8 @@
 status bar, collapsible log panel, and dark/light theme toggle.
 """
 
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -43,6 +45,20 @@ MODULES = [
     "Reports",
 ]
 
+_STATUS_BAR_COLORS = {"WARNING": "orange", "ERROR": "red"}
+
+_SIDEBAR_TOOLTIPS = {
+    "Device": "Device information, battery, and storage. Shortcut: Ctrl+1.",
+    "Files": "Browse and manage files on the device. Shortcut: Ctrl+2.",
+    "Transfer": "Pull and push files between device and computer. Shortcut: Ctrl+3.",
+    "Search": "Search for files on the device by name, size, type, or date. Shortcut: Ctrl+4.",
+    "WhatsApp": "Coming in Phase 6.3.",
+    "Storage": "Coming in Phase 6.3.",
+    "Backup": "Coming in Phase 6.3.",
+    "Apps": "Coming in Phase 6.3.",
+    "Reports": "Coming in Phase 6.3.",
+}
+
 
 class MainWindow(QMainWindow):
     """Top-level window: sidebar navigation, top status bar, log panel, and status bar."""
@@ -60,6 +76,8 @@ class MainWindow(QMainWindow):
 
         self.sidebar = QListWidget()
         self.sidebar.addItems(MODULES)
+        for i, name in enumerate(MODULES):
+            self.sidebar.item(i).setToolTip(_SIDEBAR_TOOLTIPS.get(name, name))
 
         self.files_page = FilesPage(self.files_viewmodel)
         self.transfer_page = TransferPage(self.transfer_viewmodel)
@@ -75,10 +93,16 @@ class MainWindow(QMainWindow):
         self.sidebar.currentRowChanged.connect(self.stack.setCurrentIndex)
         self.sidebar.setCurrentRow(0)
 
+        for _i in range(4):
+            _sc = QShortcut(QKeySequence(f"Ctrl+{_i + 1}"), self)
+            _sc.activated.connect(lambda idx=_i: self.sidebar.setCurrentRow(idx))
+
         self.status_dot = QLabel()
         self.status_dot.setFixedSize(12, 12)
+        self.status_dot.setToolTip("Green: device connected and ready. Red: no device connected.")
         self.status_text = QLabel("Disconnected")
         self.connect_button = QPushButton("Connect")
+        self.connect_button.setToolTip("Auto-detect and connect to a USB-attached Android device.")
         self.connect_button.clicked.connect(self.device_viewmodel.connect_device)
 
         top_bar = QWidget()
@@ -179,6 +203,26 @@ class MainWindow(QMainWindow):
         if self.session_logger is not None:
             self.session_logger.log(message, level)
         self.log_panel.append_entry(message, level)
+        color = _STATUS_BAR_COLORS.get(level)
+        if color:
+            self.status_label.setFullText(message)
+            self.status_label.setStyleSheet(f"color: {color};")
+            QTimer.singleShot(5000, lambda: self.status_label.setStyleSheet(""))
+
+    def keyPressEvent(self, event):
+        if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
+            key_to_row = {
+                Qt.Key.Key_1: 0,
+                Qt.Key.Key_2: 1,
+                Qt.Key.Key_3: 2,
+                Qt.Key.Key_4: 3,
+            }
+            row = key_to_row.get(event.key())
+            if row is not None:
+                self.sidebar.setCurrentRow(row)
+                event.accept()
+                return
+        super().keyPressEvent(event)
 
     def _on_theme_toggled(self, checked):
         mode = theme.DARK if checked else theme.LIGHT
