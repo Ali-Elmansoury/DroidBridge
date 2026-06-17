@@ -41,7 +41,7 @@ class DevicePage(QWidget):
         # keyPressEvent (ensures qtbot.keyClick works in tests).
         _f5 = QShortcut(QKeySequence("F5"), self)
         _f5.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
-        _f5.activated.connect(lambda: self.viewmodel.refresh())
+        _f5.activated.connect(self._on_refresh_shortcut)
 
         self._busy = False
         self._refresh_timer = QTimer(self)
@@ -115,9 +115,13 @@ class DevicePage(QWidget):
         self.refresh_button.setEnabled(connected)
         self._update_timer_state()
 
+    def _on_refresh_shortcut(self):
+        if self.refresh_button.isEnabled():
+            self.viewmodel.refresh()
+
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_F5:
-            self.viewmodel.refresh()
+            self._on_refresh_shortcut()
             event.accept()
         else:
             super().keyPressEvent(event)

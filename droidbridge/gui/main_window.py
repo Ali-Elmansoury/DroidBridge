@@ -151,6 +151,9 @@ class MainWindow(QMainWindow):
         self.dark_theme_action.toggled.connect(self._on_theme_toggled)
 
         self._busy_viewmodels = set()
+        self._status_color_timer = QTimer(self)
+        self._status_color_timer.setSingleShot(True)
+        self._status_color_timer.timeout.connect(lambda: self.status_label.setStyleSheet(""))
 
         self.context.connectionChanged.connect(self._on_connection_changed)
         self.device_viewmodel.statusChanged.connect(self._on_status_changed)
@@ -207,7 +210,7 @@ class MainWindow(QMainWindow):
         if color:
             self.status_label.setFullText(message)
             self.status_label.setStyleSheet(f"color: {color};")
-            QTimer.singleShot(5000, lambda: self.status_label.setStyleSheet(""))
+            self._status_color_timer.start(5000)
 
     def keyPressEvent(self, event):
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:

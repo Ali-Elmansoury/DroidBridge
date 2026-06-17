@@ -147,3 +147,15 @@ class TestDevicePageTooltipsAndShortcuts:
         qtbot.keyClick(page, Qt.Key.Key_F5)
 
         assert calls == [1]
+
+    def test_f5_no_op_when_disconnected(self, qtbot, monkeypatch):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+        page.show()
+
+        calls = []
+        monkeypatch.setattr(vm, "refresh", lambda: calls.append(1))
+
+        qtbot.keyClick(page, Qt.Key.Key_F5)
+
+        assert calls == []

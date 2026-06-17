@@ -321,3 +321,14 @@ class TestStatusBarColorCoding:
         window._on_log_message("Disk full", "ERROR")
 
         assert "Disk full" in window.status_label.text()
+
+    def test_second_error_resets_color_timer(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        window._on_log_message("First error", "ERROR")
+        window._on_log_message("Second error", "ERROR")
+
+        # Timer should be running and have been restarted (remaining time ≤ 5000ms)
+        assert window._status_color_timer.isActive()
+        assert "red" in window.status_label.styleSheet()
