@@ -255,6 +255,38 @@ def _write_search_export(results, fmt, path):
                 f.write(_format_result_line(r) + "\n")
 
 
+def _search_results_to_plan(results, dest_dir, conflict):
+    """Build a TransferPlan from search results without extra ADB stat calls.
+
+    Files are flattened into dest_dir by filename; same-filename collisions
+    within the results get _1/_2/... suffixes.
+    """
+    items = []
+    claimed = set()
+    for r in results:
+        dest = os.path.join(dest_dir, os.path.basename(r.path))
+        if dest in claimed:
+            dest = transfer_module.resolve_conflict_path(dest, lambda p: p in claimed or os.path.exists(p))
+        claimed.add(dest)
+
+        if os.path.exists(dest) and os.path.getsize(dest) == r.size:
+            action = transfer_module.ACTION_SKIP_EXISTING
+        elif os.path.exists(dest):
+            if conflict == transfer_module.CONFLICT_SKIP:
+                action = transfer_module.ACTION_SKIP_CONFLICT
+            elif conflict == transfer_module.CONFLICT_OVERWRITE:
+                action = transfer_module.ACTION_OVERWRITE
+            else:
+                dest = transfer_module.resolve_conflict_path(dest, os.path.exists)
+                claimed.add(dest)
+                action = transfer_module.ACTION_RENAME
+        else:
+            action = transfer_module.ACTION_COPY
+
+        items.append(transfer_module.TransferItem(source=r.path, dest=dest, size=r.size, action=action))
+    return transfer_module.TransferPlan(direction="pull", items=items)
+
+
 @files_cmd.command("search")
 @click.argument("path", default=None, required=False)
 @click.option(
@@ -311,7 +343,15 @@ def _write_search_export(results, fmt, path):
     default=None,
     help="Output format for --output: csv or txt.",
 )
-def files_search(path, serial, name, extensions, min_size, max_size, after, before, preset, sort_by, reverse, name_regex, mime, limit, output_path, output_format):
+@click.option("--pull-to", "pull_to_dir", default=None, help="Pull all matching files to DIR.")
+@click.option(
+    "--pull-conflict",
+    type=click.Choice([transfer_module.CONFLICT_SKIP, transfer_module.CONFLICT_OVERWRITE, transfer_module.CONFLICT_RENAME]),
+    default=transfer_module.CONFLICT_SKIP,
+    help="Conflict resolution for --pull-to (default: skip).",
+)
+@click.option("--no-verify", "pull_no_verify", is_flag=True, help="Skip verification after --pull-to.")
+def files_search(path, serial, name, extensions, min_size, max_size, after, before, preset, sort_by, reverse, name_regex, mime, limit, output_path, output_format, pull_to_dir, pull_conflict, pull_no_verify):
     """Search for files on the device (default root: /sdcard)."""
     try:
         client = _build_client()
@@ -394,6 +434,34 @@ def files_search(path, serial, name, extensions, min_size, max_size, after, befo
     if output_path:
         _write_search_export(results, output_format, output_path)
         click.echo(f"Results exported to {output_path}.")
+
+    if pull_to_dir:
+        os.makedirs(pull_to_dir, exist_ok=True)
+        plan = _search_results_to_plan(results, pull_to_dir, pull_conflict)
+        _print_plan_summary(plan)
+        if not plan.to_transfer:
+            return
+        click.echo(f"Pulling {plan.total_files} file(s), {format_bytes(plan.total_bytes)}...")
+
+        def on_progress(progress):
+            click.echo(_format_progress_line(progress), nl=False)
+
+        try:
+            with get_sleep_inhibitor("DroidBridge file search pull"):
+                progress = transfer_module.execute_plan(
+                    client, serial, plan, progress_callback=on_progress
+                )
+        except AdbError as exc:
+            click.echo(f"\nError during pull: {exc}", err=True)
+            sys.exit(1)
+        click.echo()
+        _report_failed_items(progress.failed)
+        if not pull_no_verify:
+            verification = transfer_module.verify_pull(plan)
+            if not _report_verification(verification):
+                sys.exit(1)
+        if progress.failed:
+            sys.exit(1)
 
 
 @files_cmd.command("rename")

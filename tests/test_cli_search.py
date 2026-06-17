@@ -251,6 +251,41 @@ class TestSearchExtensionInOutput:
         assert "(none)" in result.output
 
 
+class TestSearchPullToCLI:
+    def test_pull_to_executes_transfer(self, runner, tmp_path):
+        search_output = "/sdcard/photo.jpg\t500000\t1700000000.0\n"
+        client = make_fake_client(READY_DEVICE, shell_result=search_output)
+        client.pull = MagicMock()
+        with patch("droidbridge.cli.main._build_client", return_value=client):
+            result = runner.invoke(
+                cli, ["files", "search", "--pull-to", str(tmp_path), "--no-verify"]
+            )
+        assert result.exit_code == 0, result.output
+        assert client.pull.called
+
+    def test_pull_to_skips_already_present(self, runner, tmp_path):
+        dest = tmp_path / "photo.jpg"
+        dest.write_bytes(b"x" * 500000)
+        search_output = "/sdcard/photo.jpg\t500000\t1700000000.0\n"
+        client = make_fake_client(READY_DEVICE, shell_result=search_output)
+        client.pull = MagicMock()
+        with patch("droidbridge.cli.main._build_client", return_value=client):
+            result = runner.invoke(cli, ["files", "search", "--pull-to", str(tmp_path)])
+        assert result.exit_code == 0, result.output
+        assert not client.pull.called
+        assert "already present" in result.output
+
+    def test_pull_to_creates_dest_dir(self, runner, tmp_path):
+        new_dir = tmp_path / "new_subdir"
+        assert not new_dir.exists()
+        search_output = "/sdcard/file.jpg\t100\t1700000000.0\n"
+        client = make_fake_client(READY_DEVICE, shell_result=search_output)
+        client.pull = MagicMock()
+        with patch("droidbridge.cli.main._build_client", return_value=client):
+            runner.invoke(cli, ["files", "search", "--pull-to", str(new_dir)])
+        assert new_dir.exists()
+
+
 class TestSearchExportCLI:
     def test_output_csv_writes_file(self, runner):
         client = make_fake_client(READY_DEVICE)
