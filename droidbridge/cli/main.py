@@ -1812,6 +1812,10 @@ def storage_suggest_cleanup(serial):
     click.echo(f"Total estimated recoverable: {format_bytes(total)}")
 
 
+# Android interprets any target > total device storage as "clear all caches"
+_TRIM_ALL_BYTES = 2 ** 62
+
+
 @cli.group("apps")
 def apps_cmd():
     """Manage installed apps: list, cache, uninstall, APK extraction, bloatware (Module 8)."""
@@ -1898,6 +1902,9 @@ def apps_clear_cache(serial, clear_all, target):
     Use --all to free as much cache space as possible, or --target BYTES to trim
     until the specified free space is reached.
     """
+    if clear_all and target is not None:
+        raise click.UsageError("--all and --target are mutually exclusive. Use one or the other.")
+
     if not clear_all and target is None:
         raise click.UsageError("Specify --all to clear all caches, or --target BYTES for a specific target.")
 
@@ -1910,7 +1917,7 @@ def apps_clear_cache(serial, clear_all, target):
     serial = _resolve_serial(client, serial)
 
     if clear_all:
-        desired = 2 ** 62
+        desired = _TRIM_ALL_BYTES
     else:
         desired = target
 

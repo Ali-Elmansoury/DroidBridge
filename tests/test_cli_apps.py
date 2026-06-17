@@ -443,6 +443,27 @@ class TestAppsClearCache:
         assert result.exit_code == 0
         assert "cache trim requested" in result.output.lower()
 
+    def test_all_and_target_together_gives_error(self, monkeypatch):
+        """--all and --target are mutually exclusive."""
+        from unittest.mock import patch
+
+        with patch("droidbridge.cli.main._build_client"), \
+             patch("droidbridge.cli.main._resolve_serial", return_value="SERIAL"), \
+             patch("droidbridge.cli.main.apps_module.trim_caches"):
+            result = CliRunner().invoke(main.cli, ["apps", "clear-cache", "--all", "--target", "500000000"])
+        assert result.exit_code != 0
+        assert "mutually exclusive" in result.output.lower() or "error" in result.output.lower()
+
+    def test_no_device_shows_guidance_and_exits_nonzero(self, monkeypatch):
+        """No-device case: AdbError propagates as guidance and non-zero exit."""
+        client = make_fake_client([], "")
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(main.cli, ["apps", "clear-cache", "--all"])
+
+        assert result.exit_code != 0
+        assert "usb debugging" in result.output.lower()
+
 
 class TestAppsEnable:
     def test_no_device_shows_guidance_and_exits_nonzero(self, monkeypatch):
