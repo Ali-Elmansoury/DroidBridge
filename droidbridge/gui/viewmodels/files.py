@@ -99,7 +99,7 @@ class FilesViewModel(QObject):
             client, serial = self.context.client, self.context.serial
             self._run(
                 lambda: preview_ops.fetch_preview(client, serial, entry),
-                lambda local_path: self._on_preview_fetched(generation, local_path),
+                lambda local_path, e=entry: self._on_preview_fetched(generation, local_path, e),
             )
         else:
             self.previewChanged.emit({"kind": "info", "entry": entry_or_none})
@@ -111,10 +111,10 @@ class FilesViewModel(QObject):
         self._refilter_and_resort()
         self.logMessage.emit(f"Listed {len(entries)} entr{'y' if len(entries) == 1 else 'ies'}.", "INFO")
 
-    def _on_preview_fetched(self, generation, local_path):
+    def _on_preview_fetched(self, generation, local_path, entry):
         if generation != self._preview_generation:
             return
-        self.previewChanged.emit({"kind": "image", "local_path": local_path})
+        self.previewChanged.emit({"kind": "image", "local_path": local_path, "entry": entry})
 
     def _refilter_and_resort(self):
         entries = files_module.filter_entries(

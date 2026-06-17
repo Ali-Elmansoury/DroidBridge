@@ -213,7 +213,7 @@ class TestSelection:
 
         page.table.selectRow(1)  # photo.jpg
 
-        assert events == [{"kind": "image", "local_path": "/cache/x.jpg"}]
+        assert events == [{"kind": "image", "local_path": "/cache/x.jpg", "entry": SAMPLE_ENTRIES[1]}]
         assert page.pull_selected_button.isEnabled() is True
 
     def test_multi_selection_calls_select_entry_none(self, qtbot):
@@ -287,6 +287,29 @@ class TestPreview:
         assert "photo.jpg" in page.preview_info_label.text()
         assert page.preview_info_label.isVisible()
         assert not page.preview_image_label.isVisible()
+
+    def test_image_preview_shows_metadata_alongside_image(self, qtbot, tmp_path):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        img_path = tmp_path / "preview.png"
+        QPixmap(4, 4).save(str(img_path))
+
+        entry = FileEntry(
+            name="photo.jpg",
+            path="/sdcard/DCIM/Camera/photo.jpg",
+            is_dir=False,
+            is_symlink=False,
+            size=2048,
+            mtime=datetime(2024, 6, 1, 12, 0),
+            link_target=None,
+        )
+        vm.previewChanged.emit({"kind": "image", "local_path": str(img_path), "entry": entry})
+
+        assert page.preview_image_label.isVisible()
+        assert page.preview_info_label.isVisible()
+        assert "/sdcard/DCIM/Camera/photo.jpg" in page.preview_info_label.text()
+        assert "photo.jpg" in page.preview_info_label.text()
 
 
 class TestPullSelected:

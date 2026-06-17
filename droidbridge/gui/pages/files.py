@@ -208,7 +208,19 @@ class FilesPage(QWidget):
                 )
             self.preview_image_label.setPixmap(pixmap)
             self.preview_image_label.setVisible(True)
-            self.preview_info_label.setVisible(False)
+            entry = payload.get("entry")
+            if entry is not None:
+                kind = "Directory" if entry.is_dir else (entry.extension or "File")
+                self.preview_info_label.setText(
+                    f"Path: {entry.path}\n"
+                    f"Name: {entry.name}\n"
+                    f"Type: {kind}\n"
+                    f"Size: {format_bytes(entry.size)}\n"
+                    f"Modified: {entry.mtime.strftime('%Y-%m-%d %H:%M')}"
+                )
+                self.preview_info_label.setVisible(True)
+            else:
+                self.preview_info_label.setVisible(False)
             return
 
         entry = payload["entry"]

@@ -160,7 +160,7 @@ class TestSelectEntry:
 
         vm.select_entry(entry)
 
-        assert events == [{"kind": "image", "local_path": "/cache/photo.jpg"}]
+        assert events == [{"kind": "image", "local_path": "/cache/photo.jpg", "entry": entry}]
 
     def test_directory_emits_info(self, qtbot):
         vm = FilesViewModel(_connected_context(), worker_factory=FakeWorker)
@@ -190,6 +190,6 @@ class TestSelectEntry:
         vm.previewChanged.connect(events.append)
 
         vm._preview_generation = 5
-        vm._on_preview_fetched(generation=3, local_path="/tmp/stale.jpg")
+        vm._on_preview_fetched(generation=3, local_path="/tmp/stale.jpg", entry=None)
 
         assert events == []
