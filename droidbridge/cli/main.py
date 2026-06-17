@@ -21,7 +21,7 @@ from droidbridge.modules import search as search_module
 from droidbridge.modules import storage as storage_module
 from droidbridge.modules import transfer as transfer_module
 from droidbridge.modules import whatsapp as whatsapp_module
-from droidbridge.reports import backup_reports, deletion_reports, storage_reports, transfer_reports, whatsapp_reports
+from droidbridge.reports import backup_reports, deletion_reports, files_reports, storage_reports, transfer_reports, whatsapp_reports
 from droidbridge.reports.generators import Report, to_csv, to_html, to_json, to_txt
 from droidbridge.utils.format import format_bar, format_bytes, format_duration, format_size_kb, parse_size
 
@@ -471,11 +471,23 @@ def files_search(path, serial, name, extensions, min_size, max_size, after, befo
             sys.exit(1)
         click.echo()
         _report_failed_items(progress.failed)
+        verification = None
+        verified = True
         if not pull_no_verify:
             verification = transfer_module.verify_pull(plan)
-            if not _report_verification(verification):
-                sys.exit(1)
-        if progress.failed:
+            verified = _report_verification(verification)
+        _logger = _get_session_logger()
+        if _logger:
+            _logger.log(f"files search --pull-to {pull_to_dir}")
+        report = transfer_reports.build_transfer_report("pull", plan, progress, verification=verification)
+        _write_report(report, f"search-pull_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+        click.echo("Report saved to session_logs/reports/")
+        if _logger:
+            _logger.log(
+                f"Pull complete: {progress.done_files} files, "
+                f"{format_bytes(progress.done_bytes)}, {len(progress.failed)} failed"
+            )
+        if progress.failed or not verified:
             sys.exit(1)
 
 
@@ -497,6 +509,9 @@ def files_rename(old_path, new_path, serial):
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
+    _logger = _get_session_logger()
+    if _logger:
+        _logger.log(f"files rename {old_path} → {new_path}")
 
     try:
         files_module.rename_path(client, serial, old_path, new_path)
@@ -505,6 +520,10 @@ def files_rename(old_path, new_path, serial):
         sys.exit(1)
 
     click.echo(f"Renamed {old_path} -> {new_path}")
+    report = files_reports.build_files_rename_report(old_path, new_path)
+    _write_report(report, f"files-rename_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+    if _logger:
+        _logger.log(f"Rename complete: {old_path} → {new_path}")
 
 
 @files_cmd.command("delete")
@@ -531,6 +550,9 @@ def files_delete(paths, serial, backup_dir, yes):
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
+    _logger = _get_session_logger()
+    if _logger:
+        _logger.log(f"files delete {len(paths)} path(s)")
 
     try:
         plan = files_module.build_delete_plan(client, serial, list(paths))
@@ -572,6 +594,10 @@ def files_delete(paths, serial, backup_dir, yes):
         sys.exit(1)
 
     click.echo(f"Deleted {len(verification.deleted)} path(s), {format_bytes(plan.total_size)}.")
+    report = files_reports.build_files_delete_report(list(verification.deleted))
+    _write_report(report, f"files-delete_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+    if _logger:
+        _logger.log(f"Deletion complete: {len(verification.deleted)} deleted")
 
 
 @cli.group("transfer")

@@ -186,3 +186,112 @@ class TestReportGenerateLog:
         log_text = next((tmp_path / "session_logs").glob("session_*.log")).read_text()
         assert "report generate" in log_text
         assert "Report complete" in log_text
+
+
+class TestFilesRenameLog:
+    def test_files_rename_logs_start_and_end(self, monkeypatch, tmp_path):
+        client = _make_client(shell_side_effect=[""])  # shell for rename
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+        monkeypatch.chdir(tmp_path)
+
+        CliRunner().invoke(main.cli, ["files", "rename", "/sdcard/old.jpg", "/sdcard/new.jpg"])
+
+        log_text = next((tmp_path / "session_logs").glob("session_*.log")).read_text()
+        assert "files rename" in log_text
+        assert "Rename complete" in log_text
+
+    def test_files_rename_writes_report(self, monkeypatch, tmp_path):
+        client = _make_client(shell_side_effect=[""])
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+        monkeypatch.chdir(tmp_path)
+
+        CliRunner().invoke(main.cli, ["files", "rename", "/sdcard/old.jpg", "/sdcard/new.jpg"])
+
+        reports = list((tmp_path / "session_logs" / "reports").glob("files-rename_*.txt"))
+        assert len(reports) == 1
+        content = reports[0].read_text()
+        assert "/sdcard/old.jpg" in content
+        assert "/sdcard/new.jpg" in content
+
+
+class TestFilesDeleteLog:
+    def test_files_delete_logs_start_and_end(self, monkeypatch, tmp_path):
+        # shell returns: stat (build_delete_plan), stat again (delete_paths), rm, verify
+        client = _make_client(shell_side_effect=["100", "100", "", "NO"])
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+        monkeypatch.chdir(tmp_path)
+
+        CliRunner().invoke(
+            main.cli,
+            ["files", "delete", "/sdcard/a.jpg", "--yes"],
+        )
+
+        log_text = next((tmp_path / "session_logs").glob("session_*.log")).read_text()
+        assert "files delete" in log_text
+        assert "Deletion complete" in log_text
+
+    def test_files_delete_writes_report(self, monkeypatch, tmp_path):
+        client = _make_client(shell_side_effect=["100", "100", "", "NO"])
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+        monkeypatch.chdir(tmp_path)
+
+        CliRunner().invoke(
+            main.cli,
+            ["files", "delete", "/sdcard/a.jpg", "--yes"],
+        )
+
+        reports = list((tmp_path / "session_logs" / "reports").glob("files-delete_*.txt"))
+        assert len(reports) == 1
+        content = reports[0].read_text()
+        assert "/sdcard/a.jpg" in content
+
+
+class TestFilesSearchPullToLog:
+    def test_files_search_pull_to_writes_transfer_report(self, monkeypatch, tmp_path):
+        dest = tmp_path / "out"
+        dest.mkdir()
+
+        find_output = "/sdcard/photo.jpg\t1000\t1700000000.0\n"
+        client = _make_client(shell_side_effect=[find_output])
+
+        def fake_pull(serial, remote, local):
+            Path(local).parent.mkdir(parents=True, exist_ok=True)
+            Path(local).write_bytes(b"x" * 1000)
+
+        client.pull.side_effect = fake_pull
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
+        monkeypatch.chdir(tmp_path)
+
+        CliRunner().invoke(
+            main.cli,
+            ["files", "search", "/sdcard", "--pull-to", str(dest)],
+        )
+
+        reports = list((tmp_path / "session_logs" / "reports").glob("search-pull_*.txt"))
+        assert len(reports) == 1
+
+    def test_files_search_pull_to_logs_start_and_end(self, monkeypatch, tmp_path):
+        dest = tmp_path / "out"
+        dest.mkdir()
+
+        find_output = "/sdcard/photo.jpg\t1000\t1700000000.0\n"
+        client = _make_client(shell_side_effect=[find_output])
+
+        def fake_pull(serial, remote, local):
+            Path(local).parent.mkdir(parents=True, exist_ok=True)
+            Path(local).write_bytes(b"x" * 1000)
+
+        client.pull.side_effect = fake_pull
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
+        monkeypatch.chdir(tmp_path)
+
+        CliRunner().invoke(
+            main.cli,
+            ["files", "search", "/sdcard", "--pull-to", str(dest)],
+        )
+
+        log_text = next((tmp_path / "session_logs").glob("session_*.log")).read_text()
+        assert "files search --pull-to" in log_text
+        assert "Pull complete" in log_text
