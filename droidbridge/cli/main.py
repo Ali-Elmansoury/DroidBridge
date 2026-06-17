@@ -277,7 +277,7 @@ def _search_results_to_plan(results, dest_dir, conflict):
             elif conflict == transfer_module.CONFLICT_OVERWRITE:
                 action = transfer_module.ACTION_OVERWRITE
             else:
-                dest = transfer_module.resolve_conflict_path(dest, os.path.exists)
+                dest = transfer_module.resolve_conflict_path(dest, lambda p: p in claimed or os.path.exists(p))
                 claimed.add(dest)
                 action = transfer_module.ACTION_RENAME
         else:
