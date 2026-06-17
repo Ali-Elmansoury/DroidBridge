@@ -539,6 +539,115 @@ class TestMirrorPlanReadySlot:
         assert confirmed == [False]
 
 
+class TestTransferPageTooltips:
+    def test_pull_radio_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.pull_radio.toolTip() != ""
+
+    def test_push_radio_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.push_radio.toolTip() != ""
+
+    def test_remote_path_edit_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.remote_path_edit.toolTip() != ""
+
+    def test_remote_path_browse_button_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.remote_path_browse_button.toolTip() != ""
+
+    def test_local_dir_edit_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.local_dir_edit.toolTip() != ""
+
+    def test_local_dir_browse_button_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.local_dir_browse_button.toolTip() != ""
+
+    def test_local_path_edit_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.local_path_edit.toolTip() != ""
+
+    def test_local_file_browse_button_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.local_file_browse_button.toolTip() != ""
+
+    def test_local_folder_browse_button_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.local_folder_browse_button.toolTip() != ""
+
+    def test_remote_dir_edit_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.remote_dir_edit.toolTip() != ""
+
+    def test_remote_dir_browse_button_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.remote_dir_browse_button.toolTip() != ""
+
+    def test_remote_dir_new_folder_button_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.remote_dir_new_folder_button.toolTip() != ""
+
+    def test_verify_checkbox_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.verify_checkbox.toolTip() != ""
+
+    def test_mirror_checkbox_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.mirror_checkbox.toolTip() != ""
+
+    def test_delete_extras_checkbox_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.delete_extras_checkbox.toolTip() != ""
+
+    def test_start_button_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.start_button.toolTip() != ""
+
+    def test_cancel_button_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.cancel_button.toolTip() != ""
+
+    def test_clear_history_button_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.clear_history_button.toolTip() != ""
+
+
+class TestTransferPageShortcuts:
+    def test_ctrl_return_starts_transfer(self, qtbot, monkeypatch):
+        page, vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        page.show()
+
+        page.remote_path_edit.setText("/sdcard/DCIM")
+        page.local_dir_edit.setText("/tmp")
+
+        calls = []
+        monkeypatch.setattr(vm, "start_pull", lambda *a, **k: calls.append(1))
+
+        qtbot.keyClick(page, Qt.Key.Key_Return, Qt.KeyboardModifier.ControlModifier)
+
+        assert calls
+
+
 class TestHistoryFailedColumnInPage:
     def _make_page(self, qtbot):
         from droidbridge.gui.pages.transfer import TransferPage, _HISTORY_COLUMNS

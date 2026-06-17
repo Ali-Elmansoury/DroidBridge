@@ -3,6 +3,8 @@ live progress, verification result, and transfer history. Purely declarative - b
 to TransferViewModel signals/slots, no ADB calls or business logic of its own.
 """
 
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QButtonGroup,
     QCheckBox,
@@ -43,6 +45,8 @@ class TransferPage(QWidget):
         self.pull_radio = QRadioButton("Pull (device -> computer)")
         self.push_radio = QRadioButton("Push (computer -> device)")
         self.pull_radio.setChecked(True)
+        self.pull_radio.setToolTip("Pull mode: copy files or folders from the device to your computer.")
+        self.push_radio.setToolTip("Push mode: copy files or a folder from your computer to the device.")
         self.mode_group = QButtonGroup(self)
         self.mode_group.addButton(self.pull_radio)
         self.mode_group.addButton(self.push_radio)
@@ -53,9 +57,15 @@ class TransferPage(QWidget):
         mode_bar.addStretch()
 
         self.remote_path_edit = QLineEdit()
+        self.remote_path_edit.setToolTip("Device path to pull (file or folder, starting with /).")
         self.remote_path_browse_button = QPushButton("Browse...")
+        self.remote_path_browse_button.setToolTip(
+            "Browse the device filesystem to pick a file or folder to pull."
+        )
         self.local_dir_edit = QLineEdit()
+        self.local_dir_edit.setToolTip("Local folder on your computer where pulled files will be saved.")
         self.local_dir_browse_button = QPushButton("Browse...")
+        self.local_dir_browse_button.setToolTip("Browse your computer for a destination folder.")
 
         remote_path_row = QHBoxLayout()
         remote_path_row.addWidget(self.remote_path_edit)
@@ -71,11 +81,21 @@ class TransferPage(QWidget):
         pull_layout.addRow("Local folder:", local_dir_row)
 
         self.local_path_edit = QLineEdit()
+        self.local_path_edit.setToolTip("Local file or folder on your computer to push to the device.")
         self.local_file_browse_button = QPushButton("Browse File...")
+        self.local_file_browse_button.setToolTip("Browse your computer for a single file to push.")
         self.local_folder_browse_button = QPushButton("Browse Folder...")
+        self.local_folder_browse_button.setToolTip("Browse your computer for a folder to push.")
         self.remote_dir_edit = QLineEdit()
+        self.remote_dir_edit.setToolTip("Device folder where pushed files or folders will be placed.")
         self.remote_dir_browse_button = QPushButton("Browse...")
+        self.remote_dir_browse_button.setToolTip(
+            "Browse the device filesystem to pick a destination folder."
+        )
         self.remote_dir_new_folder_button = QPushButton("New Folder...")
+        self.remote_dir_new_folder_button.setToolTip(
+            "Create a new folder on the device and use it as the push destination."
+        )
 
         local_path_row = QHBoxLayout()
         local_path_row.addWidget(self.local_path_edit)
@@ -110,6 +130,9 @@ class TransferPage(QWidget):
         )
         self.verify_checkbox = QCheckBox("Verify after transfer")
         self.verify_checkbox.setChecked(True)
+        self.verify_checkbox.setToolTip(
+            "After the transfer completes, confirm that file count and total size match the source."
+        )
 
         self.retry_spin = QSpinBox()
         self.retry_spin.setRange(0, 10)
@@ -117,8 +140,15 @@ class TransferPage(QWidget):
         self.retry_spin.setToolTip("Number of retries for a failed file (0 to disable).")
 
         self.mirror_checkbox = QCheckBox("Mirror mode (sync, always overwrite changed files)")
+        self.mirror_checkbox.setToolTip(
+            "Sync mode: always overwrite changed files at the destination, skipping identical ones."
+        )
         self.delete_extras_checkbox = QCheckBox("Delete extra files on destination")
         self.delete_extras_checkbox.setVisible(False)
+        self.delete_extras_checkbox.setToolTip(
+            "In mirror mode, delete files at the destination that don't exist in the source. "
+            "Requires 'YES DELETE' confirmation."
+        )
 
         options_row = QHBoxLayout()
         options_row.addWidget(QLabel("On conflict:"))
@@ -129,8 +159,10 @@ class TransferPage(QWidget):
         options_row.addStretch()
 
         self.start_button = QPushButton("Start Transfer")
+        self.start_button.setToolTip("Start the pull or push transfer. Shortcut: Ctrl+Return.")
         self.cancel_button = QPushButton("Cancel")
         self.cancel_button.setVisible(False)
+        self.cancel_button.setToolTip("Cancel the in-progress transfer.")
 
         action_row = QHBoxLayout()
         action_row.addWidget(self.start_button)
@@ -146,6 +178,7 @@ class TransferPage(QWidget):
         self.history_table = QTableWidget(0, len(_HISTORY_COLUMNS))
         self.history_table.setHorizontalHeaderLabels(_HISTORY_COLUMNS)
         self.clear_history_button = QPushButton("Clear")
+        self.clear_history_button.setToolTip("Clear the transfer history.")
 
         history_header_row = QHBoxLayout()
         history_header_row.addWidget(QLabel("Transfer History:"))
@@ -186,6 +219,18 @@ class TransferPage(QWidget):
         self.viewmodel.historyEntryAdded.connect(self._on_history_entry_added)
         self.viewmodel.busyChanged.connect(self._on_busy_changed)
         self.viewmodel.mirrorPlanReady.connect(self._on_mirror_plan_ready)
+
+        _ctrl_return = QShortcut(QKeySequence("Ctrl+Return"), self)
+        _ctrl_return.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        _ctrl_return.activated.connect(self.start_button.click)
+
+    def keyPressEvent(self, event):
+        if (event.key() == Qt.Key.Key_Return and
+                event.modifiers() == Qt.KeyboardModifier.ControlModifier):
+            self.start_button.click()
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
     def _on_browse_local_dir(self):
         path = QFileDialog.getExistingDirectory(self, "Select destination folder")
