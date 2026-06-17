@@ -2164,6 +2164,12 @@ def backup_profile_show(name):
     click.echo("Sources:")
     for source in profile.sources:
         click.echo(f"  {source}")
+    click.echo("Excludes:")
+    if profile.excludes:
+        for exc in profile.excludes:
+            click.echo(f"  {exc}")
+    else:
+        click.echo("  (none)")
 
 
 @backup_profile_cmd.command("remove")

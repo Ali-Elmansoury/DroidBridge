@@ -122,6 +122,44 @@ class TestBackupProfileShow:
         assert "/backups/wa" in result.output
         assert "overwrite" in result.output
 
+    def test_shows_excludes_when_set(self, tmp_path, monkeypatch):
+        path = tmp_path / "profiles.json"
+        monkeypatch.setattr(backup_manager, "DEFAULT_PROFILES_PATH", path)
+        backup_manager.save_profile(
+            path,
+            backup_manager.BackupProfile(
+                name="media_backup",
+                sources=["/sdcard/DCIM"],
+                dest="/backups/dcim",
+                conflict="skip",
+                excludes=["/sdcard/DCIM/thumbnails", "/sdcard/DCIM/.trash"],
+            ),
+        )
+
+        result = CliRunner().invoke(main.cli, ["backup", "profile", "show", "media_backup"])
+
+        assert result.exit_code == 0
+        assert "/sdcard/DCIM/thumbnails" in result.output
+        assert "/sdcard/DCIM/.trash" in result.output
+
+    def test_shows_none_when_excludes_empty(self, tmp_path, monkeypatch):
+        path = tmp_path / "profiles.json"
+        monkeypatch.setattr(backup_manager, "DEFAULT_PROFILES_PATH", path)
+        backup_manager.save_profile(
+            path,
+            backup_manager.BackupProfile(
+                name="simple",
+                sources=["/sdcard/Documents"],
+                dest="/backups/docs",
+            ),
+        )
+
+        result = CliRunner().invoke(main.cli, ["backup", "profile", "show", "simple"])
+
+        assert result.exit_code == 0
+        assert "Excludes" in result.output
+        assert "(none)" in result.output
+
     def test_unknown_profile_errors(self, tmp_path, monkeypatch):
         path = tmp_path / "profiles.json"
         monkeypatch.setattr(backup_manager, "DEFAULT_PROFILES_PATH", path)
