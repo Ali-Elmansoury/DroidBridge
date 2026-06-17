@@ -1,8 +1,12 @@
 """Tests for droidbridge.modules.search - Module 7: Search & Discovery."""
 
+import shlex
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock
 
+import pytest
+
+from droidbridge.modules.search import _build_find_command, search_files
 from droidbridge.modules import search
 
 FIND_OUTPUT = (
@@ -203,3 +207,31 @@ class TestPresetFilters:
             assert False, "expected ValueError"
         except ValueError:
             pass
+
+
+class TestRegexSearch:
+    def test_build_find_command_with_regex(self):
+        cmd = _build_find_command("/sdcard", name_regex=".*\\.jpg")
+        assert "-regextype posix-extended" in cmd
+        assert "-iregex" in cmd
+        assert shlex.quote(".*\\.jpg") in cmd
+        assert "-iname" not in cmd
+
+    def test_search_files_passes_regex_to_find(self):
+        client = make_fake_client("/sdcard/photo.jpg\t1000\t1700000000.0\n")
+        results = search_files(client, "serial", name_regex=".*\\.jpg")
+        cmd = client.shell.call_args[0][1]
+        assert "-iregex" in cmd
+        assert len(results) == 1
+
+    def test_search_files_raises_if_both_pattern_and_regex(self):
+        client = make_fake_client("")
+        with pytest.raises(ValueError, match="Cannot use both"):
+            search_files(client, "serial", name_pattern="*.jpg", name_regex=".*\\.jpg")
+
+    def test_no_regex_flags_without_name_regex(self):
+        client = make_fake_client("")
+        search_files(client, "serial")
+        cmd = client.shell.call_args[0][1]
+        assert "-regextype" not in cmd
+        assert "-iregex" not in cmd

@@ -40,12 +40,14 @@ class SearchResult:
         return PurePosixPath(self.path).suffix.lstrip(".").lower()
 
 
-def _build_find_command(root_path, name_pattern=None):
+def _build_find_command(root_path, name_pattern=None, name_regex=None):
     # -L follows symlinks (e.g. /sdcard -> /storage/self/primary), without
     # which a recursive search from /sdcard returns nothing.
     cmd = f"find -L {shlex.quote(root_path)} -type f"
     if name_pattern:
         cmd += f" -iname {shlex.quote(name_pattern)}"
+    elif name_regex:
+        cmd += f" -regextype posix-extended -iregex {shlex.quote(name_regex)}"
     cmd += r" -printf '%p\t%s\t%T@\n'"
     return cmd
 
@@ -86,6 +88,7 @@ def search_files(
     serial,
     root_path=DEFAULT_ROOT,
     name_pattern=None,
+    name_regex=None,
     extensions=None,
     min_size=None,
     max_size=None,
@@ -93,7 +96,9 @@ def search_files(
     before=None,
 ):
     """Recursively search `root_path` for files matching the given filters."""
-    cmd = _build_find_command(root_path, name_pattern)
+    if name_pattern and name_regex:
+        raise ValueError("Cannot use both name_pattern and name_regex")
+    cmd = _build_find_command(root_path, name_pattern=name_pattern, name_regex=name_regex)
     # No timeout: a recursive search of /sdcard can take well over 30s.
     output = client.shell(serial, cmd, timeout=None)
     results = _parse_find_output(output)
