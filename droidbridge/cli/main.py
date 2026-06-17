@@ -2724,6 +2724,8 @@ def report_generate(serial, app, report_type, report_format, output_path, top_n,
 
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(content, encoding="utf-8")
+    if _logger:
+        _logger.log(f"Report written: {out}")
 
     if report_format == "txt":
         click.echo(content)

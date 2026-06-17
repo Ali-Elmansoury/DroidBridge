@@ -11,8 +11,30 @@ from click.testing import CliRunner
 
 from droidbridge.cli import main
 from droidbridge.core.adb import Device
+from droidbridge.modules import transfer as transfer_module
 
 READY_DEVICE = [Device(serial="SERIAL123", state="device", model="Pixel_7")]
+
+_WA_MEDIA = "/sdcard/Android/media/com.whatsapp/WhatsApp/Media"
+# detect_installs issues one compound shell command checking 4 [ -d ] paths (2 apps × 2 paths each).
+_DETECT_WA_ONLY = "1\n0\n0\n0\n"   # modern WhatsApp path present, all others absent
+_DETECT_NONE    = "0\n0\n0\n0\n"   # no WhatsApp installations found
+_SCAN_OUTPUT = f"{_WA_MEDIA}/WhatsApp Images/IMG-20230101-WA0001.jpg\t1000\t1672531200.0\n"
+_DELETE_SCAN_OUTPUT = (
+    f"{_WA_MEDIA}/WhatsApp Images/IMG-20230101-WA0001.jpg\t1000\t1672531200.0\n"
+    f"{_WA_MEDIA}/WhatsApp Images/IMG-20250101-WA0002.jpg\t2000\t1735689600.0\n"
+)
+_DELETE_RESCAN_OUTPUT = f"{_WA_MEDIA}/WhatsApp Images/IMG-20250101-WA0002.jpg\t2000\t1735689600.0\n"
+_DF_OUTPUT = (
+    "Filesystem     1K-blocks     Used Available Use% Mounted on\n"
+    "/dev/fuse      120000000 80000000  40000000  67% /storage/emulated/0\n"
+)
+
+
+def _write_wa_backup_file(backup_dir, rel_path, size):
+    path = backup_dir / "WhatsApp" / "Media" / rel_path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"x" * size)
 
 
 @contextmanager
@@ -127,13 +149,9 @@ class TestTransferCommandsLog:
 
 class TestWhatsappCommandsLog:
     def test_whatsapp_scan_logs_start(self, monkeypatch, tmp_path):
-        client = _make_client(
-            shell_side_effect=[
-                "package:com.whatsapp",                         # pm list packages
-                "/sdcard/Android/media/com.whatsapp/WhatsApp",  # stat media path
-                "",                                             # find output (empty)
-            ]
-        )
+        # detect_installs makes one compound shell call; _DETECT_NONE → no installs → sys.exit(1)
+        # but START log is written before the detect call, so "whatsapp scan" is always recorded.
+        client = _make_client(shell_side_effect=[_DETECT_NONE])
         monkeypatch.setattr(main, "_build_client", lambda: client)
         monkeypatch.chdir(tmp_path)
 
@@ -141,6 +159,72 @@ class TestWhatsappCommandsLog:
 
         log_text = next((tmp_path / "session_logs").glob("session_*.log")).read_text()
         assert "whatsapp scan" in log_text
+
+    def test_whatsapp_scan_logs_scan_complete(self, monkeypatch, tmp_path):
+        client = _make_client(shell_side_effect=[_DETECT_WA_ONLY, _SCAN_OUTPUT])
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+        monkeypatch.chdir(tmp_path)
+
+        CliRunner().invoke(main.cli, ["whatsapp", "scan"])
+
+        log_text = next((tmp_path / "session_logs").glob("session_*.log")).read_text()
+        assert "whatsapp scan" in log_text
+        assert "Scan complete" in log_text
+
+    def test_whatsapp_analyze_logs_start_and_end(self, monkeypatch, tmp_path):
+        client = _make_client(shell_side_effect=[_DETECT_WA_ONLY, _SCAN_OUTPUT])
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+        monkeypatch.chdir(tmp_path)
+
+        CliRunner().invoke(main.cli, ["whatsapp", "analyze"])
+
+        log_text = next((tmp_path / "session_logs").glob("session_*.log")).read_text()
+        assert "whatsapp analyze" in log_text
+        assert "Analysis complete" in log_text
+
+    def test_whatsapp_backup_logs_start_and_end(self, monkeypatch, tmp_path):
+        client = _make_client(shell_side_effect=[_DETECT_WA_ONLY, _SCAN_OUTPUT])
+
+        def fake_pull(serial, remote, local):
+            Path(local).parent.mkdir(parents=True, exist_ok=True)
+            Path(local).write_bytes(b"x" * 1000)
+
+        client.pull.side_effect = fake_pull
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
+        monkeypatch.chdir(tmp_path)
+
+        CliRunner().invoke(main.cli, ["whatsapp", "backup", "--dest", str(tmp_path / "backup")])
+
+        log_text = next((tmp_path / "session_logs").glob("session_*.log")).read_text()
+        assert "whatsapp backup" in log_text
+        assert "Backup complete" in log_text
+
+    def test_whatsapp_delete_logs_start_and_end(self, monkeypatch, tmp_path):
+        backup_dir = tmp_path / "backup"
+        _write_wa_backup_file(backup_dir, "WhatsApp Images/IMG-20230101-WA0001.jpg", 1000)
+
+        shell_outputs = [
+            _DETECT_WA_ONLY,        # detect_installs
+            _DELETE_SCAN_OUTPUT,    # scan_media
+            _DF_OUTPUT,             # before_storage (get_storage_breakdown)
+            "",                     # execute_delete_plan (rm)
+            _DELETE_RESCAN_OUTPUT,  # verify_delete (rescan)
+            _DF_OUTPUT,             # after_storage (get_storage_breakdown)
+        ]
+        client = _make_client(shell_side_effect=shell_outputs)
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+        monkeypatch.chdir(tmp_path)
+
+        CliRunner().invoke(
+            main.cli,
+            ["whatsapp", "delete", "--before", "2024-09-01", "--backup-dir", str(backup_dir)],
+            input="YES DELETE\n",
+        )
+
+        log_text = next((tmp_path / "session_logs").glob("session_*.log")).read_text()
+        assert "whatsapp delete" in log_text
+        assert "Deletion complete" in log_text
 
 
 class TestBackupCommandsLog:
@@ -173,6 +257,107 @@ class TestBackupCommandsLog:
         assert "backup run" in log_text
         assert "Backup complete" in log_text
 
+    def test_backup_verify_logs_start_and_end(self, monkeypatch, tmp_path):
+        from droidbridge.modules import backup_manager as bm
+        profiles_path = tmp_path / "profiles.json"
+        history_path = tmp_path / "history.json"
+        monkeypatch.setattr(bm, "DEFAULT_PROFILES_PATH", str(profiles_path))
+        monkeypatch.setattr(bm, "DEFAULT_HISTORY_PATH", str(history_path))
+        monkeypatch.chdir(tmp_path)
+
+        dest = tmp_path / "dest"
+        dest.mkdir()
+        (dest / "a.jpg").write_bytes(b"x" * 1000)
+
+        bm.save_profile(profiles_path, bm.BackupProfile(name="test", sources=["/sdcard/a.jpg"], dest=str(dest)))
+        bm.append_history(
+            history_path,
+            bm.BackupRecord("test", "2026-06-01T00:00:00+00:00", 1, 1000, 1.0, str(dest), True),
+        )
+
+        CliRunner().invoke(main.cli, ["backup", "verify", "--profile", "test"])
+
+        log_text = next((tmp_path / "session_logs").glob("session_*.log")).read_text()
+        assert "backup verify" in log_text
+        assert "Verification" in log_text
+
+
+class TestTransferMirrorCommandsLog:
+    def test_transfer_mirror_pull_logs_start_and_end(self, monkeypatch, tmp_path):
+        local_camera = tmp_path / "Camera"
+
+        def fake_plan_mirror_pull(client_, serial, remote_path, local_dir):
+            local_camera.mkdir(exist_ok=True)
+            (local_camera / "photo.jpg").write_bytes(b"x" * 1000)
+            return transfer_module.TransferPlan(
+                direction="pull",
+                items=[transfer_module.TransferItem(
+                    source="/sdcard/Camera/photo.jpg",
+                    dest=str(local_camera / "photo.jpg"),
+                    size=1000,
+                    action=transfer_module.ACTION_COPY,
+                )],
+            )
+
+        def fake_execute_mirror(client_, serial, plan, **kwargs):
+            return transfer_module.MirrorResult(
+                progress=transfer_module.TransferProgress(1, 1000, 1, 1000),
+            )
+
+        client = _make_client()
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
+        monkeypatch.setattr(transfer_module, "plan_mirror_pull", fake_plan_mirror_pull)
+        monkeypatch.setattr(transfer_module, "execute_mirror", fake_execute_mirror)
+        monkeypatch.setattr(
+            transfer_module, "verify_pull",
+            lambda p: transfer_module.VerificationResult(1, 1000, 1, 1000),
+        )
+        monkeypatch.chdir(tmp_path)
+
+        CliRunner().invoke(main.cli, ["transfer", "mirror", "pull", "/sdcard/Camera", str(tmp_path)])
+
+        log_text = next((tmp_path / "session_logs").glob("session_*.log")).read_text()
+        assert "transfer mirror pull" in log_text
+        assert "Mirror complete" in log_text
+
+    def test_transfer_mirror_push_logs_start_and_end(self, monkeypatch, tmp_path):
+        local_dir = tmp_path / "local"
+        local_dir.mkdir()
+        (local_dir / "photo.jpg").write_bytes(b"x" * 1000)
+
+        def fake_plan_mirror_push(client_, serial, local_path, remote_dir):
+            return transfer_module.TransferPlan(
+                direction="push",
+                items=[transfer_module.TransferItem(
+                    source=str(local_dir / "photo.jpg"),
+                    dest="/sdcard/Backup/photo.jpg",
+                    size=1000,
+                    action=transfer_module.ACTION_COPY,
+                )],
+            )
+
+        def fake_execute_mirror(client_, serial, plan, **kwargs):
+            return transfer_module.MirrorResult(
+                progress=transfer_module.TransferProgress(1, 1000, 1, 1000),
+            )
+
+        client = _make_client()
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
+        monkeypatch.setattr(transfer_module, "plan_mirror_push", fake_plan_mirror_push)
+        monkeypatch.setattr(transfer_module, "execute_mirror", fake_execute_mirror)
+        monkeypatch.chdir(tmp_path)
+
+        CliRunner().invoke(
+            main.cli,
+            ["transfer", "mirror", "push", str(local_dir), "/sdcard/Backup", "--no-verify"],
+        )
+
+        log_text = next((tmp_path / "session_logs").glob("session_*.log")).read_text()
+        assert "transfer mirror push" in log_text
+        assert "Mirror complete" in log_text
+
 
 class TestReportGenerateLog:
     def test_report_generate_logs_start_and_end(self, monkeypatch, tmp_path):
@@ -185,6 +370,7 @@ class TestReportGenerateLog:
 
         log_text = next((tmp_path / "session_logs").glob("session_*.log")).read_text()
         assert "report generate" in log_text
+        assert "Report written" in log_text
         assert "Report complete" in log_text
 
 
