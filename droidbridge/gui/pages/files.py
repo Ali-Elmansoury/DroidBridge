@@ -6,6 +6,7 @@ binds to FilesViewModel signals/slots, no ADB calls or business logic of its own
 from PyQt6.QtCore import QItemSelectionModel, Qt, pyqtSignal
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QComboBox,
     QFileDialog,
@@ -13,6 +14,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMenu,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
@@ -136,6 +138,8 @@ class FilesPage(QWidget):
         self.pull_selected_button.clicked.connect(self._on_pull_selected)
         self.rename_button.clicked.connect(self._on_rename)
         self.delete_button.clicked.connect(self._on_delete)
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._on_context_menu)
 
         self.viewmodel.entriesChanged.connect(self._on_entries_changed)
         self.viewmodel.pathChanged.connect(self._on_path_changed)
@@ -208,11 +212,39 @@ class FilesPage(QWidget):
         else:
             kind = "Directory" if entry.is_dir else (entry.extension or "File")
             self.preview_info_label.setText(
+                f"Path: {entry.path}\n"
                 f"Name: {entry.name}\n"
                 f"Type: {kind}\n"
                 f"Size: {format_bytes(entry.size)}\n"
                 f"Modified: {entry.mtime.strftime('%Y-%m-%d %H:%M')}"
             )
+
+    def _on_context_menu(self, pos):
+        selected_rows = sorted({index.row() for index in self.table.selectedIndexes()})
+        single = len(selected_rows) == 1
+        multi = bool(selected_rows)
+
+        menu = QMenu(self)
+        pull_action = menu.addAction("Pull to Laptop...")
+        pull_action.setEnabled(multi)
+        rename_action = menu.addAction("Rename...")
+        rename_action.setEnabled(single)
+        delete_action = menu.addAction("Delete...")
+        delete_action.setEnabled(multi)
+        menu.addSeparator()
+        copy_path_action = menu.addAction("Copy Path to Clipboard")
+        copy_path_action.setEnabled(single)
+
+        action = menu.exec(self.table.viewport().mapToGlobal(pos))
+        if action == pull_action:
+            self._on_pull_selected()
+        elif action == rename_action:
+            self._on_rename()
+        elif action == delete_action:
+            self._on_delete()
+        elif action == copy_path_action and single:
+            path = self._rows[selected_rows[0]]["path"]
+            QApplication.clipboard().setText(path)
 
     def _on_pull_selected(self):
         selected_rows = sorted({index.row() for index in self.table.selectedIndexes()})

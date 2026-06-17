@@ -440,3 +440,46 @@ class TestDelete:
         qtbot.mouseClick(page.delete_button, Qt.MouseButton.LeftButton)
 
         assert calls == []
+
+
+class TestFilesPageContextMenu:
+    def test_context_menu_policy_is_custom(self, qtbot):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        assert page.table.contextMenuPolicy() == Qt.ContextMenuPolicy.CustomContextMenu
+
+
+class TestFilesPagePreviewPath:
+    def test_preview_shows_full_path(self, qtbot):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        entry = FileEntry(
+            name="photo.jpg",
+            path="/sdcard/DCIM/Camera/photo.jpg",
+            is_dir=False,
+            is_symlink=False,
+            size=2048,
+            mtime=datetime(2024, 6, 1, 12, 0),
+            link_target=None,
+        )
+        page._on_preview_changed({"kind": "entry", "entry": entry})
+        assert "/sdcard/DCIM/Camera/photo.jpg" in page.preview_info_label.text()
+
+    def test_preview_path_is_first_line(self, qtbot):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        entry = FileEntry(
+            name="doc.pdf",
+            path="/sdcard/Download/doc.pdf",
+            is_dir=False,
+            is_symlink=False,
+            size=512,
+            mtime=datetime(2024, 1, 1),
+            link_target=None,
+        )
+        page._on_preview_changed({"kind": "entry", "entry": entry})
+        first_line = page.preview_info_label.text().split("\n")[0]
+        assert first_line.startswith("Path:")
