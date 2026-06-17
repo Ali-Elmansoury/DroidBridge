@@ -9,6 +9,7 @@ from droidbridge.reports.deletion_reports import (
     build_deletion_result_report,
     build_storage_comparison_report,
 )
+from droidbridge.reports.generators import to_txt
 
 
 def _media_file(path, size, year):
@@ -52,7 +53,8 @@ class TestBuildDeletionResultReport:
         assert "Failed: 1" in text
         assert "1000" in text or "1 KB" in text or "1.0 KB" in text  # space freed reflects only the deleted file
 
-        failed_section = report.sections[1]
+        # sections: [Result, Monthly Status, Failed Files]
+        failed_section = report.sections[2]
         assert failed_section.rows[0][0] == "/m/Images/IMG-20250101-WA0001.jpg"
 
     def test_no_failed_section_when_all_deleted(self):
@@ -62,7 +64,8 @@ class TestBuildDeletionResultReport:
 
         report = build_deletion_result_report(plan, verification)
 
-        assert len(report.sections) == 1
+        # Result + Monthly Status; no Failed Files section when nothing failed
+        assert len(report.sections) == 2
 
 
 class TestBuildStorageComparisonReport:
@@ -78,3 +81,57 @@ class TestBuildStorageComparisonReport:
 
         free_row = next(row for row in section.rows if row[0] == "Free")
         assert free_row[3].startswith("+")
+
+
+class TestDeletionResultMonthlyStatus:
+    def _make_file(self, year, month, day, folder_type="WhatsApp Images", section="Received"):
+        # Construct a MediaFile with a WhatsApp-style path so year_month parses correctly
+        fname = f"IMG-{year}{month:02d}{day:02d}-WA0001.jpg"
+        path = f"/sdcard/WhatsApp/Media/WhatsApp Images/Received/{fname}"
+        return MediaFile(path=path, size=1024, mtime=0, folder_type=folder_type, section=section)
+
+    def test_all_deleted_shows_done(self):
+        f1 = self._make_file(2023, 1, 1)
+        plan = DeletePlan(to_delete=[f1], kept=[])
+        verification = DeleteVerification(deleted=1, remaining=[], after_files=[])
+        txt = to_txt(build_deletion_result_report(plan, verification))
+        assert "Monthly Status" in txt
+        assert "2023-01" in txt
+        assert "Done" in txt
+
+    def test_none_deleted_shows_pending(self):
+        f1 = self._make_file(2023, 1, 1)
+        plan = DeletePlan(to_delete=[f1], kept=[])
+        verification = DeleteVerification(deleted=0, remaining=[f1], after_files=[f1])
+        txt = to_txt(build_deletion_result_report(plan, verification))
+        assert "2023-01" in txt
+        assert "Pending" in txt
+
+    def test_partial_deletion_shows_partial(self):
+        f1 = self._make_file(2023, 1, 1)
+        f2 = self._make_file(2023, 1, 15)
+        plan = DeletePlan(to_delete=[f1, f2], kept=[])
+        # only f2 remains
+        verification = DeleteVerification(deleted=1, remaining=[f2], after_files=[f2])
+        txt = to_txt(build_deletion_result_report(plan, verification))
+        assert "2023-01" in txt
+        assert "Partial" in txt
+
+    def test_multiple_months_independent_status(self):
+        f_jan = self._make_file(2023, 1, 1)
+        f_feb = self._make_file(2023, 2, 1)
+        plan = DeletePlan(to_delete=[f_jan, f_feb], kept=[])
+        # jan deleted, feb not
+        verification = DeleteVerification(deleted=1, remaining=[f_feb], after_files=[f_feb])
+        txt = to_txt(build_deletion_result_report(plan, verification))
+        assert "2023-01" in txt
+        assert "Done" in txt
+        assert "2023-02" in txt
+        assert "Pending" in txt
+
+    def test_empty_plan_shows_no_dated_files(self):
+        plan = DeletePlan(to_delete=[], kept=[])
+        verification = DeleteVerification(deleted=0, remaining=[], after_files=[])
+        txt = to_txt(build_deletion_result_report(plan, verification))
+        assert "Monthly Status" in txt
+        assert "no dated files" in txt

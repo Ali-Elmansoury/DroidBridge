@@ -1,5 +1,7 @@
 """Deletion reports (spec §9.4)."""
 
+from collections import Counter
+
 from droidbridge.reports.generators import Report, ReportSection
 from droidbridge.utils.format import format_bytes
 
@@ -44,7 +46,29 @@ def build_deletion_result_report(plan, verification):
             f"Space freed: {format_bytes(freed_bytes)}"
         ),
     )
-    sections = [result]
+
+    plan_by_month = Counter(f.year_month for f in plan.to_delete)
+    remaining_by_month = Counter(f.year_month for f in verification.remaining)
+
+    month_lines = []
+    for month in sorted(plan_by_month):
+        planned = plan_by_month[month]
+        rem = remaining_by_month.get(month, 0)
+        if rem == 0:
+            status = "Done"
+        elif rem < planned:
+            status = "Partial"
+        else:
+            status = "Pending"
+        month_lines.append(
+            f"  {month:<12} {planned:>6} planned  {rem:>6} remaining  {status}"
+        )
+    if not month_lines:
+        month_lines = ["  (no dated files in deletion plan)"]
+
+    monthly_section = ReportSection(title="Monthly Status", text="\n".join(month_lines))
+
+    sections = [result, monthly_section]
     if failed:
         sections.append(
             ReportSection(
