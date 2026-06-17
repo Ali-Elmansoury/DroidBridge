@@ -3,7 +3,6 @@
 from unittest.mock import MagicMock
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QKeySequence
 
 from droidbridge.gui.device_context import DeviceContext
 from droidbridge.gui.pages.device import DevicePage
