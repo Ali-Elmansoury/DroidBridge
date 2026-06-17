@@ -1280,13 +1280,21 @@ def whatsapp_backup(dest, serial, app, types, conflict, no_verify):
         click.echo(_format_progress_line(progress), nl=False)
 
     with get_sleep_inhibitor("DroidBridge file transfer"):
-        transfer_module.execute_plan(client, serial, plan, progress_callback=on_progress)
+        progress = transfer_module.execute_plan(client, serial, plan, progress_callback=on_progress)
     click.echo()
 
-    if no_verify:
-        return
+    _report_failed_items(progress.failed)
 
-    if not _report_verification(transfer_module.verify_pull(plan)):
+    verification = None
+    if not no_verify:
+        verification = transfer_module.verify_pull(plan)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    report = transfer_reports.build_transfer_report("pull", plan, progress, verification=verification)
+    _write_report(report, f"whatsapp-backup_{timestamp}")
+    click.echo("Report saved to session_logs/reports/")
+
+    if verification is not None and not _report_verification(verification):
         sys.exit(1)
 
 

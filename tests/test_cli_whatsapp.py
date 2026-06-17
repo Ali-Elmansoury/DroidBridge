@@ -10,6 +10,13 @@ from droidbridge.cli import main
 from droidbridge.cli.main import cli
 from droidbridge.core.adb import Device
 from droidbridge.modules.whatsapp import MediaFile, WhatsAppInstall
+from droidbridge.modules.transfer import (
+    ACTION_COPY,
+    TransferItem,
+    TransferPlan,
+    TransferProgress,
+    VerificationResult,
+)
 from tests.test_device import DF_OUTPUT
 
 
@@ -830,3 +837,77 @@ class TestAnalyzeReportSaved:
              patch("droidbridge.cli.main.whatsapp_module.scan_media", return_value=[_WA_MEDIA_FILE]):
             result = runner.invoke(cli, ["whatsapp", "analyze", "--cutoff", "2024-01-01"])
         assert "Report saved to session_logs/reports/" in result.output
+
+
+_WA_BACKUP_INSTALL = WhatsAppInstall(
+    "com.whatsapp", "WhatsApp", "/sdcard/Android/media/com.whatsapp/WhatsApp"
+)
+_FAKE_ITEM = TransferItem(
+    source="/sdcard/WhatsApp/Media/img.jpg",
+    dest="/tmp/backup/img.jpg",
+    size=1024,
+    action=ACTION_COPY,
+)
+_FAKE_PLAN = TransferPlan(direction="pull", items=[_FAKE_ITEM])
+_FAKE_PROGRESS = TransferProgress(total_files=1, total_bytes=1024, done_files=1, done_bytes=1024)
+_FAKE_VERIFICATION = VerificationResult(
+    expected_files=1, expected_bytes=1024, actual_files=1, actual_bytes=1024
+)
+
+
+class TestBackupReportSaved:
+    def test_backup_writes_report_file(self, runner, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        with patch("droidbridge.cli.main._build_client"), \
+             patch("droidbridge.cli.main._resolve_serial", return_value="SERIAL"), \
+             patch("droidbridge.cli.main.whatsapp_module.detect_installs", return_value=[_WA_BACKUP_INSTALL]), \
+             patch("droidbridge.cli.main.whatsapp_module.plan_backup", return_value=_FAKE_PLAN), \
+             patch("droidbridge.cli.main.transfer_module.execute_plan", return_value=_FAKE_PROGRESS), \
+             patch("droidbridge.cli.main.transfer_module.verify_pull", return_value=_FAKE_VERIFICATION), \
+             patch("droidbridge.cli.main.get_sleep_inhibitor", _noop_inhibitor):
+            result = runner.invoke(cli, ["whatsapp", "backup", "--dest", str(tmp_path / "backup")])
+        assert result.exit_code == 0, result.output
+        reports = list((tmp_path / "session_logs" / "reports").glob("whatsapp-backup_*.txt"))
+        assert len(reports) == 1
+
+    def test_backup_prints_report_saved(self, runner, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        with patch("droidbridge.cli.main._build_client"), \
+             patch("droidbridge.cli.main._resolve_serial", return_value="SERIAL"), \
+             patch("droidbridge.cli.main.whatsapp_module.detect_installs", return_value=[_WA_BACKUP_INSTALL]), \
+             patch("droidbridge.cli.main.whatsapp_module.plan_backup", return_value=_FAKE_PLAN), \
+             patch("droidbridge.cli.main.transfer_module.execute_plan", return_value=_FAKE_PROGRESS), \
+             patch("droidbridge.cli.main.transfer_module.verify_pull", return_value=_FAKE_VERIFICATION), \
+             patch("droidbridge.cli.main.get_sleep_inhibitor", _noop_inhibitor):
+            result = runner.invoke(cli, ["whatsapp", "backup", "--dest", str(tmp_path / "backup")])
+        assert "Report saved to session_logs/reports/" in result.output
+
+    def test_backup_no_report_when_nothing_to_transfer(self, runner, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        empty_plan = TransferPlan(direction="pull", items=[])
+        with patch("droidbridge.cli.main._build_client"), \
+             patch("droidbridge.cli.main._resolve_serial", return_value="SERIAL"), \
+             patch("droidbridge.cli.main.whatsapp_module.detect_installs", return_value=[_WA_BACKUP_INSTALL]), \
+             patch("droidbridge.cli.main.whatsapp_module.plan_backup", return_value=empty_plan), \
+             patch("droidbridge.cli.main.get_sleep_inhibitor", _noop_inhibitor):
+            result = runner.invoke(cli, ["whatsapp", "backup", "--dest", str(tmp_path / "backup")])
+        assert result.exit_code == 0
+        assert "nothing to transfer" in result.output.lower()
+        assert not (tmp_path / "session_logs" / "reports").exists()
+
+    def test_backup_writes_report_without_verify_when_no_verify_flag(self, runner, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        with patch("droidbridge.cli.main._build_client"), \
+             patch("droidbridge.cli.main._resolve_serial", return_value="SERIAL"), \
+             patch("droidbridge.cli.main.whatsapp_module.detect_installs", return_value=[_WA_BACKUP_INSTALL]), \
+             patch("droidbridge.cli.main.whatsapp_module.plan_backup", return_value=_FAKE_PLAN), \
+             patch("droidbridge.cli.main.transfer_module.execute_plan", return_value=_FAKE_PROGRESS), \
+             patch("droidbridge.cli.main.transfer_module.verify_pull", return_value=_FAKE_VERIFICATION) as mock_verify, \
+             patch("droidbridge.cli.main.get_sleep_inhibitor", _noop_inhibitor):
+            result = runner.invoke(
+                cli, ["whatsapp", "backup", "--dest", str(tmp_path / "backup"), "--no-verify"]
+            )
+        assert result.exit_code == 0, result.output
+        reports = list((tmp_path / "session_logs" / "reports").glob("whatsapp-backup_*.txt"))
+        assert len(reports) == 1
+        mock_verify.assert_not_called()
