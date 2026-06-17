@@ -447,6 +447,37 @@ class TestPlanBackupExcludes:
         assert len(result.items) == 1
         assert result.items[0].source == "/sdcard/DCIM/thumbnails/t.jpg"
 
+    def test_plan_backup_exclude_directory_does_not_match_longer_sibling(self):
+        """Exclude '/sdcard/DCIM/thumb' (bare dir) must NOT exclude '/sdcard/DCIM/thumbnails/...'."""
+        from droidbridge.modules.transfer import TransferPlan, TransferItem, ACTION_COPY
+
+        thumbnails_item = TransferItem(
+            source="/sdcard/DCIM/thumbnails/img.jpg",
+            dest="/tmp/thumbnails/img.jpg",
+            size=1,
+            action=ACTION_COPY,
+        )
+        thumb_dir_item = TransferItem(
+            source="/sdcard/DCIM/thumb/t.jpg",
+            dest="/tmp/thumb/t.jpg",
+            size=1,
+            action=ACTION_COPY,
+        )
+        fake_plan = TransferPlan(direction="pull", items=[thumbnails_item, thumb_dir_item])
+        profile = BackupProfile(
+            name="test",
+            sources=["/sdcard/DCIM"],
+            dest="/tmp/backup",
+            excludes=["/sdcard/DCIM/thumb"],  # bare directory name — must NOT match thumbnails/
+        )
+
+        with patch("droidbridge.modules.backup_manager.transfer_module.plan_pull", return_value=fake_plan):
+            result = plan_backup(MagicMock(), "SERIAL", profile)
+
+        # Only items under /sdcard/DCIM/thumb/ should be excluded
+        assert len(result.items) == 1
+        assert result.items[0].source == "/sdcard/DCIM/thumbnails/img.jpg"
+
     def test_plan_backup_exclude_slash_root_does_not_exclude_everything(self):
         """Exclude '/' must not silently wipe the entire backup."""
         from droidbridge.modules.transfer import TransferPlan, TransferItem, ACTION_COPY
