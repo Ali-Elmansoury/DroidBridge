@@ -141,6 +141,7 @@ class TestSearchButton:
             "min_size_str": "10MB", "max_size_str": "1GB",
             "after": date(2023, 1, 1), "before": None,
             "preset": None, "sort_by": "size", "reverse": True,
+            "name_regex": None, "mime": None,
         }]
 
     def test_preset_selection_passed_through(self, qtbot, monkeypatch):
@@ -695,3 +696,51 @@ class TestSearchViewModelNewParams:
             mime=None,
         )
         assert calls[0]["extensions"] == ["jpg"]
+
+
+class TestNameModeToggle:
+    def test_name_mode_combo_exists_with_glob_default(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert hasattr(page, "name_mode_combo")
+        assert page.name_mode_combo.currentText() == "Glob"
+
+    def test_name_mode_combo_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.name_mode_combo.toolTip() != ""
+
+    def test_name_mode_glob_placeholder_and_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert "*.jpg" in page.name_edit.placeholderText()
+        assert "glob" in page.name_edit.toolTip().lower()
+
+    def test_name_mode_switch_to_regex_changes_placeholder_and_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        page.name_mode_combo.setCurrentText("Regex")
+        assert "IMG_" in page.name_edit.placeholderText()
+        assert "regular expression" in page.name_edit.toolTip().lower()
+
+    def test_search_glob_mode_passes_name_not_name_regex(self, qtbot, monkeypatch):
+        page, vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        calls = []
+        monkeypatch.setattr(vm, "search", lambda **kw: calls.append(kw))
+        page.name_mode_combo.setCurrentText("Glob")
+        page.name_edit.setText("vacation")
+        qtbot.mouseClick(page.search_button, Qt.MouseButton.LeftButton)
+        assert calls[0]["name"] == "vacation"
+        assert calls[0]["name_regex"] is None
+
+    def test_search_regex_mode_passes_name_regex_not_name(self, qtbot, monkeypatch):
+        page, vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        calls = []
+        monkeypatch.setattr(vm, "search", lambda **kw: calls.append(kw))
+        page.name_mode_combo.setCurrentText("Regex")
+        page.name_edit.setText("IMG_.*\\.jpg")
+        qtbot.mouseClick(page.search_button, Qt.MouseButton.LeftButton)
+        assert calls[0]["name_regex"] == "IMG_.*\\.jpg"
+        assert calls[0]["name"] is None

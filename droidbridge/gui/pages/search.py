@@ -51,11 +51,19 @@ class SearchPage(QWidget):
             "Browse subfolders of the root path: pick one to search inside it, "
             "or '..' to go up a level."
         )
-        self.name_edit = QLineEdit()
-        self.name_edit.setToolTip(
-            "Filename pattern to search for. Supports glob wildcards (* matches anything). "
-            "Leave blank to match all names."
+        self.name_mode_combo = QComboBox()
+        self.name_mode_combo.addItems(["Glob", "Regex"])
+        self.name_mode_combo.setToolTip(
+            "Choose whether to treat the name field as a glob pattern or a Python regular expression."
         )
+        self.name_edit = QLineEdit()
+        self.name_edit.setPlaceholderText("e.g. *.jpg")
+        self.name_edit.setToolTip(
+            "Filename glob pattern. * matches any characters, ? matches one. "
+            "Case-insensitive. Leave blank to match all names."
+        )
+        self.mime_combo = QComboBox()
+        self.mime_combo.addItems(["—", "image", "video", "audio", "document", "archive"])
         self.extensions_edit = QLineEdit()
         self.extensions_edit.setPlaceholderText("Extensions (comma-separated)")
         self.extensions_edit.setToolTip(
@@ -106,7 +114,10 @@ class SearchPage(QWidget):
         root_row.addWidget(self.root_browse_label)
         root_row.addWidget(self.root_browse_combo)
         form.addRow("Root path:", root_row)
-        form.addRow("Name pattern:", self.name_edit)
+        name_row = QHBoxLayout()
+        name_row.addWidget(self.name_mode_combo)
+        name_row.addWidget(self.name_edit, 1)
+        form.addRow("Name:", name_row)
         form.addRow("Extensions:", self.extensions_edit)
         form.addRow("Min size:", self.min_size_edit)
         form.addRow("Max size:", self.max_size_edit)
@@ -202,6 +213,7 @@ class SearchPage(QWidget):
         self.rename_button.clicked.connect(self._on_rename)
         self.delete_button.clicked.connect(self._on_delete)
 
+        self.name_mode_combo.currentTextChanged.connect(self._on_name_mode_changed)
         self.root_browse_combo.activated.connect(self._on_root_browse_selected)
         self.root_edit.editingFinished.connect(self._on_root_edit_finished)
         self.viewmodel.context.connectionChanged.connect(self._on_connection_changed)
@@ -265,6 +277,16 @@ class SearchPage(QWidget):
         preset = self.preset_combo.currentText()
         preset = None if preset == "None" else preset
 
+        if self.name_mode_combo.currentText() == "Regex":
+            name_regex = self.name_edit.text().strip() or None
+            name = None
+        else:
+            name = self.name_edit.text().strip() or None
+            name_regex = None
+
+        mime = self.mime_combo.currentText()
+        mime = None if mime == "—" else mime
+
         extensions_text = self.extensions_edit.text().strip()
         extensions = (
             [e.strip().lower() for e in extensions_text.split(",") if e.strip()]
@@ -272,12 +294,18 @@ class SearchPage(QWidget):
             else None
         )
 
+        if extensions and mime:
+            self.viewmodel.statusChanged.emit(
+                "Error: Extensions and MIME type are mutually exclusive — clear one before searching."
+            )
+            return
+
         after = self.after_date_edit.date().toPyDate() if self.after_checkbox.isChecked() else None
         before = self.before_date_edit.date().toPyDate() if self.before_checkbox.isChecked() else None
 
         self.viewmodel.search(
             root=self.root_edit.text().strip(),
-            name=self.name_edit.text().strip() or None,
+            name=name,
             extensions=extensions,
             min_size_str=self.min_size_edit.text().strip(),
             max_size_str=self.max_size_edit.text().strip(),
@@ -286,7 +314,24 @@ class SearchPage(QWidget):
             preset=preset,
             sort_by=self.sort_combo.currentText(),
             reverse=self.reverse_checkbox.isChecked(),
+            name_regex=name_regex,
+            mime=mime,
         )
+
+    def _on_name_mode_changed(self, text):
+        if text == "Regex":
+            self.name_edit.setPlaceholderText('e.g. IMG_.*\\.jpg')
+            self.name_edit.setToolTip(
+                "Python regular expression matched case-insensitively against the full "
+                "file path. A leading .* is added automatically if the pattern does not "
+                "start with it."
+            )
+        else:
+            self.name_edit.setPlaceholderText("e.g. *.jpg")
+            self.name_edit.setToolTip(
+                "Filename glob pattern. * matches any characters, ? matches one. "
+                "Case-insensitive. Leave blank to match all names."
+            )
 
     def _on_root_subdirs_changed(self, path, subdirs):
         self._root_browse_path = path
