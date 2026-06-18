@@ -182,6 +182,28 @@ class TestHistory:
 
         assert page.history_table.rowCount() == 0
 
+    def test_history_table_has_deleted_column(self, qtbot):
+        page, _vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        headers = [
+            page.history_table.horizontalHeaderItem(i).text()
+            for i in range(page.history_table.columnCount())
+        ]
+        assert "Deleted" in headers
+
+    def test_deleted_files_count_populated_from_entry(self, qtbot):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        vm.historyEntryAdded.emit({
+            "direction": "mirror-pull", "total_files": 5, "total_bytes": 500,
+            "verification_ok": True, "failed": 0, "deleted_files": 3,
+        })
+
+        deleted_col = page.history_table.columnCount() - 1
+        assert page.history_table.item(0, deleted_col).text() == "3"
+
 
 class TestCancelButton:
     def test_visible_only_while_busy(self, qtbot):
@@ -664,8 +686,9 @@ class TestHistoryFailedColumnInPage:
     def test_five_columns_in_history_table(self, qtbot):
         page, _ = self._make_page(qtbot)
         from droidbridge.gui.pages.transfer import _HISTORY_COLUMNS
-        assert page.history_table.columnCount() == 5
+        assert page.history_table.columnCount() == 6
         assert "Failed" in _HISTORY_COLUMNS
+        assert "Deleted" in _HISTORY_COLUMNS
 
     def test_failed_column_shows_count(self, qtbot):
         page, vm = self._make_page(qtbot)

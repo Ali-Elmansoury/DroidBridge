@@ -32,7 +32,7 @@ from droidbridge.gui.widgets.remote_browse_dialog import RemoteBrowseDialog
 from droidbridge.modules import transfer as transfer_module
 from droidbridge.utils.format import format_bytes
 
-_HISTORY_COLUMNS = ("Direction", "Files", "Bytes", "Verified", "Failed")
+_HISTORY_COLUMNS = ("Direction", "Files", "Bytes", "Verified", "Failed", "Deleted")
 
 
 class TransferPage(QWidget):
@@ -370,6 +370,7 @@ class TransferPage(QWidget):
         verified = "-" if entry["verification_ok"] is None else ("Yes" if entry["verification_ok"] else "No")
         self.history_table.setItem(row, 3, QTableWidgetItem(verified))
         self.history_table.setItem(row, 4, QTableWidgetItem(str(entry.get("failed", 0))))
+        self.history_table.setItem(row, 5, QTableWidgetItem(str(entry.get("deleted_files", 0))))
 
     def _on_clear_history(self):
         self.history_table.setRowCount(0)
