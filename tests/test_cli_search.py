@@ -336,3 +336,16 @@ class TestSearchExportCLI:
             result = runner.invoke(cli, ["files", "search", "--format", "csv"])
         assert result.exit_code == 1
         assert "--output" in result.output
+
+    def test_bad_output_path_oserror_handling(self, runner):
+        """Test that OSError when writing to output path is handled gracefully."""
+        client = make_fake_client(READY_DEVICE)
+        with patch("droidbridge.cli.main._build_client", return_value=client):
+            with patch("droidbridge.cli.main._write_search_export") as mock_write:
+                mock_write.side_effect = OSError("Permission denied")
+                result = runner.invoke(
+                    cli, ["files", "search", "--output", "/bad/path/out.csv", "--format", "csv"]
+                )
+        assert result.exit_code == 1, result.output
+        assert "error" in result.output.lower()
+        assert "/bad/path/out.csv" in result.output

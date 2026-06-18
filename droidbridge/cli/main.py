@@ -447,8 +447,12 @@ def files_search(path, serial, name, extensions, min_size, max_size, after, befo
         click.echo(_format_result_line(result))
 
     if output_path:
-        _write_search_export(results, output_format, output_path)
-        click.echo(f"Results exported to {output_path}.")
+        try:
+            _write_search_export(results, output_format, output_path)
+            click.echo(f"Results exported to {output_path}.")
+        except OSError as exc:
+            click.echo(f"Error writing {output_path}: {exc}", err=True)
+            sys.exit(1)
 
     if pull_to_dir:
         os.makedirs(pull_to_dir, exist_ok=True)
