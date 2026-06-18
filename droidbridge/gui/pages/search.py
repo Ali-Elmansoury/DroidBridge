@@ -64,10 +64,17 @@ class SearchPage(QWidget):
         )
         self.mime_combo = QComboBox()
         self.mime_combo.addItems(["—", "image", "video", "audio", "document", "archive"])
+        self.mime_combo.setToolTip(
+            "Filter by file type group. 'image' matches jpg/png/gif/etc., "
+            "'video' matches mp4/mkv/etc., 'audio' matches mp3/aac/etc., "
+            "'document' matches pdf/docx/etc., 'archive' matches zip/tar/etc. "
+            "Mutually exclusive with Extensions — clear Extensions before using this."
+        )
         self.extensions_edit = QLineEdit()
         self.extensions_edit.setPlaceholderText("Extensions (comma-separated)")
         self.extensions_edit.setToolTip(
-            "Filter by file extension(s), e.g. jpg, png. Leave blank for all types."
+            "Filter by file extension(s), e.g. jpg, png. Leave blank for all types. "
+            "Mutually exclusive with MIME type."
         )
         self.min_size_edit = QLineEdit()
         self.min_size_edit.setPlaceholderText("e.g. 10MB")
@@ -119,6 +126,7 @@ class SearchPage(QWidget):
         name_row.addWidget(self.name_edit, 1)
         form.addRow("Name:", name_row)
         form.addRow("Extensions:", self.extensions_edit)
+        form.addRow("MIME type:", self.mime_combo)
         form.addRow("Min size:", self.min_size_edit)
         form.addRow("Max size:", self.max_size_edit)
 

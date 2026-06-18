@@ -744,3 +744,58 @@ class TestNameModeToggle:
         qtbot.mouseClick(page.search_button, Qt.MouseButton.LeftButton)
         assert calls[0]["name_regex"] == "IMG_.*\\.jpg"
         assert calls[0]["name"] is None
+
+
+class TestMimeDropdown:
+    def test_mime_combo_exists_with_dash_default(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert hasattr(page, "mime_combo")
+        assert page.mime_combo.currentText() == "—"
+
+    def test_mime_combo_has_six_items(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        items = [page.mime_combo.itemText(i) for i in range(page.mime_combo.count())]
+        assert items == ["—", "image", "video", "audio", "document", "archive"]
+
+    def test_mime_combo_has_tooltip(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert page.mime_combo.toolTip() != ""
+
+    def test_extensions_edit_tooltip_mentions_mime(self, qtbot):
+        page, _vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        assert "mime" in page.extensions_edit.toolTip().lower()
+
+    def test_search_with_mime_passes_mime_to_viewmodel(self, qtbot, monkeypatch):
+        page, vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        calls = []
+        monkeypatch.setattr(vm, "search", lambda **kw: calls.append(kw))
+        page.mime_combo.setCurrentText("image")
+        qtbot.mouseClick(page.search_button, Qt.MouseButton.LeftButton)
+        assert calls[0]["mime"] == "image"
+
+    def test_mime_dash_passes_none_to_viewmodel(self, qtbot, monkeypatch):
+        page, vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        calls = []
+        monkeypatch.setattr(vm, "search", lambda **kw: calls.append(kw))
+        page.mime_combo.setCurrentText("—")
+        qtbot.mouseClick(page.search_button, Qt.MouseButton.LeftButton)
+        assert calls[0]["mime"] is None
+
+    def test_extensions_and_mime_both_set_emits_status_error_and_no_search(self, qtbot, monkeypatch):
+        page, vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        calls = []
+        statuses = []
+        monkeypatch.setattr(vm, "search", lambda **kw: calls.append(kw))
+        vm.statusChanged.connect(statuses.append)
+        page.extensions_edit.setText("jpg")
+        page.mime_combo.setCurrentText("image")
+        qtbot.mouseClick(page.search_button, Qt.MouseButton.LeftButton)
+        assert calls == []
+        assert any("mutually exclusive" in s for s in statuses)
