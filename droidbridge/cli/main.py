@@ -1395,11 +1395,8 @@ def whatsapp_backup(dest, serial, app, types, conflict, no_verify):
 
     _report_failed_items(progress.failed)
 
-    if progress.failed:
-        sys.exit(1)
-
     verification = None
-    if not no_verify:
+    if not no_verify and not progress.failed:
         verification = transfer_module.verify_pull(plan)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -1413,6 +1410,9 @@ def whatsapp_backup(dest, serial, app, types, conflict, no_verify):
         )
 
     click.echo("Report saved to session_logs/reports/")
+
+    if progress.failed:
+        sys.exit(1)
 
     if verification is not None and not _report_verification(verification):
         sys.exit(1)
