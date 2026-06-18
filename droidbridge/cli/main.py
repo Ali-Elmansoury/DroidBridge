@@ -1395,6 +1395,9 @@ def whatsapp_backup(dest, serial, app, types, conflict, no_verify):
 
     _report_failed_items(progress.failed)
 
+    if progress.failed:
+        sys.exit(1)
+
     verification = None
     if not no_verify:
         verification = transfer_module.verify_pull(plan)

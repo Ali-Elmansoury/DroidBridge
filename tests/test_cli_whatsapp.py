@@ -12,6 +12,7 @@ from droidbridge.core.adb import Device
 from droidbridge.modules.whatsapp import MediaFile, WhatsAppInstall
 from droidbridge.modules.transfer import (
     ACTION_COPY,
+    FailedTransferItem,
     TransferItem,
     TransferPlan,
     TransferProgress,
@@ -364,6 +365,42 @@ class TestWhatsAppBackup:
 
         assert result.exit_code == 0
         assert "nothing to transfer" in result.output.lower()
+
+    def test_exits_nonzero_when_files_fail(self, monkeypatch, tmp_path):
+        shell_outputs = [DETECT_WA_ONLY, SCAN_OUTPUT]
+        client = make_fake_client(READY_DEVICE, shell_side_effect=shell_outputs)
+
+        failed_item = FailedTransferItem(
+            item=TransferItem(
+                source=f"{WA_MEDIA}/WhatsApp Images/IMG-20230101-WA0001.jpg",
+                dest=str(tmp_path / "WhatsApp/Media/WhatsApp Images/IMG-20230101-WA0001.jpg"),
+                size=1000,
+                action=ACTION_COPY,
+            ),
+            error="Connection reset",
+        )
+
+        def fake_execute_plan(client, serial, plan, progress_callback=None, should_cancel=None,
+                               retry_count=3, retry_delay=1.0, sleep_fn=None):
+            progress = TransferProgress(
+                total_files=1, total_bytes=1000, done_files=0, done_bytes=0,
+                failed=[failed_item],
+            )
+            return progress
+
+        # Even with successful verification, should exit 1 if there are failed items
+        verification = VerificationResult(
+            expected_files=1, expected_bytes=1000, actual_files=1, actual_bytes=1000
+        )
+
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+        monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)
+        monkeypatch.setattr("droidbridge.modules.transfer.execute_plan", fake_execute_plan)
+        monkeypatch.setattr("droidbridge.modules.transfer.verify_pull", lambda plan: verification)
+
+        result = CliRunner().invoke(main.cli, ["whatsapp", "backup", "--dest", str(tmp_path)])
+
+        assert result.exit_code == 1
 
 
 class TestWhatsAppRestore:
