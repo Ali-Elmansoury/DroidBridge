@@ -286,7 +286,7 @@ class SearchPage(QWidget):
         preset = None if preset == "None" else preset
 
         if self.name_mode_combo.currentText() == "Regex":
-            name_regex = self.name_edit.text().strip() or None
+            name_regex = self.name_edit.text() or None
             name = None
         else:
             name = self.name_edit.text().strip() or None
@@ -305,6 +305,13 @@ class SearchPage(QWidget):
         if extensions and mime:
             self.viewmodel.statusChanged.emit(
                 "Error: Extensions and MIME type are mutually exclusive — clear one before searching."
+            )
+            return
+
+        if mime and preset in search_module.PRESET_EXTENSIONS:
+            self.viewmodel.statusChanged.emit(
+                f"Error: MIME type and preset '{preset}' are mutually exclusive "
+                f"— both filter by file extension. Clear one before searching."
             )
             return
 

@@ -799,3 +799,40 @@ class TestMimeDropdown:
         qtbot.mouseClick(page.search_button, Qt.MouseButton.LeftButton)
         assert calls == []
         assert any("mutually exclusive" in s for s in statuses)
+
+
+class TestGap1RegexNoStrip:
+    def test_regex_mode_preserves_leading_trailing_whitespace(self, qtbot, monkeypatch):
+        page, vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        calls = []
+        monkeypatch.setattr(vm, "search", lambda **kw: calls.append(kw))
+        page.name_mode_combo.setCurrentText("Regex")
+        page.name_edit.setText(" IMG_.* ")
+        qtbot.mouseClick(page.search_button, Qt.MouseButton.LeftButton)
+        assert calls[0]["name_regex"] == " IMG_.* "
+
+
+class TestGap2MimePresetConflict:
+    def test_extension_preset_and_mime_emits_error_and_no_search(self, qtbot, monkeypatch):
+        page, vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        calls = []
+        statuses = []
+        monkeypatch.setattr(vm, "search", lambda **kw: calls.append(kw))
+        vm.statusChanged.connect(statuses.append)
+        page.preset_combo.setCurrentText("photos")
+        page.mime_combo.setCurrentText("video")
+        qtbot.mouseClick(page.search_button, Qt.MouseButton.LeftButton)
+        assert calls == []
+        assert any("mutually exclusive" in s.lower() for s in statuses)
+
+    def test_non_extension_preset_and_mime_allows_search(self, qtbot, monkeypatch):
+        page, vm, _ctx = _make_page()
+        qtbot.addWidget(page)
+        calls = []
+        monkeypatch.setattr(vm, "search", lambda **kw: calls.append(kw))
+        page.preset_combo.setCurrentText("whatsapp")
+        page.mime_combo.setCurrentText("image")
+        qtbot.mouseClick(page.search_button, Qt.MouseButton.LeftButton)
+        assert len(calls) == 1
