@@ -48,6 +48,7 @@ class TestSearch:
         assert calls == [("/sdcard", {
             "name": "jpg", "extensions": None, "min_size": None, "max_size": None,
             "after": None, "before": None, "preset": None, "sort_by": "path", "reverse": False,
+            "name_regex": None,
         })]
 
     def test_parses_min_max_size(self, qtbot, monkeypatch):

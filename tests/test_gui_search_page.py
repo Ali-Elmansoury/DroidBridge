@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QFileDialog, QHeaderView
 
-from droidbridge.gui import files_ops
+from droidbridge.gui import files_ops, search_ops
 from droidbridge.gui.device_context import DeviceContext
 from droidbridge.gui.pages.search import SearchPage
 from droidbridge.gui.viewmodels.search import SearchViewModel
@@ -645,3 +645,53 @@ class TestExportButton:
         assert header == ["path", "size", "date", "extension"]
         assert data[0] == "/sdcard/photo.jpg"
         assert data[3] == "jpg"
+
+
+class TestSearchViewModelNewParams:
+    def test_name_regex_passed_to_run_search(self, monkeypatch):
+        context = DeviceContext()
+        context.set_connected(MagicMock(), "SERIAL123", "Pixel 7")
+        vm = SearchViewModel(context, worker_factory=FakeWorker)
+
+        calls = []
+        monkeypatch.setattr(search_ops, "run_search", lambda *a, **kw: calls.append(kw) or [])
+
+        vm.search(
+            root="/sdcard", name=None, extensions=None,
+            min_size_str="", max_size_str="", after=None, before=None,
+            preset=None, sort_by="path", reverse=False,
+            name_regex="IMG_.*\\.jpg",
+        )
+        assert calls[0].get("name_regex") == "IMG_.*\\.jpg"
+
+    def test_mime_resolved_to_extensions_before_run_search(self, monkeypatch):
+        context = DeviceContext()
+        context.set_connected(MagicMock(), "SERIAL123", "Pixel 7")
+        vm = SearchViewModel(context, worker_factory=FakeWorker)
+
+        calls = []
+        monkeypatch.setattr(search_ops, "run_search", lambda *a, **kw: calls.append(kw) or [])
+
+        vm.search(
+            root="/sdcard", name=None, extensions=None,
+            min_size_str="", max_size_str="", after=None, before=None,
+            preset=None, sort_by="path", reverse=False,
+            mime="image",
+        )
+        assert calls[0]["extensions"] == search_module.mime_to_extensions("image")
+
+    def test_mime_none_leaves_extensions_unchanged(self, monkeypatch):
+        context = DeviceContext()
+        context.set_connected(MagicMock(), "SERIAL123", "Pixel 7")
+        vm = SearchViewModel(context, worker_factory=FakeWorker)
+
+        calls = []
+        monkeypatch.setattr(search_ops, "run_search", lambda *a, **kw: calls.append(kw) or [])
+
+        vm.search(
+            root="/sdcard", name=None, extensions=["jpg"],
+            min_size_str="", max_size_str="", after=None, before=None,
+            preset=None, sort_by="path", reverse=False,
+            mime=None,
+        )
+        assert calls[0]["extensions"] == ["jpg"]

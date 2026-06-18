@@ -39,7 +39,7 @@ class SearchViewModel(QObject):
         self._workers = []
         self._results = []
 
-    def search(self, root, name, extensions, min_size_str, max_size_str, after, before, preset, sort_by, reverse):
+    def search(self, root, name, extensions, min_size_str, max_size_str, after, before, preset, sort_by, reverse, name_regex=None, mime=None):
         """Parse the size fields, then run search_ops.run_search via a Worker.
 
         A ValueError from parse_size (invalid size string) is reported via
@@ -52,12 +52,16 @@ class SearchViewModel(QObject):
             self._on_error(exc)
             return
 
+        if mime:
+            extensions = search_module.mime_to_extensions(mime)
+
         client, serial = self.context.client, self.context.serial
         self.logMessage.emit("Searching...", "INFO")
         self._run(
             lambda: search_ops.run_search(
                 client, serial, root, name=name, extensions=extensions, min_size=min_size,
-                max_size=max_size, after=after, before=before, preset=preset, sort_by=sort_by, reverse=reverse,
+                max_size=max_size, after=after, before=before, preset=preset, sort_by=sort_by,
+                reverse=reverse, name_regex=name_regex,
             ),
             self._on_searched,
         )
