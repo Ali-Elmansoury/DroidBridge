@@ -83,7 +83,9 @@ class TransferPage(QWidget):
         self.local_path_edit = QLineEdit()
         self.local_path_edit.setToolTip("Local file or folder on your computer to push to the device.")
         self.local_file_browse_button = QPushButton("Browse File...")
-        self.local_file_browse_button.setToolTip("Browse your computer for a single file to push.")
+        self.local_file_browse_button.setToolTip(
+            "Select one or more files to push. Hold Ctrl or Shift to select multiple files."
+        )
         self.local_folder_browse_button = QPushButton("Browse Folder...")
         self.local_folder_browse_button.setToolTip("Browse your computer for a folder to push.")
         self.remote_dir_edit = QLineEdit()
@@ -212,6 +214,8 @@ class TransferPage(QWidget):
         self.cancel_button.clicked.connect(self.viewmodel.cancel_transfer)
         self.clear_history_button.clicked.connect(self._on_clear_history)
 
+        self._push_local_paths: list = []
+
         self.mirror_checkbox.toggled.connect(self._on_mirror_toggled)
         self.viewmodel.planChanged.connect(self._on_plan_changed)
         self.viewmodel.progressChanged.connect(self._on_progress_changed)
@@ -238,13 +242,19 @@ class TransferPage(QWidget):
             self.local_dir_edit.setText(path)
 
     def _on_browse_local_file(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Select file to push")
-        if path:
-            self.local_path_edit.setText(path)
+        paths, _ = QFileDialog.getOpenFileNames(self, "Select file(s) to push")
+        if not paths:
+            return
+        self._push_local_paths = paths
+        if len(paths) == 1:
+            self.local_path_edit.setText(paths[0])
+        else:
+            self.local_path_edit.setText(f"{len(paths)} files selected")
 
     def _on_browse_local_folder(self):
         path = QFileDialog.getExistingDirectory(self, "Select folder to push")
         if path:
+            self._push_local_paths = []
             self.local_path_edit.setText(path)
 
     def _on_browse_remote_path(self):
@@ -314,8 +324,12 @@ class TransferPage(QWidget):
                 conflict=conflict, verify=verify, retry_count=retry,
             )
         else:
+            if self._push_local_paths:
+                local_paths = self._push_local_paths
+            else:
+                local_paths = [self.local_path_edit.text().strip()]
             self.viewmodel.start_push(
-                self.local_path_edit.text().strip(), self.remote_dir_edit.text().strip(),
+                local_paths, self.remote_dir_edit.text().strip(),
                 conflict=conflict, verify=verify, retry_count=retry,
             )
 

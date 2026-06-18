@@ -87,7 +87,7 @@ class TestStartTransfer:
 
         qtbot.mouseClick(page.start_button, Qt.MouseButton.LeftButton)
 
-        assert calls == [(("/tmp/photo.jpg", "/sdcard/Pictures"), {
+        assert calls == [((["/tmp/photo.jpg"], "/sdcard/Pictures"), {
             "conflict": transfer_module.CONFLICT_SKIP, "verify": True, "retry_count": 3,
         })]
 
@@ -245,11 +245,35 @@ class TestBrowseButtons:
         page, _vm, _context = _make_page()
         qtbot.addWidget(page)
 
-        monkeypatch.setattr(QFileDialog, "getOpenFileName", staticmethod(lambda *a, **k: ("/tmp/photo.jpg", "")))
+        monkeypatch.setattr(QFileDialog, "getOpenFileNames", staticmethod(lambda *a, **k: (["/tmp/photo.jpg"], "")))
 
         qtbot.mouseClick(page.local_file_browse_button, Qt.MouseButton.LeftButton)
 
         assert page.local_path_edit.text() == "/tmp/photo.jpg"
+
+    def test_multi_file_browse_calls_start_push_with_list(self, qtbot, monkeypatch):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        monkeypatch.setattr(
+            QFileDialog, "getOpenFileNames",
+            staticmethod(lambda *a, **k: (["/tmp/a.jpg", "/tmp/b.jpg"], "")),
+        )
+
+        calls = []
+        monkeypatch.setattr(vm, "start_push", lambda *a, **k: calls.append((a, k)))
+
+        page.push_radio.setChecked(True)
+        page.remote_dir_edit.setText("/sdcard/Pictures")
+        qtbot.mouseClick(page.local_file_browse_button, Qt.MouseButton.LeftButton)
+
+        assert page.local_path_edit.text() == "2 files selected"
+
+        qtbot.mouseClick(page.start_button, Qt.MouseButton.LeftButton)
+
+        assert calls == [((["/tmp/a.jpg", "/tmp/b.jpg"], "/sdcard/Pictures"), {
+            "conflict": transfer_module.CONFLICT_SKIP, "verify": True, "retry_count": 3,
+        })]
 
     def test_browse_local_folder_fills_push_field(self, qtbot, monkeypatch):
         page, _vm, _context = _make_page()

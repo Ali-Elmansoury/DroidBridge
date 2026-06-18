@@ -111,15 +111,15 @@ class TransferViewModel(QObject):
         self.logMessage.emit(f"Pulling {remote_path}...", "INFO")
         self._run(do_transfer, self._on_transfer_finished, report_progress=True, on_progress=self._on_progress)
 
-    def start_push(self, local_path, remote_dir, conflict, verify, retry_count=3):
-        """Plan, execute, and (if `verify`) verify a push of a single local path."""
+    def start_push(self, local_paths, remote_dir, conflict, verify, retry_count=3):
+        """Start a push of one or more local files to `remote_dir`."""
         if self._reject_if_busy():
             return
         self._cancel_requested = False
         client, serial = self.context.client, self.context.serial
 
         def do_transfer(progress_callback=None):
-            plans = transfer_ops.plan_push_many(client, serial, [local_path], remote_dir, conflict=conflict)
+            plans = transfer_ops.plan_push_many(client, serial, local_paths, remote_dir, conflict=conflict)
             self.planChanged.emit(_format_plan(plans))
             result = transfer_ops.execute_plans(
                 client, serial, plans, progress_callback=progress_callback,
@@ -132,7 +132,8 @@ class TransferViewModel(QObject):
             )
             return "push", result, verification
 
-        self.logMessage.emit(f"Pushing {local_path}...", "INFO")
+        label = local_paths[0] if len(local_paths) == 1 else f"{len(local_paths)} files"
+        self.logMessage.emit(f"Pushing {label}...", "INFO")
         self._run(do_transfer, self._on_transfer_finished, report_progress=True, on_progress=self._on_progress)
 
     def pull_selected(self, remote_paths, local_dir):
