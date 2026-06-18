@@ -454,6 +454,32 @@ class TestAppsClearCache:
         assert result.exit_code != 0
         assert "mutually exclusive" in result.output.lower() or "error" in result.output.lower()
 
+    def test_target_accepts_human_readable_size(self, monkeypatch):
+        calls = []
+
+        def fake_shell(serial, command, timeout=None):
+            if command[:2] == ["pm", "trim-caches"]:
+                calls.append(command)
+                return ""
+            return _apps_fake_shell(serial, command, timeout)
+
+        client = make_fake_client(READY_DEVICE, fake_shell)
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(main.cli, ["apps", "clear-cache", "--target", "500MB"])
+
+        assert result.exit_code == 0
+        assert calls == [["pm", "trim-caches", "524288000"]]
+
+    def test_target_invalid_size_exits_nonzero(self, monkeypatch):
+        client = make_fake_client(READY_DEVICE, _apps_fake_shell)
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+
+        result = CliRunner().invoke(main.cli, ["apps", "clear-cache", "--target", "notanumber"])
+
+        assert result.exit_code != 0
+        assert "invalid" in result.output.lower() or "error" in result.output.lower()
+
     def test_no_device_shows_guidance_and_exits_nonzero(self, monkeypatch):
         """No-device case: AdbError propagates as guidance and non-zero exit."""
         client = make_fake_client([], "")

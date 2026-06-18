@@ -2024,7 +2024,7 @@ def apps_trim_cache(serial, target):
 @apps_cmd.command("clear-cache")
 @_SERIAL_OPTION
 @click.option("--all", "clear_all", is_flag=True, default=False, help="Free as much cache space as possible.")
-@click.option("--target", type=int, default=None, help="Trim until this many bytes are free.")
+@click.option("--target", type=str, default=None, help="Free at least this much space (e.g. '500MB', '1GB', or raw bytes).")
 def apps_clear_cache(serial, clear_all, target):
     """Clear app caches system-wide via Android's cache-trim mechanism.
 
@@ -2049,7 +2049,13 @@ def apps_clear_cache(serial, clear_all, target):
     if clear_all:
         desired = _TRIM_ALL_BYTES
     else:
-        desired = target
+        try:
+            desired = parse_size(target)
+        except ValueError:
+            raise click.BadParameter(
+                f"Invalid size {target!r}. Use a value like '500MB', '1GB', or a raw byte count.",
+                param_hint="--target",
+            )
 
     apps_module.trim_caches(client, serial, desired)
     click.echo("Cache trim requested.")
