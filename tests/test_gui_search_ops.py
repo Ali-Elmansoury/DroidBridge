@@ -3,6 +3,8 @@
 from datetime import datetime
 from unittest.mock import MagicMock
 
+import pytest
+
 from droidbridge.gui import search_ops
 from droidbridge.modules import search as search_module
 
@@ -134,6 +136,20 @@ class TestBuildSearchKwargsNameRegex:
         _, kwargs = search_ops.build_search_kwargs(
             root="", name="", extensions=None, min_size=None, max_size=None,
             after=None, before=None, preset=None, name_regex=None,
+        )
+        assert "name_regex" not in kwargs
+
+    def test_name_and_name_regex_together_raises_value_error(self):
+        with pytest.raises(ValueError, match="mutually exclusive"):
+            search_ops.build_search_kwargs(
+                root="", name="vacation", extensions=None, min_size=None, max_size=None,
+                after=None, before=None, preset=None, name_regex="IMG_.*\\.jpg",
+            )
+
+    def test_name_regex_empty_string_not_added_to_kwargs(self):
+        _, kwargs = search_ops.build_search_kwargs(
+            root="", name="", extensions=None, min_size=None, max_size=None,
+            after=None, before=None, preset=None, name_regex="",
         )
         assert "name_regex" not in kwargs
 

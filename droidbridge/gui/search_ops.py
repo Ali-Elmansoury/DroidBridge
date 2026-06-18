@@ -13,6 +13,9 @@ def build_search_kwargs(root, name, extensions, min_size, max_size, after, befor
     Returns (root_path, kwargs) ready for
     search_files(client, serial, root_path, **kwargs).
     """
+    if name and name_regex:
+        raise ValueError("name and name_regex are mutually exclusive")
+
     kwargs = {}
     root_path = root or None
 
