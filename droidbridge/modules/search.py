@@ -1,5 +1,6 @@
 """Module 7 - Search & Discovery: recursive file search with combined filters."""
 
+import re
 import shlex
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -65,11 +66,11 @@ class SearchResult:
 def _build_find_command(root_path, name_pattern=None, name_regex=None):
     # -L follows symlinks (e.g. /sdcard -> /storage/self/primary), without
     # which a recursive search from /sdcard returns nothing.
+    # name_regex is intentionally NOT passed to find: BusyBox find (Android)
+    # doesn't support -regextype/-iregex. Regex filtering is done in Python.
     cmd = f"find -L {shlex.quote(root_path)} -type f"
     if name_pattern:
         cmd += f" -iname {shlex.quote(name_pattern)}"
-    elif name_regex:
-        cmd += f" -regextype posix-extended -iregex {shlex.quote(name_regex)}"
     cmd += r" -printf '%p\t%s\t%T@\n'"
     return cmd
 
@@ -120,14 +121,17 @@ def search_files(
     """Recursively search `root_path` for files matching the given filters."""
     if name_pattern and name_regex:
         raise ValueError("Cannot use both name_pattern and name_regex")
-    # find -iregex matches the full path. Prepend .* so callers can write
-    # filename-only patterns without worrying about path prefix.
-    if name_regex is not None and not name_regex.startswith(".*"):
-        name_regex = ".*" + name_regex
-    cmd = _build_find_command(root_path, name_pattern=name_pattern, name_regex=name_regex)
+    cmd = _build_find_command(root_path, name_pattern=name_pattern)
     # No timeout: a recursive search of /sdcard can take well over 30s.
     output = client.shell(serial, cmd, timeout=None)
     results = _parse_find_output(output)
+    if name_regex is not None:
+        # Prepend .* so callers can write filename-only patterns without
+        # worrying about the path prefix (mirrors old -iregex full-path match).
+        if not name_regex.startswith(".*"):
+            name_regex = ".*" + name_regex
+        pattern = re.compile(name_regex, re.IGNORECASE)
+        results = [r for r in results if pattern.search(r.path)]
     return filter_results(
         results, extensions=extensions, min_size=min_size, max_size=max_size, after=after, before=before
     )

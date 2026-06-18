@@ -210,19 +210,44 @@ class TestPresetFilters:
 
 
 class TestRegexSearch:
-    def test_build_find_command_with_regex(self):
+    def test_build_find_command_with_regex_has_no_regextype(self):
+        # BusyBox find (Android) doesn't support -regextype; regex filtering
+        # is done in Python, so the find command must not include these flags.
         cmd = _build_find_command("/sdcard", name_regex=".*\\.jpg")
-        assert "-regextype posix-extended" in cmd
-        assert "-iregex" in cmd
-        assert shlex.quote(".*\\.jpg") in cmd
+        assert "-regextype" not in cmd
+        assert "-iregex" not in cmd
         assert "-iname" not in cmd
 
-    def test_search_files_passes_regex_to_find(self):
-        client = make_fake_client("/sdcard/photo.jpg\t1000\t1700000000.0\n")
-        results = search_files(client, "serial", name_regex=".*\\.jpg")
-        cmd = client.shell.call_args[0][1]
-        assert "-iregex" in cmd
+    def test_search_files_regex_filtered_in_python(self):
+        # find returns two files; only the .jpg should survive the Python regex filter
+        client = make_fake_client(
+            "/sdcard/photo.jpg\t1000\t1700000000.0\n"
+            "/sdcard/notes.txt\t500\t1700000000.0\n"
+        )
+        results = search_files(client, "serial", name_regex="IMG_.*\\.jpg")
+        # no files match IMG_*.jpg pattern
+        assert len(results) == 0
+
+    def test_search_files_regex_matches_filename(self):
+        client = make_fake_client(
+            "/sdcard/IMG_001.jpg\t1000\t1700000000.0\n"
+            "/sdcard/notes.txt\t500\t1700000000.0\n"
+        )
+        results = search_files(client, "serial", name_regex="IMG_.*\\.jpg")
         assert len(results) == 1
+        assert results[0].path == "/sdcard/IMG_001.jpg"
+
+    def test_search_files_regex_is_case_insensitive(self):
+        client = make_fake_client("/sdcard/img_001.JPG\t1000\t1700000000.0\n")
+        results = search_files(client, "serial", name_regex="IMG_.*\\.jpg")
+        assert len(results) == 1
+
+    def test_search_files_regex_does_not_appear_in_find_cmd(self):
+        client = make_fake_client("")
+        search_files(client, "serial", name_regex=".*\\.jpg")
+        cmd = client.shell.call_args[0][1]
+        assert "-regextype" not in cmd
+        assert "-iregex" not in cmd
 
     def test_search_files_raises_if_both_pattern_and_regex(self):
         client = make_fake_client("")
