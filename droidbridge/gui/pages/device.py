@@ -57,6 +57,8 @@ class DevicePage(QWidget):
         self.storage_label = QLabel("-")
         self.storage_bar = QProgressBar()
         self.storage_bar.setRange(0, 100)
+        self.usb_speed_label = QLabel("-")
+        self.usb_mode_label = QLabel("-")
 
         form = QFormLayout()
         form.addRow("Serial:", self.serial_label)
@@ -67,6 +69,8 @@ class DevicePage(QWidget):
         form.addRow("Battery:", self.battery_label)
         form.addRow("Storage:", self.storage_label)
         form.addRow("", self.storage_bar)
+        form.addRow("USB Speed:", self.usb_speed_label)
+        form.addRow("USB Mode:", self.usb_mode_label)
 
         buttons = QHBoxLayout()
         buttons.addWidget(self.refresh_button)
@@ -96,6 +100,8 @@ class DevicePage(QWidget):
             f"({info['storage_free']} free)"
         )
         self.storage_bar.setValue(int(info["storage_used_percent"]))
+        self.usb_speed_label.setText(info.get("usb_speed", "Unknown"))
+        self.usb_mode_label.setText(info.get("usb_mode", "Unknown"))
 
     def _on_busy_changed(self, busy):
         self._busy = busy

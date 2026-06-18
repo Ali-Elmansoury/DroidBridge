@@ -159,3 +159,41 @@ class TestDevicePageTooltipsAndShortcuts:
         qtbot.keyClick(page, Qt.Key.Key_F5)
 
         assert calls == []
+
+
+class TestUsbInfoLabels:
+    def test_usb_info_displayed_when_present(self, qtbot):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        vm.infoChanged.emit(
+            {
+                "serial": "S", "model": "M", "manufacturer": "X",
+                "android": "14", "build": "B", "battery": "90%",
+                "storage_total": "1 KB", "storage_used": "0 KB",
+                "storage_free": "1 KB", "storage_used_percent": 0,
+                "usb_speed": "USB 2.0 (High Speed) (~30-40 MB/s)",
+                "usb_mode": "mtp",
+            }
+        )
+
+        assert page.usb_speed_label.text() == "USB 2.0 (High Speed) (~30-40 MB/s)"
+        assert page.usb_mode_label.text() == "mtp"
+
+    def test_usb_info_shows_unknown_when_none(self, qtbot):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        vm.infoChanged.emit(
+            {
+                "serial": "S", "model": "M", "manufacturer": "X",
+                "android": "14", "build": "B", "battery": "90%",
+                "storage_total": "1 KB", "storage_used": "0 KB",
+                "storage_free": "1 KB", "storage_used_percent": 0,
+                "usb_speed": "Unknown",
+                "usb_mode": "Unknown",
+            }
+        )
+
+        assert page.usb_speed_label.text() == "Unknown"
+        assert page.usb_mode_label.text() == "Unknown"

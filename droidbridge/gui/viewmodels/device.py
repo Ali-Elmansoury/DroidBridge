@@ -104,6 +104,15 @@ class DeviceViewModel(QObject):
             "storage_used": format_bytes(info.storage.used_kb * 1024),
             "storage_free": format_bytes(info.storage.free_kb * 1024),
             "storage_used_percent": info.storage.used_percent,
+            "usb_speed": (
+                f"{info.usb_speed.usb_type} ({info.usb_speed.estimated_speed})"
+                if info.usb_speed and info.usb_speed.usb_type != "Unknown"
+                else "Unknown"
+            ),
+            "usb_mode": (
+                ", ".join(info.usb_mode.functions) if info.usb_mode and info.usb_mode.functions
+                else "Unknown"
+            ),
         }
         self.infoChanged.emit(data)
         self.logMessage.emit("Device info refreshed.", "INFO")
