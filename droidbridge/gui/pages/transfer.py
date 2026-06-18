@@ -216,6 +216,8 @@ class TransferPage(QWidget):
 
         self._push_local_paths: list = []
 
+        self.local_path_edit.textEdited.connect(lambda _: setattr(self, '_push_local_paths', []))
+
         self.mirror_checkbox.toggled.connect(self._on_mirror_toggled)
         self.viewmodel.planChanged.connect(self._on_plan_changed)
         self.viewmodel.progressChanged.connect(self._on_progress_changed)

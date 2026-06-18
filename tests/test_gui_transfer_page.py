@@ -275,6 +275,31 @@ class TestBrowseButtons:
             "conflict": transfer_module.CONFLICT_SKIP, "verify": True, "retry_count": 3,
         })]
 
+    def test_typing_in_local_path_overrides_file_browse(self, qtbot, monkeypatch):
+        page, vm, _context = _make_page()
+        qtbot.addWidget(page)
+
+        # First browse for 2 files
+        monkeypatch.setattr(
+            QFileDialog, "getOpenFileNames",
+            staticmethod(lambda *a, **k: (["/tmp/a.jpg", "/tmp/b.jpg"], "")),
+        )
+        page.push_radio.setChecked(True)
+        qtbot.mouseClick(page.local_file_browse_button, Qt.MouseButton.LeftButton)
+        assert page.local_path_edit.text() == "2 files selected"
+
+        # Then user types a different path
+        page.local_path_edit.textEdited.emit("/tmp/c.jpg")
+        page.local_path_edit.setText("/tmp/c.jpg")
+
+        # Now clicking Start should push ["/tmp/c.jpg"], not the original 2 files
+        calls = []
+        monkeypatch.setattr(vm, "start_push", lambda *a, **k: calls.append((a, k)))
+        page.remote_dir_edit.setText("/sdcard/Pictures")
+        qtbot.mouseClick(page.start_button, Qt.MouseButton.LeftButton)
+
+        assert calls[0][0][0] == ["/tmp/c.jpg"]
+
     def test_browse_local_folder_fills_push_field(self, qtbot, monkeypatch):
         page, _vm, _context = _make_page()
         qtbot.addWidget(page)
