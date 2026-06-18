@@ -119,3 +119,31 @@ class TestRunSearch:
         assert [r.name for r in results] == ["clip.mp4"]
         client.shell.assert_called_once()
         assert "/sdcard" in client.shell.call_args[0][1]
+
+
+class TestBuildSearchKwargsNameRegex:
+    def test_name_regex_included_in_kwargs(self):
+        _, kwargs = search_ops.build_search_kwargs(
+            root="", name="", extensions=None, min_size=None, max_size=None,
+            after=None, before=None, preset=None, name_regex="IMG_.*\\.jpg",
+        )
+        assert kwargs.get("name_regex") == "IMG_.*\\.jpg"
+        assert "name_pattern" not in kwargs
+
+    def test_name_regex_none_not_added_to_kwargs(self):
+        _, kwargs = search_ops.build_search_kwargs(
+            root="", name="", extensions=None, min_size=None, max_size=None,
+            after=None, before=None, preset=None, name_regex=None,
+        )
+        assert "name_regex" not in kwargs
+
+
+class TestRunSearchNameRegex:
+    def test_run_search_with_name_regex_filters_results(self):
+        client = make_fake_client(
+            "/sdcard/IMG_001.jpg\t1000\t1700000000.0\n"
+            "/sdcard/notes.txt\t500\t1700000000.0\n"
+        )
+        results = search_ops.run_search(client, "SERIAL", "", name_regex="IMG_.*\\.jpg")
+        assert len(results) == 1
+        assert results[0].path == "/sdcard/IMG_001.jpg"

@@ -7,7 +7,7 @@ does, so the GUI never duplicates business logic.
 from droidbridge.modules import search as search_module
 
 
-def build_search_kwargs(root, name, extensions, min_size, max_size, after, before, preset):
+def build_search_kwargs(root, name, extensions, min_size, max_size, after, before, preset, name_regex=None):
     """Merge form fields with a preset, matching `files search` CLI semantics.
 
     Returns (root_path, kwargs) ready for
@@ -30,6 +30,9 @@ def build_search_kwargs(root, name, extensions, min_size, max_size, after, befor
             name = f"*{name}*"
         kwargs["name_pattern"] = name
 
+    if name_regex:
+        kwargs["name_regex"] = name_regex
+
     if extensions:
         kwargs["extensions"] = extensions
 
@@ -50,8 +53,11 @@ def build_search_kwargs(root, name, extensions, min_size, max_size, after, befor
 
 def run_search(client, serial, root, name=None, extensions=None, min_size=None,
                 max_size=None, after=None, before=None, preset=None, sort_by="path",
-                reverse=False):
+                reverse=False, name_regex=None):
     """build_search_kwargs(...) -> search_files() -> sort_results()."""
-    root_path, kwargs = build_search_kwargs(root, name, extensions, min_size, max_size, after, before, preset)
+    root_path, kwargs = build_search_kwargs(
+        root, name, extensions, min_size, max_size, after, before, preset,
+        name_regex=name_regex,
+    )
     results = search_module.search_files(client, serial, root_path, **kwargs)
     return search_module.sort_results(results, by=sort_by, reverse=reverse)
