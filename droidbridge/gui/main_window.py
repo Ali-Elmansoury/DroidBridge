@@ -24,6 +24,7 @@ from droidbridge.gui.pages.files import FilesPage
 from droidbridge.gui.pages.placeholder import PlaceholderPage
 from droidbridge.gui.pages.search import SearchPage
 from droidbridge.gui.pages.transfer import TransferPage
+from droidbridge.gui.pages.whatsapp import WhatsAppPage
 from droidbridge.gui.viewmodels.device import DeviceViewModel
 from droidbridge.gui.viewmodels.files import FilesViewModel
 from droidbridge.gui.viewmodels.search import SearchViewModel
@@ -52,7 +53,7 @@ _SIDEBAR_TOOLTIPS = {
     "Files": "Browse and manage files on the device. Shortcut: Ctrl+2.",
     "Transfer": "Pull and push files between device and computer. Shortcut: Ctrl+3.",
     "Search": "Search for files on the device by name, size, type, or date. Shortcut: Ctrl+4.",
-    "WhatsApp": "Coming in Phase 6.3.",
+    "WhatsApp": "WhatsApp Toolkit: scan, backup, restore, organize, delete, and more.",
     "Storage": "Coming in Phase 6.3.",
     "Backup": "Coming in Phase 6.3.",
     "Apps": "Coming in Phase 6.3.",
@@ -88,7 +89,9 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.files_page)
         self.stack.addWidget(self.transfer_page)
         self.stack.addWidget(self.search_page)
-        for name in MODULES[4:]:
+        self.whatsapp_page = WhatsAppPage(self.context)
+        self.stack.addWidget(self.whatsapp_page)
+        for name in MODULES[5:]:
             self.stack.addWidget(PlaceholderPage(name))
         self.sidebar.currentRowChanged.connect(self.stack.setCurrentIndex)
         self.sidebar.setCurrentRow(0)
@@ -169,6 +172,11 @@ class MainWindow(QMainWindow):
         self.search_page.pullRequested.connect(self._on_pull_requested)
 
         for vm in (self.files_viewmodel, self.transfer_viewmodel, self.search_viewmodel):
+            vm.statusChanged.connect(self._on_status_changed)
+            vm.busyChanged.connect(lambda busy, vm=vm: self._on_busy_changed(vm, busy))
+            vm.logMessage.connect(self._on_log_message)
+
+        for vm in self.whatsapp_page.viewmodels:
             vm.statusChanged.connect(self._on_status_changed)
             vm.busyChanged.connect(lambda busy, vm=vm: self._on_busy_changed(vm, busy))
             vm.logMessage.connect(self._on_log_message)

@@ -12,6 +12,7 @@ from droidbridge.gui.pages.files import FilesPage
 from droidbridge.gui.pages.placeholder import PlaceholderPage
 from droidbridge.gui.pages.search import SearchPage
 from droidbridge.gui.pages.transfer import TransferPage
+from droidbridge.gui.pages.whatsapp import WhatsAppPage
 
 
 class TestMainWindow:
@@ -138,11 +139,17 @@ class TestNewPages:
         assert isinstance(window.stack.widget(2), TransferPage)
         assert isinstance(window.stack.widget(3), SearchPage)
 
+    def test_whatsapp_index_is_whatsapp_page(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        assert isinstance(window.stack.widget(4), WhatsAppPage)
+
     def test_remaining_modules_are_placeholders(self, qtbot):
         window = MainWindow()
         qtbot.addWidget(window)
 
-        for i in range(4, 9):
+        for i in range(5, 9):
             assert isinstance(window.stack.widget(i), PlaceholderPage)
 
 
