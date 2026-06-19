@@ -492,6 +492,27 @@ Manage full phone backups with profiles, scheduling, verification, and restore s
 - WhatsApp restore: push organized backup back to correct phone paths
 - Conflict resolution during restore (skip/overwrite/rename)
 
+### 6.6 Contacts & Call Log Export (GUI, planned for sub-phase 6.4)
+
+Decided 2026-06-19, beyond the original file/folder-based scope above —
+see PROGRESS.md's 2026-06-19 "Decided scope for sub-phase 6.4" entry for
+the full feasibility analysis.
+
+- Export Contacts (`content query --uri content://contacts/...`) and Call
+  Log (`content://call_log/calls`) via adb, no root required
+- Export formats: vCard/CSV/JSON
+- **Backup-only, one-way** — no restore guarantee (re-inserting contacts
+  via `content insert` risks duplicates; no clean restore path)
+- **Explicitly excluded** (re-raise scope question before adding):
+  - **SMS** — read/write access varies too much by OEM/Android version
+  - **Accounts** — `dumpsys account` only exposes names/types, never
+    credentials/tokens, so it would be informational-only
+  - **Settings** — restoring risks breaking network/UI settings; would
+    need a prominent warning like §4.8's msgstore warning
+  - Android's native `adb backup -all` — effectively dead since ~Android
+    12 (most apps disable it; requires interactive on-device PIN
+    confirmation; can't run headless)
+
 ---
 
 ## 10. Module 7 — Search & Discovery 🔍
