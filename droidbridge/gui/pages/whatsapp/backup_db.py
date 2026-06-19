@@ -3,8 +3,14 @@ from PyQt6.QtWidgets import (
     QProgressBar, QPushButton, QVBoxLayout, QWidget, QLineEdit,
 )
 from droidbridge.gui.viewmodels.whatsapp.backup_db import BackupDbViewModel
+from droidbridge.modules.whatsapp import MSGSTORE_WARNING
 
 _CONFLICT_OPTIONS = ["skip", "overwrite", "rename"]
+_SCOPE_NOTE = (
+    "Backs up the Databases/, Backups/, and accounts/ folders. Backups/ can "
+    "include sticker-pack files and other large caches, so the file count "
+    "may be far higher than just the chat databases.\n\n" + MSGSTORE_WARNING
+)
 
 
 class BackupDbPanel(QWidget):
@@ -17,6 +23,10 @@ class BackupDbPanel(QWidget):
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
+
+        self.scope_label = QLabel(_SCOPE_NOTE)
+        self.scope_label.setWordWrap(True)
+        layout.addWidget(self.scope_label)
 
         dest_row = QHBoxLayout()
         dest_row.addWidget(QLabel("Destination:"))

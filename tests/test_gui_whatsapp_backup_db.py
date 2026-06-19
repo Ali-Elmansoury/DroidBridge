@@ -6,6 +6,7 @@ from droidbridge.gui.viewmodels.whatsapp.backup_db import BackupDbViewModel
 from droidbridge.gui.pages.whatsapp.backup_db import BackupDbPanel
 from tests.test_gui_viewmodels_device import FakeWorker
 from droidbridge.modules.transfer import TransferProgress
+from droidbridge.modules.whatsapp import MSGSTORE_WARNING
 
 def _connected_ctx():
     ctx = DeviceContext()
@@ -84,3 +85,16 @@ class TestBackupDbPanel:
         assert panel.progress_bar.isVisible()
         panel.viewmodel.busyChanged.emit(False)
         assert not panel.progress_bar.isVisible()
+
+    def test_scope_note_discloses_backed_up_folders_and_msgstore_warning(self, qtbot):
+        # Real-device validation surfaced that "Backup Databases" silently
+        # pulls Databases/, Backups/, and accounts/ (DB_BACKUP_FOLDERS) -
+        # Backups/ can include sticker-pack files and balloon the file
+        # count far past what "databases" implies. The panel must disclose
+        # this scope and the CLI's MSGSTORE_WARNING up front.
+        panel = BackupDbPanel(_connected_ctx(), lambda: "whatsapp")
+        qtbot.addWidget(panel)
+        assert "Databases" in panel.scope_label.text()
+        assert "Backups" in panel.scope_label.text()
+        assert "accounts" in panel.scope_label.text()
+        assert MSGSTORE_WARNING in panel.scope_label.text()
