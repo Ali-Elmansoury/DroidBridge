@@ -1,5 +1,5 @@
 import datetime
-from PyQt6.QtCore import Qt, QDate
+from PyQt6.QtCore import QDate
 from PyQt6.QtWidgets import (
     QDateEdit, QHBoxLayout, QLabel, QProgressBar,
     QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,

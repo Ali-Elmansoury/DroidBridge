@@ -2,7 +2,7 @@ import os
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import (
-    QCheckBox, QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel,
+    QCheckBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel,
     QProgressBar, QPushButton, QScrollArea, QVBoxLayout, QWidget, QLineEdit,
 )
 from droidbridge.gui.viewmodels.whatsapp.save_status import SaveStatusViewModel
