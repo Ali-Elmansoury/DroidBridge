@@ -6,6 +6,7 @@ from droidbridge.gui.viewmodels.whatsapp.backup import BackupViewModel
 from droidbridge.gui.pages.whatsapp.backup import BackupPanel
 from tests.test_gui_viewmodels_device import FakeWorker
 from droidbridge.modules.transfer import TransferProgress
+from droidbridge.modules.whatsapp import BACKUP_TYPES
 
 def _connected_ctx():
     ctx = DeviceContext()
@@ -80,3 +81,22 @@ class TestBackupPanel:
         assert panel.progress_bar.isVisible()
         panel.viewmodel.busyChanged.emit(False)
         assert not panel.progress_bar.isVisible()
+
+    def test_selected_type_passes_folder_type_value_not_dict_key(self, qtbot, monkeypatch, tmp_path):
+        # Regression: plan_backup() filters by `folder_type` (the BACKUP_TYPES
+        # *value*, e.g. "Voice Notes"), not the snake_case CLI key
+        # ("voice_notes"). Selecting "voice_notes" used to pass the raw key
+        # straight through, so nothing ever matched and backups silently
+        # moved 0 files (found via real-device manual validation).
+        panel = BackupPanel(_connected_ctx(), lambda: "whatsapp")
+        qtbot.addWidget(panel)
+        panel.dest_edit.setText(str(tmp_path))
+        matches = [i for i in range(panel.type_list.count())
+                   if panel.type_list.item(i).text() == BACKUP_TYPES["voice_notes"]]
+        assert matches, "type_list must display the folder_type value, not the dict key"
+        panel.type_list.item(matches[0]).setSelected(True)
+        calls = []
+        monkeypatch.setattr(panel.viewmodel, "backup",
+                             lambda app, dest, types, conflict, verify: calls.append(types))
+        qtbot.mouseClick(panel.backup_button, Qt.MouseButton.LeftButton)
+        assert calls == [[BACKUP_TYPES["voice_notes"]]]

@@ -5,6 +5,7 @@ from droidbridge.gui.device_context import DeviceContext
 from droidbridge.gui.viewmodels.whatsapp.delete import DeleteViewModel
 from droidbridge.gui.pages.whatsapp.delete import DeletePanel
 from tests.test_gui_viewmodels_device import FakeWorker
+from droidbridge.modules.whatsapp import BACKUP_TYPES
 
 def _connected_ctx():
     ctx = DeviceContext()
@@ -101,3 +102,20 @@ class TestDeletePanel:
         )
         qtbot.mouseClick(panel.delete_button, Qt.MouseButton.LeftButton)
         assert execute_calls == []
+
+    def test_selected_keep_type_passes_folder_type_value_not_dict_key(self, qtbot, monkeypatch):
+        # Regression: plan_delete() filters keep_types by `folder_type` (the
+        # BACKUP_TYPES *value*, e.g. "Voice Notes"), not the snake_case CLI
+        # key ("voice_notes"). Selecting "voice_notes" used to pass the raw
+        # key straight through, so nothing was ever kept.
+        panel = DeletePanel(_connected_ctx(), lambda: "whatsapp")
+        qtbot.addWidget(panel)
+        matches = [i for i in range(panel.keep_list.count())
+                   if panel.keep_list.item(i).text() == BACKUP_TYPES["voice_notes"]]
+        assert matches, "keep_list must display the folder_type value, not the dict key"
+        panel.keep_list.item(matches[0]).setSelected(True)
+        calls = []
+        monkeypatch.setattr(panel.viewmodel, "preview",
+                             lambda app, before, keep_types, backup_dir: calls.append(keep_types))
+        panel._on_preview()
+        assert calls == [[BACKUP_TYPES["voice_notes"]]]

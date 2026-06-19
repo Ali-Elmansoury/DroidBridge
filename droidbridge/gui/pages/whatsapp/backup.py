@@ -34,8 +34,8 @@ class BackupPanel(QWidget):
         self.type_list = QListWidget()
         self.type_list.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
         self.type_list.setToolTip("Select specific media types to back up, or leave empty for a full backup.")
-        for key in BACKUP_TYPES:
-            self.type_list.addItem(key)
+        for label in BACKUP_TYPES.values():
+            self.type_list.addItem(label)
         self.type_list.setFixedHeight(120)
         layout.addWidget(self.type_list)
 

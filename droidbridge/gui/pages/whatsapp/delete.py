@@ -36,8 +36,8 @@ class DeletePanel(QWidget):
         self.keep_list = QListWidget()
         self.keep_list.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
         self.keep_list.setToolTip("Select types to keep even if they match the date filter.")
-        for key in BACKUP_TYPES:
-            self.keep_list.addItem(key)
+        for label in BACKUP_TYPES.values():
+            self.keep_list.addItem(label)
         self.keep_list.setFixedHeight(100)
         layout.addWidget(self.keep_list)
 
