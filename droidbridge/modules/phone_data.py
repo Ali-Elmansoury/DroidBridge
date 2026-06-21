@@ -9,6 +9,7 @@ from pathlib import Path
 
 _ROW_PREFIX = "Row:"
 _FIELD_PATTERN = re.compile(r"(\w+)=(.*?)(?=, \w+=|$)")
+_PERMISSION_DENIAL_MARKERS = ("SecurityException", "Permission Denial", "Error while accessing provider")
 
 _CALL_TYPES = {
     "1": "incoming",
@@ -72,6 +73,10 @@ def _query(client, serial, uri, projection, where=None):
     if where:
         command += f' --where "{where}"'
     output = client.shell(serial, command)
+    if any(marker in output for marker in _PERMISSION_DENIAL_MARKERS):
+        lines = output.splitlines()
+        detail = next((line.strip() for line in lines if "Permission Denial" in line), lines[0].strip() if lines else uri)
+        raise PermissionError(f"Device denied access to {uri}: {detail}")
     return _parse_rows(output)
 
 

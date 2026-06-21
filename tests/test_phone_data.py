@@ -147,6 +147,21 @@ class TestQueryCallLog:
         assert entries == []
         assert skipped == 1
 
+    def test_permission_denial_raises_instead_of_returning_empty(self):
+        output = (
+            "Error while accessing provider:call_log\n"
+            "java.lang.SecurityException: Permission Denial: opening provider "
+            "com.android.providers.contacts.CallLogProvider from (null) (pid=2267, uid=2000) "
+            "requires android.permission.READ_CALL_LOG or android.permission.WRITE_CALL_LOG\n"
+        )
+        client = _client_with_shell_outputs(output)
+        try:
+            query_call_log(client, "SERIAL")
+            assert False, "expected PermissionError"
+        except PermissionError as exc:
+            assert "call_log" in str(exc)
+            assert "SecurityException" in str(exc) or "Permission Denial" in str(exc)
+
 
 class TestExportContacts:
     def test_writes_one_vcf_and_json_pair_per_source(self, tmp_path):
@@ -198,3 +213,13 @@ class TestExportCallLog:
         json_data = json.loads((tmp_path / "call_log.json").read_text(encoding="utf-8"))
         assert json_data[0]["number"] == "+15551112222"
         assert json_data[0]["call_type"] == "incoming"
+
+    def test_permission_denial_propagates_instead_of_writing_empty_files(self, tmp_path):
+        output = "java.lang.SecurityException: Permission Denial: requires android.permission.READ_CALL_LOG\n"
+        client = _client_with_shell_outputs(output)
+        try:
+            export_call_log(client, "SERIAL", str(tmp_path))
+            assert False, "expected PermissionError"
+        except PermissionError:
+            pass
+        assert not (tmp_path / "call_log.csv").exists()
