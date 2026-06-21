@@ -14,7 +14,6 @@ class AppsPanel(QWidget):
     def __init__(self, context, parent=None):
         super().__init__(parent)
         self.viewmodel = AppsViewModel(context)
-        self._all_rows = []
         self._build_ui()
         self._connect()
 
@@ -70,7 +69,6 @@ class AppsPanel(QWidget):
         self.refresh_button.setEnabled(not busy)
 
     def _populate(self, rows):
-        self._all_rows = rows
         visible_rows = rows if self.show_all_checkbox.isChecked() else rows[: self.top_spin.value()]
         is_empty = not visible_rows
         self.empty_label.setVisible(is_empty)
