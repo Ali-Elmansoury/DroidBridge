@@ -1,0 +1,138 @@
+from PyQt6.QtWidgets import (
+    QComboBox, QFileDialog, QHBoxLayout, QInputDialog, QLabel,
+    QLineEdit, QListWidget, QPushButton, QVBoxLayout, QWidget,
+)
+
+from droidbridge.gui.viewmodels.backup.profiles import ProfilesViewModel
+
+_CONFLICT_OPTIONS = ["skip", "overwrite", "rename"]
+
+
+class ProfilesPanel(QWidget):
+    def __init__(self, on_profiles_changed=None, parent=None):
+        super().__init__(parent)
+        self.viewmodel = ProfilesViewModel()
+        self._on_profiles_changed = on_profiles_changed
+        self._build_ui()
+        self._connect()
+
+    def _build_ui(self):
+        layout = QVBoxLayout(self)
+
+        layout.addWidget(QLabel("Saved profiles:"))
+        self.profile_list = QListWidget()
+        layout.addWidget(self.profile_list)
+
+        name_row = QHBoxLayout()
+        name_row.addWidget(QLabel("Name:"))
+        self.name_edit = QLineEdit()
+        name_row.addWidget(self.name_edit)
+        layout.addLayout(name_row)
+
+        layout.addWidget(QLabel("Sources:"))
+        self.sources_list = QListWidget()
+        layout.addWidget(self.sources_list)
+        sources_btn_row = QHBoxLayout()
+        self.add_source_button = QPushButton("Add Source…")
+        self.remove_source_button = QPushButton("Remove Selected Source")
+        sources_btn_row.addWidget(self.add_source_button)
+        sources_btn_row.addWidget(self.remove_source_button)
+        layout.addLayout(sources_btn_row)
+
+        dest_row = QHBoxLayout()
+        dest_row.addWidget(QLabel("Destination:"))
+        self.dest_edit = QLineEdit()
+        dest_row.addWidget(self.dest_edit)
+        self.browse_dest_button = QPushButton("Browse…")
+        dest_row.addWidget(self.browse_dest_button)
+        layout.addLayout(dest_row)
+
+        conflict_row = QHBoxLayout()
+        conflict_row.addWidget(QLabel("Conflict:"))
+        self.conflict_combo = QComboBox()
+        self.conflict_combo.addItems(_CONFLICT_OPTIONS)
+        conflict_row.addWidget(self.conflict_combo)
+        conflict_row.addStretch()
+        layout.addLayout(conflict_row)
+
+        layout.addWidget(QLabel("Excludes:"))
+        self.excludes_list = QListWidget()
+        layout.addWidget(self.excludes_list)
+        excludes_btn_row = QHBoxLayout()
+        self.add_exclude_button = QPushButton("Add Exclude…")
+        self.remove_exclude_button = QPushButton("Remove Selected Exclude")
+        excludes_btn_row.addWidget(self.add_exclude_button)
+        excludes_btn_row.addWidget(self.remove_exclude_button)
+        layout.addLayout(excludes_btn_row)
+
+        action_row = QHBoxLayout()
+        self.save_button = QPushButton("Save Profile")
+        self.remove_button = QPushButton("Remove Profile")
+        action_row.addWidget(self.save_button)
+        action_row.addWidget(self.remove_button)
+        layout.addLayout(action_row)
+
+        self.status_label = QLabel()
+        layout.addWidget(self.status_label)
+        layout.addStretch()
+
+    def _connect(self):
+        self.add_source_button.clicked.connect(lambda: self._add_text_item(self.sources_list, "Add Source", "Device source path:"))
+        self.remove_source_button.clicked.connect(lambda: self._remove_selected(self.sources_list))
+        self.browse_dest_button.clicked.connect(self._browse_dest)
+        self.add_exclude_button.clicked.connect(lambda: self._add_text_item(self.excludes_list, "Add Exclude", "Device path to exclude:"))
+        self.remove_exclude_button.clicked.connect(lambda: self._remove_selected(self.excludes_list))
+        self.save_button.clicked.connect(self._on_save)
+        self.remove_button.clicked.connect(self._on_remove)
+        self.profile_list.currentTextChanged.connect(self._on_profile_selected)
+        self.viewmodel.statusChanged.connect(self.status_label.setText)
+        self.viewmodel.profilesChanged.connect(self._on_profiles_changed_internal)
+
+    def _add_text_item(self, list_widget, title, label):
+        text, ok = QInputDialog.getText(self, title, label)
+        if ok and text:
+            list_widget.addItem(text)
+
+    def _remove_selected(self, list_widget):
+        row = list_widget.currentRow()
+        if row >= 0:
+            list_widget.takeItem(row)
+
+    def _browse_dest(self):
+        path = QFileDialog.getExistingDirectory(self, "Select backup destination")
+        if path:
+            self.dest_edit.setText(path)
+
+    def _on_profile_selected(self, name):
+        if not name:
+            return
+        profile = self.viewmodel.get(name)
+        if profile is None:
+            return
+        self.name_edit.setText(profile.name)
+        self.sources_list.clear()
+        self.sources_list.addItems(profile.sources)
+        self.dest_edit.setText(profile.dest)
+        self.conflict_combo.setCurrentText(profile.conflict)
+        self.excludes_list.clear()
+        self.excludes_list.addItems(profile.excludes)
+
+    def _on_save(self):
+        sources = [self.sources_list.item(i).text() for i in range(self.sources_list.count())]
+        excludes = [self.excludes_list.item(i).text() for i in range(self.excludes_list.count())]
+        self.viewmodel.save(self.name_edit.text(), sources, self.dest_edit.text(), self.conflict_combo.currentText(), excludes)
+
+    def _on_remove(self):
+        item = self.profile_list.currentItem()
+        name = item.text() if item else self.name_edit.text()
+        if name:
+            self.viewmodel.remove(name)
+
+    def refresh(self):
+        self.viewmodel.refresh()
+
+    def _on_profiles_changed_internal(self, profiles):
+        self.profile_list.clear()
+        self.profile_list.addItems([p.name for p in profiles])
+        if self._on_profiles_changed:
+            self._on_profiles_changed([p.name for p in profiles])
