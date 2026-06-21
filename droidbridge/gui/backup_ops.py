@@ -101,3 +101,35 @@ def get_history(profile_name=None, max_age_days=7):
     outdated = backup_module.is_outdated(history, profile_name, max_age_days)
     comparison = backup_module.compare_backups(history, profile_name)
     return {"records": matches, "outdated": outdated, "comparison": comparison}
+
+
+def run_restore(client, serial, profile_name, sources, after, before, conflict, no_verify, progress_callback=None):
+    profile = backup_module.get_profile(backup_module.DEFAULT_PROFILES_PATH, profile_name)
+    if profile is None:
+        raise ValueError(f"Profile {profile_name!r} not found.")
+
+    targets = backup_module.plan_restore(client, serial, profile, sources=sources or None, conflict=conflict)
+
+    results = []
+    for target in targets:
+        plan = target.plan
+        if after or before:
+            plan = backup_module.filter_plan_by_date(plan, after=after, before=before)
+
+        if not plan.to_transfer:
+            results.append({"source": target.source, "done": 0, "total": 0, "failed": 0, "verified": None})
+            continue
+
+        progress = transfer_module.execute_plan(client, serial, plan, progress_callback=progress_callback)
+        verified = None
+        if not no_verify:
+            verified = transfer_module.verify_push(client, serial, plan, target.remote_dir).ok
+
+        results.append({
+            "source": target.source,
+            "done": progress.done_files,
+            "total": plan.total_files,
+            "failed": len(progress.failed),
+            "verified": verified,
+        })
+    return results

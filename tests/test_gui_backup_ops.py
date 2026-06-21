@@ -128,3 +128,47 @@ class TestGetHistory:
         result = backup_ops.get_history("nightly", max_age_days=7)
         assert len(result["records"]) == 1
         assert result["outdated"] is True
+
+
+from droidbridge.modules.backup_manager import RestoreTarget
+
+
+class TestRunRestore:
+    def test_raises_when_profile_missing(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(backup_ops.backup_module, "DEFAULT_PROFILES_PATH", tmp_path / "profiles.json")
+        try:
+            backup_ops.run_restore(MagicMock(), "SERIAL", "missing", [], None, None, "skip", False)
+            assert False, "expected ValueError"
+        except ValueError as exc:
+            assert "missing" in str(exc)
+
+    def test_restores_each_target_and_reports_per_source_results(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(backup_ops.backup_module, "DEFAULT_PROFILES_PATH", tmp_path / "profiles.json")
+        backup_ops.save_profile("nightly", ["/sdcard/DCIM"], str(tmp_path / "dest"), "skip", [])
+
+        item = TransferItem(source=str(tmp_path / "dest/a.jpg"), dest="/sdcard/DCIM/a.jpg", size=50, action=ACTION_COPY)
+        plan = TransferPlan(direction="push", items=[item])
+        target = RestoreTarget(source="/sdcard/DCIM", local_path=str(tmp_path / "dest"), remote_dir="/sdcard", plan=plan)
+        progress = TransferProgress(total_files=1, total_bytes=50)
+        progress.done_files = 1
+
+        with patch("droidbridge.gui.backup_ops.backup_module.plan_restore", return_value=[target]), \
+             patch("droidbridge.gui.backup_ops.transfer_module.execute_plan", return_value=progress), \
+             patch("droidbridge.gui.backup_ops.transfer_module.verify_push", return_value=VerificationResult(1, 50, 1, 50)):
+            results = backup_ops.run_restore(MagicMock(), "SERIAL", "nightly", [], None, None, "skip", False)
+
+        assert results == [{"source": "/sdcard/DCIM", "done": 1, "total": 1, "failed": 0, "verified": True}]
+
+    def test_nothing_to_transfer_for_a_target_reports_zeroes(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(backup_ops.backup_module, "DEFAULT_PROFILES_PATH", tmp_path / "profiles.json")
+        backup_ops.save_profile("nightly", ["/sdcard/DCIM"], str(tmp_path / "dest"), "skip", [])
+
+        plan = TransferPlan(direction="push", items=[])
+        target = RestoreTarget(source="/sdcard/DCIM", local_path=str(tmp_path / "dest"), remote_dir="/sdcard", plan=plan)
+
+        with patch("droidbridge.gui.backup_ops.backup_module.plan_restore", return_value=[target]), \
+             patch("droidbridge.gui.backup_ops.transfer_module.execute_plan") as mock_execute:
+            results = backup_ops.run_restore(MagicMock(), "SERIAL", "nightly", [], None, None, "skip", True)
+
+        mock_execute.assert_not_called()
+        assert results == [{"source": "/sdcard/DCIM", "done": 0, "total": 0, "failed": 0, "verified": None}]
