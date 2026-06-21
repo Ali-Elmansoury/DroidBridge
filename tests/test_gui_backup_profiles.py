@@ -35,14 +35,23 @@ class TestProfilesViewModel:
         assert logs == ["ERROR"]
 
 
+from unittest.mock import MagicMock
+
 from PyQt6.QtCore import Qt
 
+from droidbridge.gui.device_context import DeviceContext
 from droidbridge.gui.pages.backup.profiles import ProfilesPanel
+
+
+def _connected_ctx():
+    ctx = DeviceContext()
+    ctx.set_connected(MagicMock(), "S1", "Pixel 7")
+    return ctx
 
 
 class TestProfilesPanel:
     def test_save_button_collects_form_fields(self, qtbot, monkeypatch):
-        panel = ProfilesPanel()
+        panel = ProfilesPanel(_connected_ctx())
         qtbot.addWidget(panel)
         panel.name_edit.setText("nightly")
         panel.sources_list.addItem("/sdcard/DCIM")
@@ -56,7 +65,7 @@ class TestProfilesPanel:
 
     def test_selecting_a_profile_populates_the_form(self, qtbot, monkeypatch):
         from droidbridge.modules.backup_manager import BackupProfile
-        panel = ProfilesPanel()
+        panel = ProfilesPanel(_connected_ctx())
         qtbot.addWidget(panel)
         profile = BackupProfile(name="nightly", sources=["/sdcard/DCIM"], dest="/d", conflict="overwrite", excludes=["/x"])
         monkeypatch.setattr(panel.viewmodel, "get", lambda name: profile)
@@ -70,9 +79,39 @@ class TestProfilesPanel:
     def test_profiles_changed_repopulates_profile_list(self, qtbot):
         from droidbridge.modules.backup_manager import BackupProfile
         seen = []
-        panel = ProfilesPanel(on_profiles_changed=seen.append)
+        panel = ProfilesPanel(_connected_ctx(), on_profiles_changed=seen.append)
         qtbot.addWidget(panel)
         panel.viewmodel.profilesChanged.emit([BackupProfile(name="a", sources=[], dest="/d", conflict="skip", excludes=[])])
         assert panel.profile_list.count() == 1
         assert panel.profile_list.item(0).text() == "a"
         assert seen == [["a"]]
+
+    def test_add_source_button_appends_picked_device_path(self, qtbot, monkeypatch):
+        panel = ProfilesPanel(_connected_ctx())
+        qtbot.addWidget(panel)
+        monkeypatch.setattr(
+            "droidbridge.gui.pages.backup.profiles.RemoteBrowseDialog.get_remote_path",
+            lambda *a, **kw: "/sdcard/DCIM",
+        )
+        qtbot.mouseClick(panel.add_source_button, Qt.MouseButton.LeftButton)
+        assert [panel.sources_list.item(i).text() for i in range(panel.sources_list.count())] == ["/sdcard/DCIM"]
+
+    def test_add_exclude_button_appends_picked_device_path(self, qtbot, monkeypatch):
+        panel = ProfilesPanel(_connected_ctx())
+        qtbot.addWidget(panel)
+        monkeypatch.setattr(
+            "droidbridge.gui.pages.backup.profiles.RemoteBrowseDialog.get_remote_path",
+            lambda *a, **kw: "/sdcard/DCIM/.thumbnails",
+        )
+        qtbot.mouseClick(panel.add_exclude_button, Qt.MouseButton.LeftButton)
+        assert [panel.excludes_list.item(i).text() for i in range(panel.excludes_list.count())] == ["/sdcard/DCIM/.thumbnails"]
+
+    def test_add_source_button_cancelled_dialog_adds_nothing(self, qtbot, monkeypatch):
+        panel = ProfilesPanel(_connected_ctx())
+        qtbot.addWidget(panel)
+        monkeypatch.setattr(
+            "droidbridge.gui.pages.backup.profiles.RemoteBrowseDialog.get_remote_path",
+            lambda *a, **kw: None,
+        )
+        qtbot.mouseClick(panel.add_source_button, Qt.MouseButton.LeftButton)
+        assert panel.sources_list.count() == 0

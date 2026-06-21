@@ -51,7 +51,7 @@ class BackupManagerPage(QWidget):
         splitter.addWidget(self.op_list)
 
         get_profile = lambda: self.selected_profile()
-        self._profiles_panel = ProfilesPanel(on_profiles_changed=self._on_profiles_changed)
+        self._profiles_panel = ProfilesPanel(self._context, on_profiles_changed=self._on_profiles_changed)
         self._run_panel = RunPanel(self._context, get_profile)
         self._verify_panel = VerifyPanel(get_profile)
         self._history_panel = HistoryPanel(get_profile)

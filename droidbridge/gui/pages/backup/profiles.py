@@ -1,16 +1,19 @@
 from PyQt6.QtWidgets import (
-    QComboBox, QFileDialog, QHBoxLayout, QInputDialog, QLabel,
+    QComboBox, QFileDialog, QHBoxLayout, QLabel,
     QLineEdit, QListWidget, QPushButton, QVBoxLayout, QWidget,
 )
 
+from droidbridge.gui import files_ops
 from droidbridge.gui.viewmodels.backup.profiles import ProfilesViewModel
+from droidbridge.gui.widgets.remote_browse_dialog import RemoteBrowseDialog
 
 _CONFLICT_OPTIONS = ["skip", "overwrite", "rename"]
 
 
 class ProfilesPanel(QWidget):
-    def __init__(self, on_profiles_changed=None, parent=None):
+    def __init__(self, context, on_profiles_changed=None, parent=None):
         super().__init__(parent)
+        self._context = context
         self.viewmodel = ProfilesViewModel()
         self._on_profiles_changed = on_profiles_changed
         self._build_ui()
@@ -77,10 +80,10 @@ class ProfilesPanel(QWidget):
         layout.addStretch()
 
     def _connect(self):
-        self.add_source_button.clicked.connect(lambda: self._add_text_item(self.sources_list, "Add Source", "Device source path:"))
+        self.add_source_button.clicked.connect(lambda: self._add_device_path(self.sources_list))
         self.remove_source_button.clicked.connect(lambda: self._remove_selected(self.sources_list))
         self.browse_dest_button.clicked.connect(self._browse_dest)
-        self.add_exclude_button.clicked.connect(lambda: self._add_text_item(self.excludes_list, "Add Exclude", "Device path to exclude:"))
+        self.add_exclude_button.clicked.connect(lambda: self._add_device_path(self.excludes_list))
         self.remove_exclude_button.clicked.connect(lambda: self._remove_selected(self.excludes_list))
         self.save_button.clicked.connect(self._on_save)
         self.remove_button.clicked.connect(self._on_remove)
@@ -88,10 +91,13 @@ class ProfilesPanel(QWidget):
         self.viewmodel.statusChanged.connect(self.status_label.setText)
         self.viewmodel.profilesChanged.connect(self._on_profiles_changed_internal)
 
-    def _add_text_item(self, list_widget, title, label):
-        text, ok = QInputDialog.getText(self, title, label)
-        if ok and text:
-            list_widget.addItem(text)
+    def _add_device_path(self, list_widget):
+        client, serial = self._context.client, self._context.serial
+        path = RemoteBrowseDialog.get_remote_path(
+            self, client, serial, files_ops.QUICK_JUMP_PATHS["Root"], mode="directory"
+        )
+        if path:
+            list_widget.addItem(path)
 
     def _remove_selected(self, list_widget):
         row = list_widget.currentRow()
