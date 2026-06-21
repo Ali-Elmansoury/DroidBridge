@@ -49,3 +49,31 @@ class TestElidedLabel:
 
         assert label.text() == long_text
         assert label.text() != narrow_text
+
+    def test_wrap_mode_shows_full_text_even_when_narrow(self, qtbot):
+        label = ElidedLabel()
+        qtbot.addWidget(label)
+        label.resize(60, 20)
+
+        long_text = "adb command failed (...): error: device '26597aca' not found"
+        label.setFullText(long_text)
+        assert "…" in label.text()
+
+        label.setWrapMode(True)
+        assert label.text() == long_text
+        assert label.wordWrap() is True
+
+    def test_disabling_wrap_mode_restores_eliding(self, qtbot):
+        label = ElidedLabel()
+        qtbot.addWidget(label)
+        label.resize(60, 20)
+
+        long_text = "adb command failed (...): error: device '26597aca' not found"
+        label.setFullText(long_text)
+        label.setWrapMode(True)
+
+        label.setWrapMode(False)
+
+        assert label.text() != long_text
+        assert "…" in label.text()
+        assert label.wordWrap() is False

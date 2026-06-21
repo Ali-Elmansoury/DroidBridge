@@ -15,6 +15,7 @@ class ElidedLabel(QLabel):
     def __init__(self, text="", parent=None):
         super().__init__(parent)
         self._full_text = ""
+        self._wrap = False
         self.setFullText(text)
 
     def fullText(self):
@@ -23,12 +24,25 @@ class ElidedLabel(QLabel):
     def setFullText(self, text):
         self._full_text = text
         self.setToolTip(text)
-        self._update_elided_text()
+        self._update_text()
+
+    def setWrapMode(self, wrap):
+        """Switch between single-line eliding (default) and full word-wrap.
+
+        Used for error/warning messages, which matter enough to read in
+        full rather than being truncated with "..." like routine status text.
+        """
+        self._wrap = wrap
+        self.setWordWrap(wrap)
+        self._update_text()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self._update_elided_text()
+        self._update_text()
 
-    def _update_elided_text(self):
-        elided = self.fontMetrics().elidedText(self._full_text, Qt.TextElideMode.ElideRight, self.width())
-        super().setText(elided)
+    def _update_text(self):
+        if self._wrap:
+            super().setText(self._full_text)
+        else:
+            elided = self.fontMetrics().elidedText(self._full_text, Qt.TextElideMode.ElideRight, self.width())
+            super().setText(elided)
