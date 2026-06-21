@@ -105,3 +105,26 @@ class TestRunVerify:
         )
         result = backup_ops.run_verify("nightly")
         assert result == {"ok": True, "expected_files": 1, "expected_bytes": 100, "actual_files": 1, "actual_bytes": 100}
+
+
+class TestGetHistory:
+    def test_returns_all_records_when_no_profile_given(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(backup_ops.backup_module, "DEFAULT_HISTORY_PATH", tmp_path / "history.json")
+        backup_ops.backup_module.append_history(
+            backup_ops.backup_module.DEFAULT_HISTORY_PATH,
+            BackupRecord(profile="a", timestamp="2026-06-20T00:00:00+00:00",
+                         file_count=1, total_bytes=10, duration_seconds=1.0, destination="/d", verified=True),
+        )
+        result = backup_ops.get_history()
+        assert len(result["records"]) == 1
+        assert result["outdated"] is None
+        assert result["comparison"] is None
+
+    def test_filters_and_flags_outdated_for_one_profile(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(backup_ops.backup_module, "DEFAULT_HISTORY_PATH", tmp_path / "history.json")
+        old_record = BackupRecord(profile="nightly", timestamp="2020-01-01T00:00:00+00:00",
+                                   file_count=1, total_bytes=10, duration_seconds=1.0, destination="/d", verified=True)
+        backup_ops.backup_module.append_history(backup_ops.backup_module.DEFAULT_HISTORY_PATH, old_record)
+        result = backup_ops.get_history("nightly", max_age_days=7)
+        assert len(result["records"]) == 1
+        assert result["outdated"] is True

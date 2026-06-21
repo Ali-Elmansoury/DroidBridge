@@ -90,3 +90,14 @@ def run_verify(profile_name):
         "actual_files": result.actual_files,
         "actual_bytes": result.actual_bytes,
     }
+
+
+def get_history(profile_name=None, max_age_days=7):
+    history = backup_module.load_history(backup_module.DEFAULT_HISTORY_PATH)
+    if profile_name is None:
+        return {"records": history, "outdated": None, "comparison": None}
+
+    matches = [r for r in history if r.profile == profile_name]
+    outdated = backup_module.is_outdated(history, profile_name, max_age_days)
+    comparison = backup_module.compare_backups(history, profile_name)
+    return {"records": matches, "outdated": outdated, "comparison": comparison}
