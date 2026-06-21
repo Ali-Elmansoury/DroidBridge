@@ -57,3 +57,58 @@ class TestRestoreViewModel:
         vm.logMessage.connect(lambda msg, level: logs.append((msg, level)))
         vm.run_restore("nightly", [], None, None, None, False)
         assert ("Profile 'nightly' not found.", "ERROR") in logs
+
+
+from PyQt6.QtCore import QDate, Qt
+
+from droidbridge.gui.pages.backup.restore import RestorePanel
+
+
+class TestRestorePanel:
+    def test_refresh_sources_populates_checked_list(self, qtbot, monkeypatch):
+        panel = RestorePanel(_connected_ctx(), lambda: "nightly")
+        qtbot.addWidget(panel)
+        monkeypatch.setattr(panel.viewmodel, "list_sources", lambda name: ["/sdcard/DCIM", "/sdcard/Download"])
+        panel.refresh_sources()
+        assert panel.sources_list.count() == 2
+        assert panel.sources_list.item(0).checkState() == Qt.CheckState.Checked
+
+    def test_restore_button_passes_selected_sources_only(self, qtbot, monkeypatch):
+        panel = RestorePanel(_connected_ctx(), lambda: "nightly")
+        qtbot.addWidget(panel)
+        monkeypatch.setattr(panel.viewmodel, "list_sources", lambda name: ["/sdcard/DCIM", "/sdcard/Download"])
+        panel.refresh_sources()
+        panel.sources_list.item(1).setCheckState(Qt.CheckState.Unchecked)
+
+        calls = []
+        monkeypatch.setattr(panel.viewmodel, "run_restore", lambda *a: calls.append(a))
+        qtbot.mouseClick(panel.restore_button, Qt.MouseButton.LeftButton)
+        assert calls[0][1] == ["/sdcard/DCIM"]
+
+    def test_restore_button_passes_none_dates_when_filter_unchecked(self, qtbot, monkeypatch):
+        panel = RestorePanel(_connected_ctx(), lambda: "nightly")
+        qtbot.addWidget(panel)
+        calls = []
+        monkeypatch.setattr(panel.viewmodel, "run_restore", lambda *a: calls.append(a))
+        qtbot.mouseClick(panel.restore_button, Qt.MouseButton.LeftButton)
+        assert calls[0][2] is None
+        assert calls[0][3] is None
+
+    def test_restore_button_passes_dates_when_filter_checked(self, qtbot, monkeypatch):
+        panel = RestorePanel(_connected_ctx(), lambda: "nightly")
+        qtbot.addWidget(panel)
+        panel.date_filter_checkbox.setChecked(True)
+        panel.after_date_edit.setDate(QDate(2026, 1, 1))
+        panel.before_date_edit.setDate(QDate(2026, 6, 1))
+        calls = []
+        monkeypatch.setattr(panel.viewmodel, "run_restore", lambda *a: calls.append(a))
+        qtbot.mouseClick(panel.restore_button, Qt.MouseButton.LeftButton)
+        assert calls[0][2].isoformat() == "2026-01-01"
+        assert calls[0][3].isoformat() == "2026-06-01"
+
+    def test_results_changed_populates_table(self, qtbot):
+        panel = RestorePanel(_connected_ctx(), lambda: "nightly")
+        qtbot.addWidget(panel)
+        panel.viewmodel.resultsChanged.emit([{"source": "/sdcard/DCIM", "done": 3, "total": 3, "failed": 0, "verified": True}])
+        assert panel.results_table.rowCount() == 1
+        assert panel.results_table.item(0, 0).text() == "/sdcard/DCIM"
