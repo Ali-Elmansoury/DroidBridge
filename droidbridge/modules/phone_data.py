@@ -164,3 +164,59 @@ def query_call_log(client, serial):
             duration_seconds=duration, call_type=call_type,
         ))
     return entries, skipped
+
+
+def _write_vcard(contacts, path):
+    lines = []
+    for contact in contacts:
+        lines.append("BEGIN:VCARD")
+        lines.append("VERSION:3.0")
+        lines.append(f"FN:{contact.display_name}")
+        lines.append(f"TEL:{contact.number}")
+        lines.append("END:VCARD")
+    Path(path).write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+
+
+def _write_json(items, path):
+    Path(path).write_text(json.dumps([asdict(item) for item in items], indent=2), encoding="utf-8")
+
+
+def _write_call_log_csv(entries, path):
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["name", "number", "timestamp", "duration_seconds", "call_type"])
+        for entry in entries:
+            writer.writerow([entry.name, entry.number, entry.timestamp, entry.duration_seconds, entry.call_type])
+
+
+_CONTACT_QUERIES = {
+    "phone": query_phone_contacts,
+    "accounts": query_account_contacts,
+    "sim": query_sim_contacts,
+}
+
+
+def export_contacts(client, serial, sources, dest):
+    """Export each requested contact source to its own vCard + JSON file pair.
+
+    `sources` is an iterable of "phone"/"accounts"/"sim". `dest` is a local
+    directory that must already exist. Returns {source: {"exported": N, "skipped": M}}.
+    """
+    dest_dir = Path(dest)
+    summary = {}
+    for source in sources:
+        query_fn = _CONTACT_QUERIES[source]
+        contacts, skipped = query_fn(client, serial)
+        _write_vcard(contacts, dest_dir / f"contacts_{source}.vcf")
+        _write_json(contacts, dest_dir / f"contacts_{source}.json")
+        summary[source] = {"exported": len(contacts), "skipped": skipped}
+    return summary
+
+
+def export_call_log(client, serial, dest):
+    """Export the call log to call_log.csv + call_log.json. Returns {"exported": N, "skipped": M}."""
+    dest_dir = Path(dest)
+    entries, skipped = query_call_log(client, serial)
+    _write_call_log_csv(entries, dest_dir / "call_log.csv")
+    _write_json(entries, dest_dir / "call_log.json")
+    return {"exported": len(entries), "skipped": skipped}

@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
@@ -5,6 +6,8 @@ from droidbridge.modules.phone_data import (
     CallLogEntry,
     Contact,
     _parse_rows,
+    export_call_log,
+    export_contacts,
     query_account_contacts,
     query_call_log,
     query_phone_contacts,
@@ -143,3 +146,55 @@ class TestQueryCallLog:
         entries, skipped = query_call_log(client, "SERIAL")
         assert entries == []
         assert skipped == 1
+
+
+class TestExportContacts:
+    def test_writes_one_vcf_and_json_pair_per_source(self, tmp_path):
+        client = _client_with_shell_outputs(
+            _PHONES_OUTPUT, _RAW_CONTACTS_OUTPUT,  # query_phone_contacts
+        )
+        summary = export_contacts(client, "SERIAL", ["phone"], str(tmp_path))
+        assert summary == {"phone": {"exported": 1, "skipped": 0}}
+
+        vcf_text = (tmp_path / "contacts_phone.vcf").read_text(encoding="utf-8")
+        assert "BEGIN:VCARD" in vcf_text
+        assert "FN:John Doe" in vcf_text
+        assert "TEL:+15551234567" in vcf_text
+        assert "END:VCARD" in vcf_text
+
+        json_data = json.loads((tmp_path / "contacts_phone.json").read_text(encoding="utf-8"))
+        assert json_data == [{"display_name": "John Doe", "number": "+15551234567"}]
+
+    def test_vcard_preserves_comma_in_name(self, tmp_path):
+        client = _client_with_shell_outputs(_PHONES_OUTPUT, _RAW_CONTACTS_OUTPUT)
+        export_contacts(client, "SERIAL", ["accounts"], str(tmp_path))
+        vcf_text = (tmp_path / "contacts_accounts.vcf").read_text(encoding="utf-8")
+        assert "FN:Smith, John" in vcf_text
+
+    def test_multiple_sources_write_separate_files(self, tmp_path):
+        client = _client_with_shell_outputs(
+            _PHONES_OUTPUT, _RAW_CONTACTS_OUTPUT,  # query_phone_contacts
+            "No result found.\n",                  # query_sim_contacts
+        )
+        summary = export_contacts(client, "SERIAL", ["phone", "sim"], str(tmp_path))
+        assert summary["phone"]["exported"] == 1
+        assert summary["sim"] == {"exported": 0, "skipped": 0}
+        assert (tmp_path / "contacts_phone.vcf").exists()
+        assert (tmp_path / "contacts_sim.vcf").exists()
+
+
+class TestExportCallLog:
+    def test_writes_csv_and_json(self, tmp_path):
+        output = "Row: 0 name=Jane Roe, number=+15551112222, date=1750000000000, duration=42, type=1\n"
+        client = _client_with_shell_outputs(output)
+        summary = export_call_log(client, "SERIAL", str(tmp_path))
+        assert summary == {"exported": 1, "skipped": 0}
+
+        csv_text = (tmp_path / "call_log.csv").read_text(encoding="utf-8")
+        assert "Jane Roe" in csv_text
+        assert "+15551112222" in csv_text
+        assert "incoming" in csv_text
+
+        json_data = json.loads((tmp_path / "call_log.json").read_text(encoding="utf-8"))
+        assert json_data[0]["number"] == "+15551112222"
+        assert json_data[0]["call_type"] == "incoming"
