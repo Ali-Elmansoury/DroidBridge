@@ -8,6 +8,7 @@ from PyQt6.QtGui import QCloseEvent
 from droidbridge.gui import theme
 from droidbridge.gui.device_context import DeviceContext
 from droidbridge.gui.main_window import MODULES, MainWindow
+from droidbridge.gui.pages.backup import BackupManagerPage
 from droidbridge.gui.pages.files import FilesPage
 from droidbridge.gui.pages.placeholder import PlaceholderPage
 from droidbridge.gui.pages.search import SearchPage
@@ -149,8 +150,15 @@ class TestNewPages:
         window = MainWindow()
         qtbot.addWidget(window)
 
-        for i in range(5, 9):
-            assert isinstance(window.stack.widget(i), PlaceholderPage)
+        assert isinstance(window.stack.widget(5), PlaceholderPage)
+        assert isinstance(window.stack.widget(7), PlaceholderPage)
+        assert isinstance(window.stack.widget(8), PlaceholderPage)
+
+    def test_backup_index_is_backup_manager_page(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        assert isinstance(window.stack.widget(6), BackupManagerPage)
 
 
 class TestPullRequestedWiring:
@@ -206,6 +214,14 @@ class TestNewViewModelWiring:
         window.search_viewmodel.statusChanged.emit("search error")
 
         assert window.status_label.fullText() == "search error"
+
+    def test_backup_log_message_appends_to_log_panel(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        window.backup_page.viewmodels[0].logMessage.emit("backup hello", "INFO")
+
+        assert "backup hello" in window.log_panel.toPlainText()
 
 
 class TestStatusBarLayout:
