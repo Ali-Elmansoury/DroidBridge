@@ -186,9 +186,12 @@ class MainWindow(QMainWindow):
             vm.logMessage.connect(self._on_log_message)
 
         for vm in self.backup_page.viewmodels:
-            vm.statusChanged.connect(self._on_status_changed)
-            vm.busyChanged.connect(lambda busy, vm=vm: self._on_busy_changed(vm, busy))
-            vm.logMessage.connect(self._on_log_message)
+            if hasattr(vm, "statusChanged"):
+                vm.statusChanged.connect(self._on_status_changed)
+            if hasattr(vm, "busyChanged"):
+                vm.busyChanged.connect(lambda busy, vm=vm: self._on_busy_changed(vm, busy))
+            if hasattr(vm, "logMessage"):
+                vm.logMessage.connect(self._on_log_message)
 
         self._on_connection_changed(
             self.context.is_connected, self.context.serial or "", self.context.model or ""

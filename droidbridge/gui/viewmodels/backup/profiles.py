@@ -4,7 +4,6 @@ from droidbridge.gui import backup_ops
 
 
 class ProfilesViewModel(QObject):
-    busyChanged = pyqtSignal(bool)
     profilesChanged = pyqtSignal(list)
     statusChanged = pyqtSignal(str)
     logMessage = pyqtSignal(str, str)
