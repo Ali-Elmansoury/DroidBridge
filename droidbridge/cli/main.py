@@ -2576,7 +2576,11 @@ def backup_export_contacts(dest, sources, serial):
     serial = _resolve_serial(client, serial)
     os.makedirs(dest, exist_ok=True)
 
-    summary = phone_data_module.export_contacts(client, serial, list(sources), dest)
+    try:
+        summary = phone_data_module.export_contacts(client, serial, list(sources), dest)
+    except PermissionError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
     for source, counts in summary.items():
         click.echo(f"{source}: {counts['exported']} exported, {counts['skipped']} skipped.")
 
@@ -2595,7 +2599,11 @@ def backup_export_call_log(dest, serial):
     serial = _resolve_serial(client, serial)
     os.makedirs(dest, exist_ok=True)
 
-    summary = phone_data_module.export_call_log(client, serial, dest)
+    try:
+        summary = phone_data_module.export_call_log(client, serial, dest)
+    except PermissionError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
     click.echo(f"Call log: {summary['exported']} exported, {summary['skipped']} skipped.")
 
 

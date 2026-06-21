@@ -599,6 +599,14 @@ class TestBackupExportContacts:
             runner.invoke(main.cli, ["backup", "export-contacts", "--dest", str(tmp_path), "--source", "sim"])
         mock_export.assert_called_once_with(mock_build.return_value, "SERIAL", ["sim"], str(tmp_path))
 
+    def test_permission_denial_prints_error_instead_of_traceback(self, runner, tmp_path):
+        with patch("droidbridge.cli.main._build_client"), \
+             patch("droidbridge.cli.main._resolve_serial", return_value="SERIAL"), \
+             patch("droidbridge.cli.main.phone_data_module.export_contacts", side_effect=PermissionError("Device denied access to content://call_log/calls: SecurityException")):
+            result = runner.invoke(main.cli, ["backup", "export-contacts", "--dest", str(tmp_path)])
+        assert result.exit_code == 1
+        assert "Error: Device denied access" in result.output
+
 
 class TestBackupExportCallLog:
     def test_exports_call_log(self, runner, tmp_path):
@@ -610,3 +618,11 @@ class TestBackupExportCallLog:
         assert result.exit_code == 0
         mock_export.assert_called_once_with(mock_build.return_value, "SERIAL", str(tmp_path))
         assert "Call log: 5 exported, 1 skipped." in result.output
+
+    def test_permission_denial_prints_error_instead_of_traceback(self, runner, tmp_path):
+        with patch("droidbridge.cli.main._build_client"), \
+             patch("droidbridge.cli.main._resolve_serial", return_value="SERIAL"), \
+             patch("droidbridge.cli.main.phone_data_module.export_call_log", side_effect=PermissionError("Device denied access to content://call_log/calls: SecurityException")):
+            result = runner.invoke(main.cli, ["backup", "export-call-log", "--dest", str(tmp_path)])
+        assert result.exit_code == 1
+        assert "Error: Device denied access" in result.output

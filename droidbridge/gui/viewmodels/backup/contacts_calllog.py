@@ -31,7 +31,7 @@ class ContactsCallLogViewModel(QObject):
 
     def _on_contacts_done(self, result):
         parts = [f"{source}: {counts['exported']} exported, {counts['skipped']} skipped" for source, counts in result.items()]
-        message = "Contacts export complete — " + "; ".join(parts) + "." if parts else "Contacts export complete."
+        message = ("Contacts export complete — " + "; ".join(parts) + ".") if parts else "Contacts export complete."
         self.statusChanged.emit(message)
         self.logMessage.emit(message, "INFO")
 
