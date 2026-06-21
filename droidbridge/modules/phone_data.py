@@ -65,3 +65,51 @@ def _parse_rows(output):
             continue
         rows.append(dict(fields))
     return rows, skipped
+
+
+def _query(client, serial, uri, projection, where=None):
+    command = f"content query --uri {uri} --projection {projection}"
+    if where:
+        command += f' --where "{where}"'
+    output = client.shell(serial, command)
+    return _parse_rows(output)
+
+
+def _contacts_by_account(client, serial, want_local):
+    phone_rows, skipped_a = _query(
+        client, serial,
+        "content://com.android.contacts/data/phones",
+        "display_name:data1:raw_contact_id",
+    )
+    account_rows, skipped_b = _query(
+        client, serial,
+        "content://com.android.contacts/raw_contacts",
+        "_id:account_type",
+    )
+    account_by_id = {row.get("_id"): row.get("account_type") for row in account_rows}
+
+    contacts = []
+    skipped = skipped_a + skipped_b
+    for row in phone_rows:
+        raw_id = row.get("raw_contact_id")
+        account_type = account_by_id.get(raw_id)
+        is_local = account_type in (None, "NULL")
+        if is_local != want_local:
+            continue
+        name = row.get("display_name")
+        number = row.get("data1")
+        if not name or not number:
+            skipped += 1
+            continue
+        contacts.append(Contact(display_name=name, number=number))
+    return contacts, skipped
+
+
+def query_phone_contacts(client, serial):
+    """Contacts with no synced account (account_type is NULL) - phone-local contacts only."""
+    return _contacts_by_account(client, serial, want_local=True)
+
+
+def query_account_contacts(client, serial):
+    """Contacts belonging to any synced account (Google, Samsung, etc.), merged into one bucket."""
+    return _contacts_by_account(client, serial, want_local=False)
