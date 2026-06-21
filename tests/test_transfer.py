@@ -322,6 +322,22 @@ class TestPlanPush:
         assert plan.total_files == 1
         assert plan.total_bytes == 10
 
+    def test_directory_push_manifests_only_the_destination_subtree(self, tmp_path):
+        """The remote manifest scan must stay scoped to remote_dir/base_name, not
+        all of remote_dir - remote_dir can be a large, unrelated directory (e.g.
+        a restore's source parent, often /sdcard itself), and recursively
+        `find`-ing it is what made real-device restores take well over 30s."""
+        local_dir = tmp_path / "myfolder"
+        local_dir.mkdir()
+        (local_dir / "a.txt").write_bytes(b"a" * 5)
+        client = make_client("DIR\n", "")
+
+        transfer.plan_push(client, "SERIAL", str(local_dir), "/sdcard")
+
+        exists_call, find_call = client.shell.call_args_list
+        assert "/sdcard/myfolder" in exists_call.args[1]
+        assert "/sdcard/myfolder" in find_call.args[1]
+
     def test_conflict_overwrite(self, tmp_path):
         local_file = tmp_path / "report.pdf"
         local_file.write_bytes(b"x" * 100)

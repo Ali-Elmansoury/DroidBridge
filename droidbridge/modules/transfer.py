@@ -254,13 +254,16 @@ def plan_push(client, serial, local_path, remote_dir, conflict=CONFLICT_SKIP):
     if conflict not in CONFLICT_MODES:
         raise ValueError(f"Unknown conflict mode: {conflict!r}; expected one of {CONFLICT_MODES}")
 
-    existing = _remote_manifest(client, serial, remote_dir)
     remote_dir = remote_dir.rstrip("/") or "/"
 
     items = []
     if os.path.isdir(local_path):
         local_root = local_path.rstrip("/")
         base_name = os.path.basename(local_root)
+        # Manifest only the destination subtree, not all of `remote_dir` - a
+        # restore's remote_dir is the source's parent (often /sdcard itself),
+        # and recursively `find`-ing that whole tree can take well over 30s.
+        existing = _remote_manifest(client, serial, "/".join([remote_dir, base_name]))
         for root, _, files in os.walk(local_root):
             for fname in sorted(files):
                 full = os.path.join(root, fname)
@@ -270,6 +273,7 @@ def plan_push(client, serial, local_path, remote_dir, conflict=CONFLICT_SKIP):
                 size = os.path.getsize(full)
                 items.append(_classify_remote(full, dest, size, conflict, existing))
     else:
+        existing = _remote_manifest(client, serial, remote_dir)
         name = os.path.basename(local_path)
         dest = "/".join([remote_dir, name])
         size = os.path.getsize(local_path)

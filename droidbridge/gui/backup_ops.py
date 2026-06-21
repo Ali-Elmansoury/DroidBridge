@@ -123,7 +123,10 @@ def run_restore(client, serial, profile_name, sources, after, before, conflict, 
         progress = transfer_module.execute_plan(client, serial, plan, progress_callback=progress_callback)
         verified = None
         if not no_verify:
-            verified = transfer_module.verify_push(client, serial, plan, target.remote_dir).ok
+            # Scope to the restored subtree (target.source), not target.remote_dir
+            # (its parent, often /sdcard itself) - verifying against the parent
+            # would `find` the whole device storage tree.
+            verified = transfer_module.verify_push(client, serial, plan, target.source).ok
 
         results.append({
             "source": target.source,

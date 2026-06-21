@@ -159,6 +159,26 @@ class TestRunRestore:
 
         assert results == [{"source": "/sdcard/DCIM", "done": 1, "total": 1, "failed": 0, "verified": True}]
 
+    def test_verify_scopes_to_target_source_not_its_broad_parent(self, tmp_path, monkeypatch):
+        """target.remote_dir is the source's parent (often /sdcard itself); verifying
+        against it would `find` the whole device storage tree. Must verify against
+        target.source - the actual restored subtree - instead."""
+        monkeypatch.setattr(backup_ops.backup_module, "DEFAULT_PROFILES_PATH", tmp_path / "profiles.json")
+        backup_ops.save_profile("nightly", ["/sdcard/DCIM"], str(tmp_path / "dest"), "skip", [])
+
+        item = TransferItem(source=str(tmp_path / "dest/a.jpg"), dest="/sdcard/DCIM/a.jpg", size=50, action=ACTION_COPY)
+        plan = TransferPlan(direction="push", items=[item])
+        target = RestoreTarget(source="/sdcard/DCIM", local_path=str(tmp_path / "dest"), remote_dir="/sdcard", plan=plan)
+        progress = TransferProgress(total_files=1, total_bytes=50)
+        progress.done_files = 1
+
+        with patch("droidbridge.gui.backup_ops.backup_module.plan_restore", return_value=[target]), \
+             patch("droidbridge.gui.backup_ops.transfer_module.execute_plan", return_value=progress), \
+             patch("droidbridge.gui.backup_ops.transfer_module.verify_push", return_value=VerificationResult(1, 50, 1, 50)) as mock_verify:
+            backup_ops.run_restore(MagicMock(), "SERIAL", "nightly", [], None, None, "skip", False)
+
+        assert mock_verify.call_args.args[3] == "/sdcard/DCIM"
+
     def test_nothing_to_transfer_for_a_target_reports_zeroes(self, tmp_path, monkeypatch):
         monkeypatch.setattr(backup_ops.backup_module, "DEFAULT_PROFILES_PATH", tmp_path / "profiles.json")
         backup_ops.save_profile("nightly", ["/sdcard/DCIM"], str(tmp_path / "dest"), "skip", [])
