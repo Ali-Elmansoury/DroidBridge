@@ -2,7 +2,7 @@
 
 import os
 from datetime import datetime
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from click.testing import CliRunner
 
@@ -574,3 +574,39 @@ class TestBackupVerify:
 
         assert result.exit_code == 1
         assert "Status: MISMATCH" in result.output
+
+
+class TestBackupExportContacts:
+    def test_exports_all_sources_by_default(self, runner, tmp_path):
+        with patch("droidbridge.cli.main._build_client") as mock_build, \
+             patch("droidbridge.cli.main._resolve_serial", return_value="SERIAL"), \
+             patch("droidbridge.cli.main.phone_data_module.export_contacts") as mock_export:
+            mock_export.return_value = {
+                "phone": {"exported": 2, "skipped": 0},
+                "accounts": {"exported": 1, "skipped": 0},
+                "sim": {"exported": 0, "skipped": 0},
+            }
+            result = runner.invoke(main.cli, ["backup", "export-contacts", "--dest", str(tmp_path)])
+        assert result.exit_code == 0
+        mock_export.assert_called_once_with(mock_build.return_value, "SERIAL", ["phone", "accounts", "sim"], str(tmp_path))
+        assert "phone: 2 exported, 0 skipped." in result.output
+
+    def test_exports_only_requested_sources(self, runner, tmp_path):
+        with patch("droidbridge.cli.main._build_client") as mock_build, \
+             patch("droidbridge.cli.main._resolve_serial", return_value="SERIAL"), \
+             patch("droidbridge.cli.main.phone_data_module.export_contacts") as mock_export:
+            mock_export.return_value = {"sim": {"exported": 0, "skipped": 0}}
+            runner.invoke(main.cli, ["backup", "export-contacts", "--dest", str(tmp_path), "--source", "sim"])
+        mock_export.assert_called_once_with(mock_build.return_value, "SERIAL", ["sim"], str(tmp_path))
+
+
+class TestBackupExportCallLog:
+    def test_exports_call_log(self, runner, tmp_path):
+        with patch("droidbridge.cli.main._build_client") as mock_build, \
+             patch("droidbridge.cli.main._resolve_serial", return_value="SERIAL"), \
+             patch("droidbridge.cli.main.phone_data_module.export_call_log") as mock_export:
+            mock_export.return_value = {"exported": 5, "skipped": 1}
+            result = runner.invoke(main.cli, ["backup", "export-call-log", "--dest", str(tmp_path)])
+        assert result.exit_code == 0
+        mock_export.assert_called_once_with(mock_build.return_value, "SERIAL", str(tmp_path))
+        assert "Call log: 5 exported, 1 skipped." in result.output

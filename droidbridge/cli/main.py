@@ -17,6 +17,7 @@ from droidbridge.modules import apps as apps_module
 from droidbridge.modules import backup_manager as backup_module
 from droidbridge.modules import device as device_module
 from droidbridge.modules import files as files_module
+from droidbridge.modules import phone_data as phone_data_module
 from droidbridge.modules import search as search_module
 from droidbridge.modules import storage as storage_module
 from droidbridge.modules import transfer as transfer_module
@@ -2548,6 +2549,54 @@ def backup_history(profile_name, max_age_days):
             f"Change since previous backup: {comparison['file_count_delta']:+d} file(s), "
             f"{comparison['total_bytes_delta']:+d} byte(s)"
         )
+
+
+_CONTACT_SOURCES = ("phone", "accounts", "sim")
+
+
+@backup_cmd.command("export-contacts")
+@click.option("--dest", required=True, type=click.Path(file_okay=False), help="Local directory to write exported contact files to.")
+@click.option(
+    "--source",
+    "sources",
+    multiple=True,
+    type=click.Choice(_CONTACT_SOURCES),
+    default=_CONTACT_SOURCES,
+    help="Contact source(s) to export (default: all three).",
+)
+@_SERIAL_OPTION
+def backup_export_contacts(dest, sources, serial):
+    """Export device Contacts (phone/accounts/SIM) to vCard + JSON files."""
+    try:
+        client = _build_client()
+    except AdbError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+
+    serial = _resolve_serial(client, serial)
+    os.makedirs(dest, exist_ok=True)
+
+    summary = phone_data_module.export_contacts(client, serial, list(sources), dest)
+    for source, counts in summary.items():
+        click.echo(f"{source}: {counts['exported']} exported, {counts['skipped']} skipped.")
+
+
+@backup_cmd.command("export-call-log")
+@click.option("--dest", required=True, type=click.Path(file_okay=False), help="Local directory to write the exported call log files to.")
+@_SERIAL_OPTION
+def backup_export_call_log(dest, serial):
+    """Export the device's Call Log to CSV + JSON files."""
+    try:
+        client = _build_client()
+    except AdbError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+
+    serial = _resolve_serial(client, serial)
+    os.makedirs(dest, exist_ok=True)
+
+    summary = phone_data_module.export_call_log(client, serial, dest)
+    click.echo(f"Call log: {summary['exported']} exported, {summary['skipped']} skipped.")
 
 
 @cli.group("report")
