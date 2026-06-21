@@ -61,7 +61,7 @@ class TestRunViewModel:
         logs = []
         vm.logMessage.connect(lambda msg, level: logs.append((msg, level)))
         vm.run_backup("nightly", False)
-        assert logs == [("Profile 'nightly' not found.", "ERROR")]
+        assert ("Profile 'nightly' not found.", "ERROR") in logs
 
 
 from PyQt6.QtCore import Qt

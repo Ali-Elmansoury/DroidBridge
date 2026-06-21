@@ -19,6 +19,7 @@ class RunViewModel(QObject):
         self._workers = []
 
     def run_backup(self, profile_name, no_verify):
+        self.logMessage.emit(f"Running backup for profile {profile_name!r}...", "INFO")
         client, serial = self.context.client, self.context.serial
         fn = functools.partial(backup_ops.run_backup, client, serial, profile_name, no_verify)
         self._run(fn, self._on_done, report_progress=True)
