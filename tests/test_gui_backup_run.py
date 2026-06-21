@@ -62,3 +62,43 @@ class TestRunViewModel:
         vm.logMessage.connect(lambda msg, level: logs.append((msg, level)))
         vm.run_backup("nightly", False)
         assert logs == [("Profile 'nightly' not found.", "ERROR")]
+
+
+from PyQt6.QtCore import Qt
+
+from droidbridge.gui.pages.backup.run import RunPanel
+
+
+class TestRunPanel:
+    def test_run_button_triggers_viewmodel_with_selected_profile(self, qtbot, monkeypatch):
+        panel = RunPanel(_connected_ctx(), lambda: "nightly")
+        qtbot.addWidget(panel)
+        calls = []
+        monkeypatch.setattr(panel.viewmodel, "run_backup", lambda profile, no_verify: calls.append((profile, no_verify)))
+        qtbot.mouseClick(panel.run_button, Qt.MouseButton.LeftButton)
+        assert calls == [("nightly", False)]
+
+    def test_no_verify_checkbox_is_passed_through(self, qtbot, monkeypatch):
+        panel = RunPanel(_connected_ctx(), lambda: "nightly")
+        qtbot.addWidget(panel)
+        panel.no_verify_checkbox.setChecked(True)
+        calls = []
+        monkeypatch.setattr(panel.viewmodel, "run_backup", lambda profile, no_verify: calls.append((profile, no_verify)))
+        qtbot.mouseClick(panel.run_button, Qt.MouseButton.LeftButton)
+        assert calls == [("nightly", True)]
+
+    def test_progress_changed_updates_label(self, qtbot):
+        panel = RunPanel(_connected_ctx(), lambda: "nightly")
+        qtbot.addWidget(panel)
+        panel.viewmodel.progressChanged.emit(2, 4)
+        assert "2" in panel.progress_label.text()
+        assert "4" in panel.progress_label.text()
+
+    def test_busy_shows_hides_progress_bar(self, qtbot):
+        panel = RunPanel(_connected_ctx(), lambda: "nightly")
+        qtbot.addWidget(panel)
+        panel.show()
+        panel.viewmodel.busyChanged.emit(True)
+        assert panel.progress_bar.isVisible()
+        panel.viewmodel.busyChanged.emit(False)
+        assert not panel.progress_bar.isVisible()
