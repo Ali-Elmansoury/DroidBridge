@@ -27,9 +27,11 @@ class HistoryPanel(QWidget):
         layout.addWidget(self.table)
 
         self.outdated_label = QLabel()
+        self.outdated_label.setWordWrap(True)
         layout.addWidget(self.outdated_label)
 
         self.comparison_label = QLabel()
+        self.comparison_label.setWordWrap(True)
         layout.addWidget(self.comparison_label)
 
     def _connect(self):

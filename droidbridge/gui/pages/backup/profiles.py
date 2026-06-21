@@ -76,6 +76,7 @@ class ProfilesPanel(QWidget):
         layout.addLayout(action_row)
 
         self.status_label = QLabel()
+        self.status_label.setWordWrap(True)
         layout.addWidget(self.status_label)
         layout.addStretch()
 

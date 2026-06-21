@@ -21,9 +21,11 @@ class VerifyPanel(QWidget):
         layout.addLayout(btn_row)
 
         self.result_label = QLabel()
+        self.result_label.setWordWrap(True)
         layout.addWidget(self.result_label)
 
         self.status_label = QLabel()
+        self.status_label.setWordWrap(True)
         layout.addWidget(self.status_label)
         layout.addStretch()
 
