@@ -25,7 +25,7 @@ def get_overview(client, serial):
     categories = [
         {"label": label, "size_str": format_utils.format_bytes(overview.categories[key])}
         for key, label in _CATEGORY_LABELS
-        if key in overview.categories
+        if overview.categories.get(key, 0) > 0
     ]
     return {
         "total_str": format_utils.format_bytes(total_bytes),

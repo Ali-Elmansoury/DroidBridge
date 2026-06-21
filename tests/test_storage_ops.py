@@ -34,6 +34,16 @@ class TestGetOverview:
         result = storage_ops.get_overview(MagicMock(), "S1")
         assert result["percent"] == 0
 
+    def test_excludes_zero_size_categories(self, monkeypatch):
+        overview = StorageOverview(
+            total_kb=100, used_kb=50, free_kb=50,
+            categories={"apps": 20, "downloads": 0},
+        )
+        monkeypatch.setattr(storage_ops.storage_module, "get_storage_overview", lambda c, s: overview)
+        result = storage_ops.get_overview(MagicMock(), "S1")
+        labels = [c["label"] for c in result["categories"]]
+        assert labels == ["Apps"]
+
 
 class TestGetApps:
     def _apps(self):
