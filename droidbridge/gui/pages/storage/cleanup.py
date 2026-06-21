@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import (
-    QHBoxLayout, QLabel, QListWidget, QProgressBar, QPushButton,
+    QAbstractItemView, QHBoxLayout, QLabel, QListWidget, QProgressBar, QPushButton,
     QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 from droidbridge.gui.viewmodels.storage.cleanup import CleanupViewModel
@@ -30,7 +30,9 @@ class CleanupPanel(QWidget):
 
         self.suggestions_table = QTableWidget(0, len(_COLS))
         self.suggestions_table.setHorizontalHeaderLabels(_COLS)
+        self.suggestions_table.resizeColumnsToContents()
         self.suggestions_table.horizontalHeader().setStretchLastSection(True)
+        self.suggestions_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         layout.addWidget(self.suggestions_table)
 
         self.empty_label = QLabel("No cleanup suggestions found.")

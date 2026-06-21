@@ -1,7 +1,7 @@
 import datetime
 from PyQt6.QtCore import QDate
 from PyQt6.QtWidgets import (
-    QCheckBox, QDateEdit, QHBoxLayout, QLabel, QLineEdit, QListWidget,
+    QAbstractItemView, QCheckBox, QDateEdit, QHBoxLayout, QLabel, QLineEdit, QListWidget,
     QProgressBar, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 from droidbridge.gui.viewmodels.storage.media import MediaViewModel
@@ -59,6 +59,7 @@ class MediaPanel(QWidget):
         self.duplicates_table = QTableWidget(0, len(_DUPLICATE_COLS))
         self.duplicates_table.setHorizontalHeaderLabels(_DUPLICATE_COLS)
         self.duplicates_table.horizontalHeader().setStretchLastSection(True)
+        self.duplicates_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         layout.addWidget(self.duplicates_table)
 
         self.duplicates_overflow_label = QLabel()
