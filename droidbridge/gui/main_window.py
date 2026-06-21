@@ -160,7 +160,7 @@ class MainWindow(QMainWindow):
         self._busy_viewmodels = set()
         self._status_color_timer = QTimer(self)
         self._status_color_timer.setSingleShot(True)
-        self._status_color_timer.timeout.connect(self._reset_status_style)
+        self._status_color_timer.timeout.connect(lambda: self.status_label.setStyleSheet(""))
 
         self.context.connectionChanged.connect(self._on_connection_changed)
         self.device_viewmodel.statusChanged.connect(self._on_status_changed)
@@ -230,12 +230,7 @@ class MainWindow(QMainWindow):
         if color:
             self.status_label.setFullText(message)
             self.status_label.setStyleSheet(f"color: {color};")
-            self.status_label.setWrapMode(True)
             self._status_color_timer.start(5000)
-
-    def _reset_status_style(self):
-        self.status_label.setStyleSheet("")
-        self.status_label.setWrapMode(False)
 
     def keyPressEvent(self, event):
         if event.modifiers() == Qt.KeyboardModifier.ControlModifier:
