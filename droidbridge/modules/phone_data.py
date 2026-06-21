@@ -113,3 +113,54 @@ def query_phone_contacts(client, serial):
 def query_account_contacts(client, serial):
     """Contacts belonging to any synced account (Google, Samsung, etc.), merged into one bucket."""
     return _contacts_by_account(client, serial, want_local=False)
+
+
+def query_sim_contacts(client, serial):
+    """SIM card contacts via content://icc/adn - a separate, simpler provider.
+
+    Returns ([], 0) if the SIM provider is absent or the device has no SIM -
+    that's a successful empty export, not an error.
+    """
+    try:
+        rows, skipped = _query(client, serial, "content://icc/adn", "name:number")
+    except Exception:
+        return [], 0
+    contacts = []
+    for row in rows:
+        name = row.get("name")
+        number = row.get("number")
+        if not name or not number:
+            skipped += 1
+            continue
+        contacts.append(Contact(display_name=name, number=number))
+    return contacts, skipped
+
+
+def query_call_log(client, serial):
+    rows, skipped = _query(
+        client, serial,
+        "content://call_log/calls",
+        "name:number:date:duration:type",
+    )
+    entries = []
+    for row in rows:
+        number = row.get("number")
+        date_ms = row.get("date")
+        if not number or not date_ms:
+            skipped += 1
+            continue
+        try:
+            timestamp = datetime.fromtimestamp(int(date_ms) / 1000, tz=timezone.utc).isoformat(timespec="seconds")
+        except (ValueError, TypeError):
+            skipped += 1
+            continue
+        name = row.get("name") or ""
+        if name == "NULL":
+            name = ""
+        duration = row.get("duration") or "0"
+        call_type = _CALL_TYPES.get(row.get("type"), "unknown")
+        entries.append(CallLogEntry(
+            name=name, number=number, timestamp=timestamp,
+            duration_seconds=duration, call_type=call_type,
+        ))
+    return entries, skipped

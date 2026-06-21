@@ -1,10 +1,14 @@
+from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
 from droidbridge.modules.phone_data import (
+    CallLogEntry,
     Contact,
     _parse_rows,
     query_account_contacts,
+    query_call_log,
     query_phone_contacts,
+    query_sim_contacts,
 )
 
 
@@ -85,4 +89,57 @@ class TestQueryAccountContacts:
         client = _client_with_shell_outputs(phones_output, raw_output)
         contacts, skipped = query_account_contacts(client, "SERIAL")
         assert contacts == []
+        assert skipped == 1
+
+
+class TestQuerySimContacts:
+    def test_parses_sim_contacts(self):
+        client = _client_with_shell_outputs("Row: 0 name=Sim Contact, number=+15550001111\n")
+        contacts, skipped = query_sim_contacts(client, "SERIAL")
+        assert contacts == [Contact(display_name="Sim Contact", number="+15550001111")]
+        assert skipped == 0
+
+    def test_no_sim_returns_empty_not_error(self):
+        client = _client_with_shell_outputs("No result found.\n")
+        contacts, skipped = query_sim_contacts(client, "SERIAL")
+        assert contacts == []
+        assert skipped == 0
+
+    def test_provider_exception_returns_empty_not_raised(self):
+        client = MagicMock()
+        client.shell.side_effect = RuntimeError("no such provider")
+        contacts, skipped = query_sim_contacts(client, "SERIAL")
+        assert contacts == []
+        assert skipped == 0
+
+
+class TestQueryCallLog:
+    def test_parses_call_log_rows(self):
+        output = (
+            "Row: 0 name=Jane Roe, number=+15551112222, date=1750000000000, duration=42, type=1\n"
+            "Row: 1 name=NULL, number=+15553334444, date=1750000100000, duration=0, type=3\n"
+        )
+        client = _client_with_shell_outputs(output)
+        entries, skipped = query_call_log(client, "SERIAL")
+        assert skipped == 0
+        expected_ts_0 = datetime.fromtimestamp(1750000000000 / 1000, tz=timezone.utc).isoformat(timespec="seconds")
+        expected_ts_1 = datetime.fromtimestamp(1750000100000 / 1000, tz=timezone.utc).isoformat(timespec="seconds")
+        assert entries == [
+            CallLogEntry(name="Jane Roe", number="+15551112222", timestamp=expected_ts_0,
+                         duration_seconds="42", call_type="incoming"),
+            CallLogEntry(name="", number="+15553334444", timestamp=expected_ts_1,
+                         duration_seconds="0", call_type="missed"),
+        ]
+
+    def test_unknown_call_type_falls_back(self):
+        output = "Row: 0 name=X, number=+15550000000, date=1750000000000, duration=1, type=99\n"
+        client = _client_with_shell_outputs(output)
+        entries, skipped = query_call_log(client, "SERIAL")
+        assert entries[0].call_type == "unknown"
+
+    def test_missing_number_or_date_is_skipped(self):
+        output = "Row: 0 name=X, number=, date=1750000000000, duration=1, type=1\n"
+        client = _client_with_shell_outputs(output)
+        entries, skipped = query_call_log(client, "SERIAL")
+        assert entries == []
         assert skipped == 1
