@@ -77,3 +77,31 @@ class TestRunBackup:
 
         mock_execute.assert_not_called()
         assert result == {"done": 0, "total": 0, "failed": 0, "verified": True}
+
+
+class TestRunVerify:
+    def test_raises_when_no_history(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(backup_ops.backup_module, "DEFAULT_PROFILES_PATH", tmp_path / "profiles.json")
+        monkeypatch.setattr(backup_ops.backup_module, "DEFAULT_HISTORY_PATH", tmp_path / "history.json")
+        backup_ops.save_profile("nightly", ["/sdcard/DCIM"], str(tmp_path / "dest"), "skip", [])
+        try:
+            backup_ops.run_verify("nightly")
+            assert False, "expected ValueError"
+        except ValueError as exc:
+            assert "nightly" in str(exc)
+
+    def test_ok_when_destination_matches_history(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(backup_ops.backup_module, "DEFAULT_PROFILES_PATH", tmp_path / "profiles.json")
+        monkeypatch.setattr(backup_ops.backup_module, "DEFAULT_HISTORY_PATH", tmp_path / "history.json")
+        dest = tmp_path / "dest"
+        dest.mkdir()
+        (dest / "a.jpg").write_bytes(b"x" * 100)
+        backup_ops.save_profile("nightly", ["/sdcard/DCIM"], str(dest), "skip", [])
+        backup_ops.backup_module.append_history(
+            backup_ops.backup_module.DEFAULT_HISTORY_PATH,
+            BackupRecord(profile="nightly", timestamp="2026-06-21T00:00:00+00:00",
+                         file_count=1, total_bytes=100, duration_seconds=1.0,
+                         destination=str(dest), verified=True),
+        )
+        result = backup_ops.run_verify("nightly")
+        assert result == {"ok": True, "expected_files": 1, "expected_bytes": 100, "actual_files": 1, "actual_bytes": 100}

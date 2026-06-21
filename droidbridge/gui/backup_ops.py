@@ -64,3 +64,29 @@ def run_backup(client, serial, profile_name, no_verify, progress_callback=None):
         ),
     )
     return {"done": done_files, "total": plan.total_files, "failed": failed, "verified": verified}
+
+
+def run_verify(profile_name):
+    profile = backup_module.get_profile(backup_module.DEFAULT_PROFILES_PATH, profile_name)
+    if profile is None:
+        raise ValueError(f"Profile {profile_name!r} not found.")
+
+    history = backup_module.load_history(backup_module.DEFAULT_HISTORY_PATH)
+    record = backup_module.last_backup(history, profile_name)
+    if record is None:
+        raise ValueError(f"No backups recorded for profile {profile_name!r}. Run a backup first.")
+
+    actual_files, actual_bytes = backup_module.measure_destination(record.destination)
+    result = transfer_module.VerificationResult(
+        expected_files=record.file_count,
+        expected_bytes=record.total_bytes,
+        actual_files=actual_files,
+        actual_bytes=actual_bytes,
+    )
+    return {
+        "ok": result.ok,
+        "expected_files": result.expected_files,
+        "expected_bytes": result.expected_bytes,
+        "actual_files": result.actual_files,
+        "actual_bytes": result.actual_bytes,
+    }
