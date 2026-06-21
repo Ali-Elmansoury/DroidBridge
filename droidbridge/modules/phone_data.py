@@ -72,7 +72,10 @@ def _query(client, serial, uri, projection, where=None):
     command = f"content query --uri {uri} --projection {projection}"
     if where:
         command += f' --where "{where}"'
-    output = client.shell(serial, command)
+    # `content query` reports provider errors (e.g. permission denials) on the
+    # device-side stderr, which adb keeps separate from stdout - merge it in
+    # remotely so `_query` can see it instead of silently parsing empty rows.
+    output = client.shell(serial, command + " 2>&1")
     if any(marker in output for marker in _PERMISSION_DENIAL_MARKERS):
         lines = output.splitlines()
         detail = next((line.strip() for line in lines if "Permission Denial" in line), lines[0].strip() if lines else uri)
