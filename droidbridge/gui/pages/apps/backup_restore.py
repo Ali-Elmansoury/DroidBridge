@@ -130,3 +130,5 @@ class BackupRestorePanel(QWidget):
 
     def _on_busy(self, busy):
         self.progress_bar.setVisible(busy)
+        self.backup_button.setEnabled(not busy and self._current_app is not None)
+        self.restore_button.setEnabled(not busy and self._current_manifest is not None)

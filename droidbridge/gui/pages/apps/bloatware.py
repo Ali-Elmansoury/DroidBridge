@@ -93,3 +93,5 @@ class BloatwarePanel(QWidget):
 
     def _on_busy(self, busy):
         self.progress_bar.setVisible(busy)
+        self.disable_button.setEnabled(not busy)
+        self.enable_button.setEnabled(not busy)

@@ -111,16 +111,31 @@ class TestTrimCaches:
 class TestResetAppData:
     def test_calls_module_clear_app_data(self, monkeypatch):
         calls = []
+        monkeypatch.setattr(apps_ops.apps_module, "get_apps", lambda c, s: [_app("com.a")])
         monkeypatch.setattr(apps_ops.apps_module, "clear_app_data", lambda c, s, p: calls.append((s, p)))
 
         apps_ops.reset_app_data(MagicMock(), "S1", "com.a")
 
         assert calls == [("S1", "com.a")]
 
+    def test_raises_value_error_and_does_not_call_module_for_system_app(self, monkeypatch):
+        calls = []
+        monkeypatch.setattr(apps_ops.apps_module, "get_apps", lambda c, s: [_app("com.a", is_system=True)])
+        monkeypatch.setattr(apps_ops.apps_module, "clear_app_data", lambda c, s, p: calls.append((s, p)))
+
+        try:
+            apps_ops.reset_app_data(MagicMock(), "S1", "com.a")
+            assert False, "expected ValueError"
+        except ValueError:
+            pass
+
+        assert calls == []
+
 
 class TestUninstallApp:
     def test_calls_module_uninstall_and_returns_true(self, monkeypatch):
         calls = []
+        monkeypatch.setattr(apps_ops.apps_module, "get_apps", lambda c, s: [_app("com.a")])
         monkeypatch.setattr(
             apps_ops.apps_module, "uninstall_app",
             lambda c, s, p, keep_data=False: calls.append((s, p, keep_data)),
@@ -130,6 +145,22 @@ class TestUninstallApp:
 
         assert result is True
         assert calls == [("S1", "com.a", True)]
+
+    def test_raises_value_error_and_does_not_call_module_for_system_app(self, monkeypatch):
+        calls = []
+        monkeypatch.setattr(apps_ops.apps_module, "get_apps", lambda c, s: [_app("com.a", is_system=True)])
+        monkeypatch.setattr(
+            apps_ops.apps_module, "uninstall_app",
+            lambda c, s, p, keep_data=False: calls.append((s, p, keep_data)),
+        )
+
+        try:
+            apps_ops.uninstall_app(MagicMock(), "S1", "com.a")
+            assert False, "expected ValueError"
+        except ValueError:
+            pass
+
+        assert calls == []
 
 
 class TestDisableEnableApp:

@@ -224,3 +224,19 @@ class TestBackupRestorePanel:
         panel.restore_button.click()
 
         assert calls == []
+
+    def test_busy_disables_action_buttons_and_busy_false_reenables(self, qtbot):
+        panel = BackupRestorePanel(_connected_ctx())
+        qtbot.addWidget(panel)
+        panel.viewmodel.appInfoChanged.emit(_app_row())
+        panel.viewmodel.manifestChanged.emit(_manifest())
+
+        panel.viewmodel.busyChanged.emit(True)
+
+        assert not panel.backup_button.isEnabled()
+        assert not panel.restore_button.isEnabled()
+
+        panel.viewmodel.busyChanged.emit(False)
+
+        assert panel.backup_button.isEnabled()
+        assert panel.restore_button.isEnabled()

@@ -199,3 +199,18 @@ class TestBloatwarePanel:
         panel.viewmodel.appInfoChanged.emit(_app_row(is_disabled=False))
 
         assert emitted == []
+
+    def test_busy_disables_action_buttons_and_busy_false_reenables(self, qtbot):
+        panel = BloatwarePanel(_connected_ctx())
+        qtbot.addWidget(panel)
+        panel.viewmodel.appInfoChanged.emit(_app_row(is_disabled=False))
+
+        panel.viewmodel.busyChanged.emit(True)
+
+        assert not panel.disable_button.isEnabled()
+        assert not panel.enable_button.isEnabled()
+
+        panel.viewmodel.busyChanged.emit(False)
+
+        assert panel.disable_button.isEnabled()
+        assert panel.enable_button.isEnabled()

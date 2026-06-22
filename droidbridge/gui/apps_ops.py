@@ -60,10 +60,16 @@ def trim_caches(client, serial, estimate_bytes):
 
 
 def reset_app_data(client, serial, package):
+    app = next((a for a in apps_module.get_apps(client, serial) if a.package == package), None)
+    if app is not None and app.is_system:
+        raise ValueError(f"{package} is a system app; refusing to reset its data.")
     apps_module.clear_app_data(client, serial, package)
 
 
 def uninstall_app(client, serial, package, keep_data=False):
+    app = next((a for a in apps_module.get_apps(client, serial) if a.package == package), None)
+    if app is not None and app.is_system:
+        raise ValueError(f"{package} is a system app; refusing to uninstall it.")
     apps_module.uninstall_app(client, serial, package, keep_data=keep_data)
     return True
 
