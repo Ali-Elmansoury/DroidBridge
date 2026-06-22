@@ -224,3 +224,8 @@ def disable_app(client, serial, package, user=0):
 def enable_app(client, serial, package, user=0):
     """Re-enable a previously disabled `package` for `user` via `pm enable`."""
     client.shell(serial, ["pm", "enable", "--user", str(user), package])
+
+
+def install_apk(client, serial, apk_paths, allow_downgrade=False):
+    """Install/replace an app from `apk_paths` (base + any splits) via `client.install`."""
+    client.install(serial, apk_paths, allow_downgrade=allow_downgrade)

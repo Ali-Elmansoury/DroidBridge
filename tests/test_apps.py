@@ -272,3 +272,23 @@ class TestEnableApp:
         client.shell.assert_called_once_with(
             "SERIAL123", ["pm", "enable", "--user", "0", "com.example.bloat"]
         )
+
+
+class TestInstallApk:
+    def test_passes_paths_through_to_client_install(self):
+        client = MagicMock()
+
+        apps.install_apk(client, "SERIAL123", ["/local/base.apk", "/local/split.apk"])
+
+        client.install.assert_called_once_with(
+            "SERIAL123", ["/local/base.apk", "/local/split.apk"], allow_downgrade=False
+        )
+
+    def test_passes_allow_downgrade_through(self):
+        client = MagicMock()
+
+        apps.install_apk(client, "SERIAL123", ["/local/base.apk"], allow_downgrade=True)
+
+        client.install.assert_called_once_with(
+            "SERIAL123", ["/local/base.apk"], allow_downgrade=True
+        )
