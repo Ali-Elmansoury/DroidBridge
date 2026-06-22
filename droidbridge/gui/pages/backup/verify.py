@@ -16,6 +16,7 @@ class VerifyPanel(QWidget):
 
         btn_row = QHBoxLayout()
         self.verify_button = QPushButton("Verify")
+        self.verify_button.setToolTip("Compare the selected profile's last backup against its sources by file count and size.")
         btn_row.addWidget(self.verify_button)
         btn_row.addStretch()
         layout.addLayout(btn_row)

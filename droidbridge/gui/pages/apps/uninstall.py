@@ -29,11 +29,13 @@ class UninstallPanel(QWidget):
         layout.addWidget(self.acting_on_label)
 
         self.keep_data_checkbox = QCheckBox("Keep data and cache (-k)")
+        self.keep_data_checkbox.setToolTip("Keep the app's data and cache so they're restored if it's reinstalled.")
         layout.addWidget(self.keep_data_checkbox)
 
         row = QHBoxLayout()
         self.uninstall_button = QPushButton("Uninstall App")
         self.uninstall_button.setEnabled(False)
+        self.uninstall_button.setToolTip("Uninstall the selected app. Disabled for system apps.")
         row.addWidget(self.uninstall_button)
         row.addStretch()
         layout.addLayout(row)

@@ -19,6 +19,7 @@ class CleanupPanel(QWidget):
         layout = QVBoxLayout(self)
         row = QHBoxLayout()
         self.refresh_button = QPushButton("Refresh")
+        self.refresh_button.setToolTip("Scan the device and refresh cleanup suggestions.")
         row.addWidget(self.refresh_button)
         row.addStretch()
         layout.addLayout(row)
@@ -33,6 +34,7 @@ class CleanupPanel(QWidget):
         self.suggestions_table.resizeColumnsToContents()
         self.suggestions_table.horizontalHeader().setStretchLastSection(True)
         self.suggestions_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.suggestions_table.setToolTip("Select a suggestion to view its items below.")
         layout.addWidget(self.suggestions_table)
 
         self.empty_label = QLabel("No cleanup suggestions found.")

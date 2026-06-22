@@ -20,6 +20,7 @@ class RunPanel(QWidget):
 
         btn_row = QHBoxLayout()
         self.run_button = QPushButton("Run Backup")
+        self.run_button.setToolTip("Run a backup of the selected profile's sources to its destination.")
         btn_row.addWidget(self.run_button)
         btn_row.addStretch()
         layout.addLayout(btn_row)

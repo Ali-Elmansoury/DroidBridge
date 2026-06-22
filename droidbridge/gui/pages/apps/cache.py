@@ -36,6 +36,7 @@ class CachePanel(QWidget):
         trim_layout.addWidget(self.estimate_label)
         trim_row = QHBoxLayout()
         self.trim_button = QPushButton("Trim Caches Now")
+        self.trim_button.setToolTip("Clear the cache (not data) of every installed app to reclaim space.")
         trim_row.addWidget(self.trim_button)
         trim_row.addStretch()
         trim_layout.addLayout(trim_row)
@@ -51,6 +52,9 @@ class CachePanel(QWidget):
         reset_row = QHBoxLayout()
         self.reset_button = QPushButton("Reset App Data")
         self.reset_button.setEnabled(False)
+        self.reset_button.setToolTip(
+            "Wipe all data and cache for the selected app. Disabled for system apps and requires typed confirmation."
+        )
         reset_row.addWidget(self.reset_button)
         reset_row.addStretch()
         reset_layout.addLayout(reset_row)

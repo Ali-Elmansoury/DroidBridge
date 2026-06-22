@@ -25,14 +25,18 @@ class MediaPanel(QWidget):
         row = QHBoxLayout()
         row.addWidget(QLabel("Root:"))
         self.root_edit = QLineEdit(search_module.DEFAULT_ROOT)
+        self.root_edit.setToolTip("Device path to scan for media files.")
         row.addWidget(self.root_edit)
         self.before_checkbox = QCheckBox("Filter by date (before):")
+        self.before_checkbox.setToolTip("Include only media files modified before the date on the right.")
         row.addWidget(self.before_checkbox)
         self.before_date_edit = QDateEdit(QDate.currentDate())
         self.before_date_edit.setCalendarPopup(True)
         self.before_date_edit.setEnabled(False)
+        self.before_date_edit.setToolTip("Latest modification date to include in the scan.")
         row.addWidget(self.before_date_edit)
         self.scan_button = QPushButton("Scan")
+        self.scan_button.setToolTip("Scan the device for media files, categorize them, and find duplicates.")
         row.addWidget(self.scan_button)
         layout.addLayout(row)
 
@@ -60,6 +64,7 @@ class MediaPanel(QWidget):
         self.duplicates_table.setHorizontalHeaderLabels(_DUPLICATE_COLS)
         self.duplicates_table.horizontalHeader().setStretchLastSection(True)
         self.duplicates_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.duplicates_table.setToolTip("Select a duplicate group to view its file paths below.")
         layout.addWidget(self.duplicates_table)
 
         self.duplicates_overflow_label = QLabel()
@@ -68,6 +73,7 @@ class MediaPanel(QWidget):
 
         layout.addWidget(QLabel("Paths in selected group:"))
         self.duplicates_paths_list = QListWidget()
+        self.duplicates_paths_list.setToolTip("Full device paths of files in the duplicate group selected above.")
         layout.addWidget(self.duplicates_paths_list)
 
         self.status_label = QLabel()

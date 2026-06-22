@@ -18,6 +18,7 @@ class HistoryPanel(QWidget):
 
         btn_row = QHBoxLayout()
         self.refresh_button = QPushButton("Refresh")
+        self.refresh_button.setToolTip("Reload the backup history for the selected profile.")
         btn_row.addWidget(self.refresh_button)
         btn_row.addStretch()
         layout.addLayout(btn_row)

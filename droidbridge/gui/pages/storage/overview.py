@@ -18,6 +18,7 @@ class OverviewPanel(QWidget):
         layout = QVBoxLayout(self)
         row = QHBoxLayout()
         self.refresh_button = QPushButton("Refresh")
+        self.refresh_button.setToolTip("Refresh the device storage usage breakdown.")
         row.addWidget(self.refresh_button)
         row.addStretch()
         layout.addLayout(row)

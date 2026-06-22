@@ -27,11 +27,13 @@ class ApkExtractionPanel(QWidget):
         layout.addWidget(self.acting_on_label)
 
         self.files_list = QListWidget()
+        self.files_list.setToolTip("APK file(s) that make up the selected app (split APKs show more than one).")
         layout.addWidget(self.files_list)
 
         row = QHBoxLayout()
         self.extract_button = QPushButton("Extract APK...")
         self.extract_button.setEnabled(False)
+        self.extract_button.setToolTip("Pull the selected app's APK file(s) to a folder on your computer.")
         row.addWidget(self.extract_button)
         row.addStretch()
         layout.addLayout(row)

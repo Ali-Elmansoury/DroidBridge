@@ -23,18 +23,22 @@ class RestorePanel(QWidget):
 
         layout.addWidget(QLabel("Sources to restore (unchecked = skip):"))
         self.sources_list = QListWidget()
+        self.sources_list.setToolTip("Check the backed-up sources to push back to the device; uncheck to skip them.")
         layout.addWidget(self.sources_list)
 
         date_row = QHBoxLayout()
         self.date_filter_checkbox = QCheckBox("Filter by date")
+        self.date_filter_checkbox.setToolTip("Restore only files modified within the date range on the right.")
         date_row.addWidget(self.date_filter_checkbox)
         date_row.addWidget(QLabel("After:"))
         self.after_date_edit = QDateEdit(QDate.currentDate())
         self.after_date_edit.setCalendarPopup(True)
+        self.after_date_edit.setToolTip("Earliest modification date to include in the restore.")
         date_row.addWidget(self.after_date_edit)
         date_row.addWidget(QLabel("Before:"))
         self.before_date_edit = QDateEdit(QDate.currentDate())
         self.before_date_edit.setCalendarPopup(True)
+        self.before_date_edit.setToolTip("Latest modification date to include in the restore.")
         date_row.addWidget(self.before_date_edit)
         layout.addLayout(date_row)
 
@@ -42,14 +46,19 @@ class RestorePanel(QWidget):
         conflict_row.addWidget(QLabel("Conflict:"))
         self.conflict_combo = QComboBox()
         self.conflict_combo.addItems(_CONFLICT_OPTIONS)
+        self.conflict_combo.setToolTip(
+            "How to handle files that already exist on the device. Defaults to the profile's setting."
+        )
         conflict_row.addWidget(self.conflict_combo)
         self.no_verify_checkbox = QCheckBox("Skip verification")
+        self.no_verify_checkbox.setToolTip("Skip confirming every pushed file matches the backup original by size.")
         conflict_row.addWidget(self.no_verify_checkbox)
         conflict_row.addStretch()
         layout.addLayout(conflict_row)
 
         btn_row = QHBoxLayout()
         self.restore_button = QPushButton("Restore")
+        self.restore_button.setToolTip("Push the checked sources from the backup back to the device.")
         btn_row.addWidget(self.restore_button)
         btn_row.addStretch()
         layout.addLayout(btn_row)
