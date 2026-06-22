@@ -150,7 +150,6 @@ class TestNewPages:
         window = MainWindow()
         qtbot.addWidget(window)
 
-        assert isinstance(window.stack.widget(7), PlaceholderPage)
         assert isinstance(window.stack.widget(8), PlaceholderPage)
 
     def test_backup_index_is_backup_manager_page(self, qtbot):
@@ -345,6 +344,50 @@ class TestStoragePageWiring:
         from droidbridge.gui.main_window import _SIDEBAR_TOOLTIPS
 
         assert _SIDEBAR_TOOLTIPS["Storage"] != "Coming in Phase 6.3."
+
+
+class TestAppsPageWiring:
+    def test_apps_page_replaces_placeholder(self, qtbot):
+        from droidbridge.gui.pages.apps import AppsPage
+
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        assert isinstance(window.apps_page, AppsPage)
+
+    def test_apps_page_viewmodels_wired_to_status_and_log(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        vm = window.apps_page.viewmodels[0]
+        vm.statusChanged.emit("Apps test status")
+
+        assert window.status_label.fullText() == "Apps test status"
+
+    def test_apps_page_busy_changed_shows_busy_bar(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+        window.show()
+
+        vm = window.apps_page.viewmodels[0]
+        vm.busyChanged.emit(True)
+        assert window.busy_bar.isVisible()
+
+        vm.busyChanged.emit(False)
+        assert not window.busy_bar.isVisible()
+
+    def test_apps_tooltip_is_descriptive(self, qtbot):
+        from droidbridge.gui.main_window import _SIDEBAR_TOOLTIPS
+
+        assert _SIDEBAR_TOOLTIPS["Apps"] != "Coming in Phase 6.3."
+
+    def test_sidebar_row_seven_shows_apps_page(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+
+        window.sidebar.setCurrentRow(7)
+
+        assert window.stack.currentWidget() is window.apps_page
 
 
 class TestStatusBarColorCoding:

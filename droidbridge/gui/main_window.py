@@ -24,6 +24,7 @@ from droidbridge.gui.pages.files import FilesPage
 from droidbridge.gui.pages.placeholder import PlaceholderPage
 from droidbridge.gui.pages.search import SearchPage
 from droidbridge.gui.pages.transfer import TransferPage
+from droidbridge.gui.pages.apps import AppsPage
 from droidbridge.gui.pages.backup import BackupManagerPage
 from droidbridge.gui.pages.whatsapp import WhatsAppPage
 from droidbridge.gui.pages.storage import StoragePage
@@ -58,7 +59,7 @@ _SIDEBAR_TOOLTIPS = {
     "WhatsApp": "WhatsApp Toolkit: scan, backup, restore, organize, delete, and more.",
     "Storage": "Storage Analyzer: usage breakdown, app storage, media, large files, and cleanup suggestions.",
     "Backup": "Backup Manager: profiles, run, verify, history, restore, and Contacts/Call Log export.",
-    "Apps": "Coming in Phase 6.3.",
+    "Apps": "App Manager: listing, cache management, uninstall, APK extraction, bloatware manager, and APK backup/restore.",
     "Reports": "Coming in Phase 6.3.",
 }
 
@@ -97,7 +98,9 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.storage_page)
         self.backup_page = BackupManagerPage(self.context)
         self.stack.addWidget(self.backup_page)
-        for name in MODULES[7:]:
+        self.apps_page = AppsPage(self.context)
+        self.stack.addWidget(self.apps_page)
+        for name in MODULES[8:]:
             self.stack.addWidget(PlaceholderPage(name))
         self.sidebar.currentRowChanged.connect(self.stack.setCurrentIndex)
         self.sidebar.setCurrentRow(0)
@@ -199,6 +202,11 @@ class MainWindow(QMainWindow):
                 vm.busyChanged.connect(lambda busy, vm=vm: self._on_busy_changed(vm, busy))
             if hasattr(vm, "logMessage"):
                 vm.logMessage.connect(self._on_log_message)
+
+        for vm in self.apps_page.viewmodels:
+            vm.statusChanged.connect(self._on_status_changed)
+            vm.busyChanged.connect(lambda busy, vm=vm: self._on_busy_changed(vm, busy))
+            vm.logMessage.connect(self._on_log_message)
 
         self._on_connection_changed(
             self.context.is_connected, self.context.serial or "", self.context.model or ""
