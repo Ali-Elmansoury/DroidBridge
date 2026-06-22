@@ -390,6 +390,62 @@ class TestPush:
                 client.push("SERIAL", "/local/missing", "/sdcard/dest")
 
 
+class TestInstall:
+    def test_single_apk_uses_install_with_r_flag(self):
+        client = adb.AdbClient(adb_path="/fake/adb")
+        with patch.object(adb.subprocess, "run") as mock_run:
+            mock_run.return_value = _completed(stdout="Success")
+
+            client.install("SERIAL", "/local/app.apk")
+
+        args, kwargs = mock_run.call_args
+        assert args[0] == ["/fake/adb", "-s", "SERIAL", "install", "-r", "/local/app.apk"]
+        assert kwargs["timeout"] is None
+
+    def test_split_apks_uses_install_multiple(self):
+        client = adb.AdbClient(adb_path="/fake/adb")
+        with patch.object(adb.subprocess, "run") as mock_run:
+            mock_run.return_value = _completed(stdout="Success")
+
+            client.install("SERIAL", ["/local/base.apk", "/local/split.apk"])
+
+        args, kwargs = mock_run.call_args
+        assert args[0] == [
+            "/fake/adb", "-s", "SERIAL", "install-multiple", "-r",
+            "/local/base.apk", "/local/split.apk",
+        ]
+
+    def test_allow_downgrade_adds_d_flag(self):
+        client = adb.AdbClient(adb_path="/fake/adb")
+        with patch.object(adb.subprocess, "run") as mock_run:
+            mock_run.return_value = _completed(stdout="Success")
+
+            client.install("SERIAL", "/local/app.apk", allow_downgrade=True)
+
+        args, _ = mock_run.call_args
+        assert args[0] == ["/fake/adb", "-s", "SERIAL", "install", "-r", "-d", "/local/app.apk"]
+
+    def test_reinstall_false_omits_r_flag(self):
+        client = adb.AdbClient(adb_path="/fake/adb")
+        with patch.object(adb.subprocess, "run") as mock_run:
+            mock_run.return_value = _completed(stdout="Success")
+
+            client.install("SERIAL", "/local/app.apk", reinstall=False)
+
+        args, _ = mock_run.call_args
+        assert args[0] == ["/fake/adb", "-s", "SERIAL", "install", "/local/app.apk"]
+
+    def test_install_raises_on_failure(self):
+        client = adb.AdbClient(adb_path="/fake/adb")
+        with patch.object(adb.subprocess, "run") as mock_run:
+            mock_run.return_value = _completed(
+                stderr="Failure [INSTALL_FAILED_VERSION_DOWNGRADE]", returncode=1
+            )
+
+            with pytest.raises(adb.AdbCommandError):
+                client.install("SERIAL", "/local/app.apk")
+
+
 class TestRealBundledAdb:
     """Sanity checks against the real bundled Linux adb binary (no device needed)."""
 

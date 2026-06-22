@@ -208,3 +208,26 @@ class AdbClient:
         Returns the CompletedProcess (stdout/stderr/returncode).
         """
         return self._run(["push", local_path, remote_path], serial=serial, timeout=timeout)
+
+    def install(self, serial, local_paths, reinstall=True, allow_downgrade=False):
+        """Install an APK via `adb install`, or split APKs via `adb install-multiple`.
+
+        `local_paths` is a single path string for a single APK, or a list of
+        paths for split APKs. `reinstall` maps to `-r` (replace an existing
+        install — the GUI's restore flow always replaces). `allow_downgrade`
+        maps to `-d` (allow installing a lower versionCode than what's
+        currently installed; off by default since Android itself blocks it).
+        No timeout - installs can take a while on large APKs.
+        """
+        paths = [local_paths] if isinstance(local_paths, str) else list(local_paths)
+
+        flags = []
+        if reinstall:
+            flags.append("-r")
+        if allow_downgrade:
+            flags.append("-d")
+
+        if len(paths) == 1:
+            self._run(["install", *flags, paths[0]], serial=serial, timeout=None)
+        else:
+            self._run(["install-multiple", *flags, *paths], serial=serial, timeout=None)
