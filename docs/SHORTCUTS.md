@@ -36,6 +36,8 @@ fire when the file/results table has keyboard focus (click the table first).
 | `Return` | Table focused | Navigate into selected directory |
 | `F2` | Table focused | Rename selected entry |
 | `Delete` | Table focused | Delete selected entries |
+| `Ctrl+Click` | Table focused | Toggle one entry in/out of the selection (Qt built-in) |
+| `Shift+Click` | Table focused | Select a range from the last-clicked entry (Qt built-in) |
 
 ## Transfer page
 
@@ -53,6 +55,8 @@ fire when the file/results table has keyboard focus (click the table first).
 | `Ctrl+A` | Page | Select all results (Qt built-in) |
 | `F2` | Table focused | Rename selected result |
 | `Delete` | Table focused | Delete selected results |
+| `Ctrl+Click` | Table focused | Toggle one result in/out of the selection (Qt built-in) |
+| `Shift+Click` | Table focused | Select a range from the last-clicked result (Qt built-in) |
 
 ## WhatsApp, Storage, Backup, Apps, Reports pages
 
@@ -60,3 +64,8 @@ No page-internal shortcuts. Each is a multi-tab page where every tab has its own
 buttons (Refresh, Delete, Uninstall, etc.) with no single unambiguous page-wide
 action to bind F5/Escape/Delete to. Use the global `Ctrl+5`..`Ctrl+9` shortcuts
 above to switch to these pages, then click the relevant tab's buttons directly.
+
+The WhatsApp page's **Backup** and **Delete** tabs have a multi-select list
+(file types to back up / keep) that supports the same `Ctrl+Click` (toggle one)
+and `Shift+Click` (select a range) gestures as the Files/Search tables above —
+also Qt built-in, no custom wiring.
