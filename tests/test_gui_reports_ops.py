@@ -282,3 +282,128 @@ class TestGenerateReportBackup:
 
         assert "Backup Verification" in result["content"]
         assert "nightly" in result["content"]
+
+
+from tests.test_cli_whatsapp import DETECT_NONE, DETECT_WA_ONLY, SCAN_OUTPUT
+from tests.test_storage import DF_OUTPUT, DISKSTATS_OUTPUT, PM_LIST_SYSTEM_OUTPUT
+
+
+def _make_fake_client(shell_side_effect):
+    client = MagicMock()
+    client.shell.side_effect = shell_side_effect
+    return client
+
+
+def _storage_fake_shell(serial, command, timeout=None):
+    if isinstance(command, list):
+        if command[0] == "df":
+            return DF_OUTPUT
+        if command[:2] == ["dumpsys", "diskstats"]:
+            return DISKSTATS_OUTPUT
+        if command[:3] == ["pm", "list", "packages"]:
+            return PM_LIST_SYSTEM_OUTPUT
+        if command[0] == "find" or (isinstance(command, list) and command[:1] == ["find"]):
+            return ""
+        raise AssertionError(command)
+    return DETECT_NONE
+
+
+class TestGenerateReportWhatsApp:
+    def test_inventory_raises_when_no_installs(self):
+        client = _make_fake_client([DETECT_NONE])
+
+        try:
+            reports_ops.generate_report(client, "SERIAL", "whatsapp-inventory", "txt")
+            assert False, "expected ValueError"
+        except ValueError as exc:
+            assert "no whatsapp" in str(exc).lower()
+
+    def test_inventory_builds_report(self):
+        client = _make_fake_client([DETECT_WA_ONLY, SCAN_OUTPUT])
+
+        result = reports_ops.generate_report(client, "SERIAL", "whatsapp-inventory", "txt")
+
+        assert "WhatsApp Media Inventory Report" in result["content"]
+
+    def test_filetypes_builds_report(self):
+        client = _make_fake_client([DETECT_WA_ONLY, SCAN_OUTPUT])
+
+        result = reports_ops.generate_report(client, "SERIAL", "whatsapp-filetypes", "txt")
+
+        assert "WhatsApp File Type Breakdown Report" in result["content"]
+
+    def test_sections_builds_report(self):
+        client = _make_fake_client([DETECT_WA_ONLY, SCAN_OUTPUT])
+
+        result = reports_ops.generate_report(client, "SERIAL", "whatsapp-sections", "txt")
+
+        assert "WhatsApp Sent/Received/Private Breakdown Report" in result["content"]
+
+    def test_documents_builds_report(self):
+        client = _make_fake_client([DETECT_WA_ONLY, SCAN_OUTPUT])
+
+        result = reports_ops.generate_report(client, "SERIAL", "whatsapp-documents", "txt")
+
+        assert "WhatsApp Documents Categorization Report" in result["content"]
+
+    def test_cutoff_requires_cutoff_param(self):
+        client = _make_fake_client([DETECT_WA_ONLY, SCAN_OUTPUT])
+
+        try:
+            reports_ops.generate_report(client, "SERIAL", "whatsapp-cutoff", "txt")
+            assert False, "expected ValueError"
+        except ValueError as exc:
+            assert "cutoff" in str(exc).lower()
+
+    def test_cutoff_rejects_invalid_date_format(self):
+        client = _make_fake_client([DETECT_WA_ONLY, SCAN_OUTPUT])
+
+        try:
+            reports_ops.generate_report(client, "SERIAL", "whatsapp-cutoff", "txt", cutoff="not-a-date")
+            assert False, "expected ValueError"
+        except ValueError as exc:
+            assert "not-a-date" in str(exc)
+
+    def test_cutoff_builds_report(self):
+        client = _make_fake_client([DETECT_WA_ONLY, SCAN_OUTPUT])
+
+        result = reports_ops.generate_report(client, "SERIAL", "whatsapp-cutoff", "txt", cutoff="2024-09-01")
+
+        assert "WhatsApp Pre/Post Cutoff Comparison Report" in result["content"]
+
+    def test_app_filter_selects_business_only(self):
+        client = _make_fake_client([DETECT_WA_ONLY, SCAN_OUTPUT])
+
+        try:
+            reports_ops.generate_report(client, "SERIAL", "whatsapp-inventory", "txt", app="business")
+            assert False, "expected ValueError"
+        except ValueError as exc:
+            assert "no whatsapp" in str(exc).lower()
+
+
+class TestGenerateReportFull:
+    def test_combines_storage_and_whatsapp_sections(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(storage_reports, "DEFAULT_TREND_PATH", tmp_path / "storage_history.json")
+        monkeypatch.setattr(backup_manager, "DEFAULT_HISTORY_PATH", tmp_path / "backup_history.json")
+
+        def fake_shell(serial, command, timeout=None):
+            if isinstance(command, list):
+                if command[0] == "df":
+                    return DF_OUTPUT
+                if command[:2] == ["dumpsys", "diskstats"]:
+                    return DISKSTATS_OUTPUT
+                if command[:3] == ["pm", "list", "packages"]:
+                    return PM_LIST_SYSTEM_OUTPUT
+                raise AssertionError(command)
+            if not hasattr(fake_shell, "_calls"):
+                fake_shell._calls = 0
+            fake_shell._calls += 1
+            return DETECT_WA_ONLY if fake_shell._calls == 1 else SCAN_OUTPUT
+
+        client = MagicMock()
+        client.shell.side_effect = fake_shell
+
+        result = reports_ops.generate_report(client, "SERIAL", "full", "txt", top_n=1)
+
+        assert "DroidBridge Full Report" in result["content"]
+        assert "Top" in result["content"]

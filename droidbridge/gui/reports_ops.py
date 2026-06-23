@@ -13,9 +13,11 @@ from droidbridge.modules import backup_manager as backup_module
 from droidbridge.modules import search as search_module
 from droidbridge.modules import storage as storage_module
 from droidbridge.modules import transfer as transfer_module
+from droidbridge.modules import whatsapp as whatsapp_module
 from droidbridge.reports import backup_reports
 from droidbridge.reports import storage_reports
-from droidbridge.reports.generators import to_csv, to_html, to_json, to_txt
+from droidbridge.reports import whatsapp_reports
+from droidbridge.reports.generators import Report, to_csv, to_html, to_json, to_txt
 from droidbridge.utils.format import parse_size
 
 _RENDERERS = {"txt": to_txt, "html": to_html, "csv": to_csv, "json": to_json}
@@ -80,6 +82,54 @@ def _build_backup_verification(profile_name):
     return backup_reports.build_backup_verification_report(profile_name, result)
 
 
+def _select_installs(installs, app):
+    if app == "all":
+        return installs
+    package = "com.whatsapp" if app == "whatsapp" else "com.whatsapp.w4b"
+    return [install for install in installs if install.package == package]
+
+
+def _build_whatsapp_media_files(client, serial, app):
+    installs = whatsapp_module.detect_installs(client, serial)
+    installs = _select_installs(installs, app)
+    if not installs:
+        raise ValueError("No WhatsApp or WhatsApp Business installation found on this device.")
+
+    media_files = []
+    for install in installs:
+        media_files.extend(whatsapp_module.scan_media(client, serial, install))
+    return media_files
+
+
+def _build_full_report(client, serial, app, top_n):
+    sections = []
+
+    overview = storage_module.get_storage_overview(client, serial)
+    storage_reports.record_storage_snapshot(overview, path=storage_reports.DEFAULT_TREND_PATH)
+    sections.extend(storage_reports.build_storage_overview_report(overview).sections)
+
+    apps = storage_module.get_app_storage(client, serial)
+    sections.extend(storage_reports.build_top_apps_report(apps, top=top_n).sections)
+
+    history = storage_reports.load_storage_history(storage_reports.DEFAULT_TREND_PATH)
+    if len(history) >= 2:
+        sections.extend(storage_reports.build_storage_trend_report(history).sections)
+
+    installs = whatsapp_module.detect_installs(client, serial)
+    installs = _select_installs(installs, app)
+    if installs:
+        media_files = []
+        for install in installs:
+            media_files.extend(whatsapp_module.scan_media(client, serial, install))
+        sections.extend(whatsapp_reports.build_media_inventory_report(media_files).sections)
+
+    backup_history = backup_module.load_history(backup_module.DEFAULT_HISTORY_PATH)
+    if backup_history:
+        sections.extend(backup_reports.build_backup_history_report(backup_history).sections)
+
+    return Report(title="DroidBridge Full Report", sections=sections)
+
+
 def generate_report(client, serial, report_type, report_format, top_n=20, min_size=None, cutoff=None, profile=None, app="all"):
     if report_type == "storage":
         overview = storage_module.get_storage_overview(client, serial)
@@ -114,6 +164,29 @@ def generate_report(client, serial, report_type, report_format, top_n=20, min_si
         if not profile:
             raise ValueError("Error: --profile is required for --type backup-verification.")
         report = _build_backup_verification(profile)
+    elif report_type == "whatsapp-inventory":
+        media_files = _build_whatsapp_media_files(client, serial, app)
+        report = whatsapp_reports.build_media_inventory_report(media_files)
+    elif report_type == "whatsapp-cutoff":
+        if not cutoff:
+            raise ValueError("Error: --cutoff is required for --type whatsapp-cutoff.")
+        try:
+            cutoff_date = datetime.strptime(cutoff, "%Y-%m-%d").date()
+        except ValueError:
+            raise ValueError(f"Error: invalid --cutoff date {cutoff!r}, expected YYYY-MM-DD.")
+        media_files = _build_whatsapp_media_files(client, serial, app)
+        report = whatsapp_reports.build_cutoff_comparison_report(media_files, cutoff_date)
+    elif report_type == "whatsapp-filetypes":
+        media_files = _build_whatsapp_media_files(client, serial, app)
+        report = whatsapp_reports.build_file_type_breakdown_report(media_files)
+    elif report_type == "whatsapp-sections":
+        media_files = _build_whatsapp_media_files(client, serial, app)
+        report = whatsapp_reports.build_section_breakdown_report(media_files)
+    elif report_type == "whatsapp-documents":
+        media_files = _build_whatsapp_media_files(client, serial, app)
+        report = whatsapp_reports.build_documents_categorization_report(media_files)
+    elif report_type == "full":
+        report = _build_full_report(client, serial, app, top_n)
     else:
         raise ValueError(f"Unknown report type: {report_type!r}")
 
