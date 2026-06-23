@@ -21,17 +21,18 @@ from droidbridge.gui import theme
 from droidbridge.gui.device_context import DeviceContext
 from droidbridge.gui.pages.device import DevicePage
 from droidbridge.gui.pages.files import FilesPage
-from droidbridge.gui.pages.placeholder import PlaceholderPage
 from droidbridge.gui.pages.search import SearchPage
 from droidbridge.gui.pages.transfer import TransferPage
 from droidbridge.gui.pages.apps import AppsPage
 from droidbridge.gui.pages.backup import BackupManagerPage
 from droidbridge.gui.pages.whatsapp import WhatsAppPage
 from droidbridge.gui.pages.storage import StoragePage
+from droidbridge.gui.pages.reports import ReportsPage
 from droidbridge.gui.viewmodels.device import DeviceViewModel
 from droidbridge.gui.viewmodels.files import FilesViewModel
 from droidbridge.gui.viewmodels.search import SearchViewModel
 from droidbridge.gui.viewmodels.transfer import TransferViewModel
+from droidbridge.gui.viewmodels.reports import ReportsViewModel
 from droidbridge.gui.widgets.elided_label import ElidedLabel
 from droidbridge.gui.widgets.log_panel import LogPanel
 
@@ -60,7 +61,7 @@ _SIDEBAR_TOOLTIPS = {
     "Storage": "Storage Analyzer: usage breakdown, app storage, media, large files, and cleanup suggestions.",
     "Backup": "Backup Manager: profiles, run, verify, history, restore, and Contacts/Call Log export.",
     "Apps": "App Manager: listing, cache management, uninstall, APK extraction, bloatware manager, and APK backup/restore.",
-    "Reports": "Coming in Phase 6.3.",
+    "Reports": "Reports: generate storage, WhatsApp, backup, and full reports, then preview and save them.",
 }
 
 
@@ -77,6 +78,7 @@ class MainWindow(QMainWindow):
         self.files_viewmodel = FilesViewModel(self.context)
         self.transfer_viewmodel = TransferViewModel(self.context)
         self.search_viewmodel = SearchViewModel(self.context)
+        self.reports_viewmodel = ReportsViewModel(self.context)
 
         self.sidebar = QListWidget()
         self.sidebar.addItems(MODULES)
@@ -100,8 +102,8 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.backup_page)
         self.apps_page = AppsPage(self.context)
         self.stack.addWidget(self.apps_page)
-        for name in MODULES[8:]:
-            self.stack.addWidget(PlaceholderPage(name))
+        self.reports_page = ReportsPage(self.reports_viewmodel)
+        self.stack.addWidget(self.reports_page)
         self.sidebar.currentRowChanged.connect(self.stack.setCurrentIndex)
         self.sidebar.setCurrentRow(0)
 
@@ -180,7 +182,7 @@ class MainWindow(QMainWindow):
         self.files_page.pullRequested.connect(self._on_pull_requested)
         self.search_page.pullRequested.connect(self._on_pull_requested)
 
-        for vm in (self.files_viewmodel, self.transfer_viewmodel, self.search_viewmodel):
+        for vm in (self.files_viewmodel, self.transfer_viewmodel, self.search_viewmodel, self.reports_viewmodel):
             vm.statusChanged.connect(self._on_status_changed)
             vm.busyChanged.connect(lambda busy, vm=vm: self._on_busy_changed(vm, busy))
             vm.logMessage.connect(self._on_log_message)

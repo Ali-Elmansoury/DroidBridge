@@ -10,7 +10,6 @@ from droidbridge.gui.device_context import DeviceContext
 from droidbridge.gui.main_window import MODULES, MainWindow
 from droidbridge.gui.pages.backup import BackupManagerPage
 from droidbridge.gui.pages.files import FilesPage
-from droidbridge.gui.pages.placeholder import PlaceholderPage
 from droidbridge.gui.pages.search import SearchPage
 from droidbridge.gui.pages.transfer import TransferPage
 from droidbridge.gui.pages.whatsapp import WhatsAppPage
@@ -146,11 +145,13 @@ class TestNewPages:
 
         assert isinstance(window.stack.widget(4), WhatsAppPage)
 
-    def test_remaining_modules_are_placeholders(self, qtbot):
+    def test_reports_index_is_reports_page(self, qtbot):
+        from droidbridge.gui.pages.reports import ReportsPage
+
         window = MainWindow()
         qtbot.addWidget(window)
 
-        assert isinstance(window.stack.widget(8), PlaceholderPage)
+        assert isinstance(window.stack.widget(8), ReportsPage)
 
     def test_backup_index_is_backup_manager_page(self, qtbot):
         window = MainWindow()
@@ -309,6 +310,16 @@ class TestMainWindowShortcuts:
 
         assert window.sidebar.currentRow() == 3
 
+    def test_ctrl_9_does_not_switch_pages(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+        window.show()
+        window.sidebar.setCurrentRow(0)
+
+        qtbot.keyClick(window, Qt.Key.Key_9, Qt.KeyboardModifier.ControlModifier)
+
+        assert window.sidebar.currentRow() == 0
+
 
 class TestStoragePageWiring:
     def test_storage_page_replaces_placeholder(self, qtbot):
@@ -388,6 +399,11 @@ class TestAppsPageWiring:
         window.sidebar.setCurrentRow(7)
 
         assert window.stack.currentWidget() is window.apps_page
+
+    def test_reports_tooltip_is_descriptive(self, qtbot):
+        from droidbridge.gui.main_window import _SIDEBAR_TOOLTIPS
+
+        assert _SIDEBAR_TOOLTIPS["Reports"] != "Coming in Phase 6.3."
 
 
 class TestStatusBarColorCoding:
