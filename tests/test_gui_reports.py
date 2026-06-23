@@ -1,6 +1,6 @@
 from unittest.mock import MagicMock
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QDate, Qt
 from PyQt6.QtWidgets import QFileDialog
 
 from droidbridge.gui import reports_ops
@@ -273,3 +273,183 @@ class TestReportsPageSkeleton:
 
         for widget in (panel.type_combo, panel.format_combo, panel.generate_button, panel.save_button):
             assert widget.toolTip() != ""
+
+
+class TestReportsPageDynamicParams:
+    def _select_type(self, panel, type_id):
+        index = [t["id"] for t in reports_ops.REPORT_TYPES].index(type_id)
+        panel.type_combo.setCurrentIndex(index)
+
+    def test_storage_type_hides_all_param_widgets(self, qtbot):
+        panel = ReportsPage(ReportsViewModel(_connected_ctx()))
+        qtbot.addWidget(panel)
+        self._select_type(panel, "storage")
+
+        assert not panel.top_spin.isVisible()
+        assert not panel.min_size_edit.isVisible()
+        assert not panel.cutoff_date_edit.isVisible()
+        assert not panel.app_combo.isVisible()
+        assert not panel.profile_combo.isVisible()
+
+    def test_full_type_shows_top_n_and_app_only(self, qtbot):
+        panel = ReportsPage(ReportsViewModel(_connected_ctx()))
+        qtbot.addWidget(panel)
+        panel.show()
+        self._select_type(panel, "full")
+
+        assert panel.top_spin.isVisible()
+        assert panel.app_combo.isVisible()
+        assert not panel.min_size_edit.isVisible()
+        assert not panel.cutoff_date_edit.isVisible()
+        assert not panel.profile_combo.isVisible()
+
+    def test_large_files_type_shows_min_size_only(self, qtbot):
+        panel = ReportsPage(ReportsViewModel(_connected_ctx()))
+        qtbot.addWidget(panel)
+        panel.show()
+        self._select_type(panel, "large-files")
+
+        assert panel.min_size_edit.isVisible()
+        assert not panel.top_spin.isVisible()
+        assert not panel.app_combo.isVisible()
+
+    def test_whatsapp_cutoff_type_shows_cutoff_and_app(self, qtbot):
+        panel = ReportsPage(ReportsViewModel(_connected_ctx()))
+        qtbot.addWidget(panel)
+        panel.show()
+        self._select_type(panel, "whatsapp-cutoff")
+
+        assert panel.cutoff_date_edit.isVisible()
+        assert panel.app_combo.isVisible()
+        assert not panel.top_spin.isVisible()
+
+    def test_app_combo_has_three_items(self, qtbot):
+        panel = ReportsPage(ReportsViewModel(_connected_ctx()))
+        qtbot.addWidget(panel)
+
+        assert panel.app_combo.count() == 3
+        assert panel.app_combo.itemText(0) == "WhatsApp"
+        assert panel.app_combo.itemText(2) == "Both"
+
+    def test_backup_history_profile_combo_includes_sentinel(self, qtbot, monkeypatch):
+        monkeypatch.setattr(reports_ops, "list_profile_names", lambda: ["nightly"])
+        panel = ReportsPage(ReportsViewModel(_connected_ctx()))
+        qtbot.addWidget(panel)
+        panel.show()
+        self._select_type(panel, "backup-history")
+
+        assert panel.profile_combo.isVisible()
+        items = [panel.profile_combo.itemText(i) for i in range(panel.profile_combo.count())]
+        assert items == ["(all profiles)", "nightly"]
+
+    def test_backup_summary_profile_combo_omits_sentinel(self, qtbot, monkeypatch):
+        monkeypatch.setattr(reports_ops, "list_profile_names", lambda: ["nightly"])
+        panel = ReportsPage(ReportsViewModel(_connected_ctx()))
+        qtbot.addWidget(panel)
+        self._select_type(panel, "backup-summary")
+
+        items = [panel.profile_combo.itemText(i) for i in range(panel.profile_combo.count())]
+        assert items == ["nightly"]
+
+    def test_show_event_refreshes_profile_combo(self, qtbot, monkeypatch):
+        names = ["nightly"]
+        monkeypatch.setattr(reports_ops, "list_profile_names", lambda: list(names))
+        panel = ReportsPage(ReportsViewModel(_connected_ctx()))
+        qtbot.addWidget(panel)
+        self._select_type(panel, "backup-history")
+        names.append("weekly")
+
+        panel.show()
+
+        items = [panel.profile_combo.itemText(i) for i in range(panel.profile_combo.count())]
+        assert items == ["(all profiles)", "nightly", "weekly"]
+
+    def test_generate_collects_top_n_and_app_for_full(self, qtbot, monkeypatch):
+        panel = ReportsPage(ReportsViewModel(_connected_ctx()))
+        qtbot.addWidget(panel)
+        self._select_type(panel, "full")
+        panel.top_spin.setValue(5)
+        panel.app_combo.setCurrentIndex(1)  # WhatsApp Business
+        calls = []
+        monkeypatch.setattr(panel.viewmodel, "generate", lambda *a, **kw: calls.append((a, kw)))
+
+        panel._on_generate()
+
+        assert calls == [(("full", "txt"), {"top_n": 5, "app": "business"})]
+
+    def test_generate_omits_min_size_when_blank(self, qtbot, monkeypatch):
+        panel = ReportsPage(ReportsViewModel(_connected_ctx()))
+        qtbot.addWidget(panel)
+        self._select_type(panel, "large-files")
+        calls = []
+        monkeypatch.setattr(panel.viewmodel, "generate", lambda *a, **kw: calls.append((a, kw)))
+
+        panel._on_generate()
+
+        assert calls == [(("large-files", "txt"), {})]
+
+    def test_generate_includes_min_size_when_filled(self, qtbot, monkeypatch):
+        panel = ReportsPage(ReportsViewModel(_connected_ctx()))
+        qtbot.addWidget(panel)
+        self._select_type(panel, "large-files")
+        panel.min_size_edit.setText("50MB")
+        calls = []
+        monkeypatch.setattr(panel.viewmodel, "generate", lambda *a, **kw: calls.append((a, kw)))
+
+        panel._on_generate()
+
+        assert calls == [(("large-files", "txt"), {"min_size": "50MB"})]
+
+    def test_generate_formats_cutoff_as_iso_date(self, qtbot, monkeypatch):
+        panel = ReportsPage(ReportsViewModel(_connected_ctx()))
+        qtbot.addWidget(panel)
+        self._select_type(panel, "whatsapp-cutoff")
+        panel.cutoff_date_edit.setDate(QDate(2026, 1, 15))
+        calls = []
+        monkeypatch.setattr(panel.viewmodel, "generate", lambda *a, **kw: calls.append((a, kw)))
+
+        panel._on_generate()
+
+        assert calls == [(("whatsapp-cutoff", "txt"), {"cutoff": "2026-01-15", "app": "whatsapp"})]
+
+    def test_generate_maps_sentinel_profile_to_none(self, qtbot, monkeypatch):
+        monkeypatch.setattr(reports_ops, "list_profile_names", lambda: ["nightly"])
+        panel = ReportsPage(ReportsViewModel(_connected_ctx()))
+        qtbot.addWidget(panel)
+        self._select_type(panel, "backup-history")
+        panel.profile_combo.setCurrentIndex(0)  # "(all profiles)"
+        calls = []
+        monkeypatch.setattr(panel.viewmodel, "generate", lambda *a, **kw: calls.append((a, kw)))
+
+        panel._on_generate()
+
+        assert calls == [(("backup-history", "txt"), {"profile": None})]
+
+    def test_generate_passes_named_profile(self, qtbot, monkeypatch):
+        monkeypatch.setattr(reports_ops, "list_profile_names", lambda: ["nightly"])
+        panel = ReportsPage(ReportsViewModel(_connected_ctx()))
+        qtbot.addWidget(panel)
+        self._select_type(panel, "backup-summary")
+        calls = []
+        monkeypatch.setattr(panel.viewmodel, "generate", lambda *a, **kw: calls.append((a, kw)))
+
+        panel._on_generate()
+
+        assert calls == [(("backup-summary", "txt"), {"profile": "nightly"})]
+
+    def test_generate_warns_and_skips_when_required_profile_missing(self, qtbot, monkeypatch):
+        monkeypatch.setattr(reports_ops, "list_profile_names", lambda: [])
+        panel = ReportsPage(ReportsViewModel(_connected_ctx()))
+        qtbot.addWidget(panel)
+        self._select_type(panel, "backup-summary")
+        generate_calls = []
+        warnings = []
+        monkeypatch.setattr(panel.viewmodel, "generate", lambda *a, **kw: generate_calls.append((a, kw)))
+        panel.viewmodel.logMessage.connect(lambda msg, level: warnings.append((msg, level)))
+
+        panel._on_generate()
+
+        assert generate_calls == []
+        assert len(warnings) == 1
+        assert warnings[0][1] == "WARNING"
+        assert "Backup Summary" in warnings[0][0]
