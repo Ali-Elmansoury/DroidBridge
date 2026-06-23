@@ -12,6 +12,11 @@ fire when the file/results table has keyboard focus (click the table first).
 | `Ctrl+2` | Switch to Files page |
 | `Ctrl+3` | Switch to Transfer page |
 | `Ctrl+4` | Switch to Search page |
+| `Ctrl+5` | Switch to WhatsApp page |
+| `Ctrl+6` | Switch to Storage page |
+| `Ctrl+7` | Switch to Backup page |
+| `Ctrl+8` | Switch to Apps page |
+| `Ctrl+9` | Switch to Reports page |
 
 ## Device page
 
@@ -48,3 +53,10 @@ fire when the file/results table has keyboard focus (click the table first).
 | `Ctrl+A` | Page | Select all results (Qt built-in) |
 | `F2` | Table focused | Rename selected result |
 | `Delete` | Table focused | Delete selected results |
+
+## WhatsApp, Storage, Backup, Apps, Reports pages
+
+No page-internal shortcuts. Each is a multi-tab page where every tab has its own
+buttons (Refresh, Delete, Uninstall, etc.) with no single unambiguous page-wide
+action to bind F5/Escape/Delete to. Use the global `Ctrl+5`..`Ctrl+9` shortcuts
+above to switch to these pages, then click the relevant tab's buttons directly.

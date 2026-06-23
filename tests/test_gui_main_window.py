@@ -310,15 +310,50 @@ class TestMainWindowShortcuts:
 
         assert window.sidebar.currentRow() == 3
 
-    def test_ctrl_9_does_not_switch_pages(self, qtbot):
+    def test_ctrl_5_switches_to_whatsapp_page(self, qtbot):
         window = MainWindow()
         qtbot.addWidget(window)
         window.show()
-        window.sidebar.setCurrentRow(0)
+
+        qtbot.keyClick(window, Qt.Key.Key_5, Qt.KeyboardModifier.ControlModifier)
+
+        assert window.sidebar.currentRow() == 4
+
+    def test_ctrl_6_switches_to_storage_page(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+        window.show()
+
+        qtbot.keyClick(window, Qt.Key.Key_6, Qt.KeyboardModifier.ControlModifier)
+
+        assert window.sidebar.currentRow() == 5
+
+    def test_ctrl_7_switches_to_backup_page(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+        window.show()
+
+        qtbot.keyClick(window, Qt.Key.Key_7, Qt.KeyboardModifier.ControlModifier)
+
+        assert window.sidebar.currentRow() == 6
+
+    def test_ctrl_8_switches_to_apps_page(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+        window.show()
+
+        qtbot.keyClick(window, Qt.Key.Key_8, Qt.KeyboardModifier.ControlModifier)
+
+        assert window.sidebar.currentRow() == 7
+
+    def test_ctrl_9_switches_to_reports_page(self, qtbot):
+        window = MainWindow()
+        qtbot.addWidget(window)
+        window.show()
 
         qtbot.keyClick(window, Qt.Key.Key_9, Qt.KeyboardModifier.ControlModifier)
 
-        assert window.sidebar.currentRow() == 0
+        assert window.sidebar.currentRow() == 8
 
 
 class TestStoragePageWiring:

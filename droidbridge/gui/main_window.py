@@ -57,11 +57,11 @@ _SIDEBAR_TOOLTIPS = {
     "Files": "Browse and manage files on the device. Shortcut: Ctrl+2.",
     "Transfer": "Pull and push files between device and computer. Shortcut: Ctrl+3.",
     "Search": "Search for files on the device by name, size, type, or date. Shortcut: Ctrl+4.",
-    "WhatsApp": "WhatsApp Toolkit: scan, backup, restore, organize, delete, and more.",
-    "Storage": "Storage Analyzer: usage breakdown, app storage, media, large files, and cleanup suggestions.",
-    "Backup": "Backup Manager: profiles, run, verify, history, restore, and Contacts/Call Log export.",
-    "Apps": "App Manager: listing, cache management, uninstall, APK extraction, bloatware manager, and APK backup/restore.",
-    "Reports": "Reports: generate storage, WhatsApp, backup, and full reports, then preview and save them.",
+    "WhatsApp": "WhatsApp Toolkit: scan, backup, restore, organize, delete, and more. Shortcut: Ctrl+5.",
+    "Storage": "Storage Analyzer: usage breakdown, app storage, media, large files, and cleanup suggestions. Shortcut: Ctrl+6.",
+    "Backup": "Backup Manager: profiles, run, verify, history, restore, and Contacts/Call Log export. Shortcut: Ctrl+7.",
+    "Apps": "App Manager: listing, cache management, uninstall, APK extraction, bloatware manager, and APK backup/restore. Shortcut: Ctrl+8.",
+    "Reports": "Reports: generate storage, WhatsApp, backup, and full reports, then preview and save them. Shortcut: Ctrl+9.",
 }
 
 
@@ -107,7 +107,7 @@ class MainWindow(QMainWindow):
         self.sidebar.currentRowChanged.connect(self.stack.setCurrentIndex)
         self.sidebar.setCurrentRow(0)
 
-        for _i in range(4):
+        for _i in range(len(MODULES)):
             _sc = QShortcut(QKeySequence(f"Ctrl+{_i + 1}"), self)
             _sc.activated.connect(lambda idx=_i: self.sidebar.setCurrentRow(idx))
 
@@ -256,6 +256,11 @@ class MainWindow(QMainWindow):
                 Qt.Key.Key_2: 1,
                 Qt.Key.Key_3: 2,
                 Qt.Key.Key_4: 3,
+                Qt.Key.Key_5: 4,
+                Qt.Key.Key_6: 5,
+                Qt.Key.Key_7: 6,
+                Qt.Key.Key_8: 7,
+                Qt.Key.Key_9: 8,
             }
             row = key_to_row.get(event.key())
             if row is not None:
