@@ -168,9 +168,6 @@ class TestGenerateReportStorage:
             assert "not-a-type" in str(exc)
 
 
-from droidbridge.modules.transfer import VerificationResult
-
-
 class TestGenerateReportBackup:
     def test_backup_history_lists_all_when_no_profile_filter(self, tmp_path, monkeypatch):
         history_path = tmp_path / "history.json"
@@ -282,6 +279,27 @@ class TestGenerateReportBackup:
 
         assert "Backup Verification" in result["content"]
         assert "nightly" in result["content"]
+
+    def test_backup_verification_reports_mismatch_when_files_missing(self, tmp_path, monkeypatch):
+        profiles_path = tmp_path / "profiles.json"
+        history_path = tmp_path / "history.json"
+        monkeypatch.setattr(backup_manager, "DEFAULT_PROFILES_PATH", profiles_path)
+        monkeypatch.setattr(backup_manager, "DEFAULT_HISTORY_PATH", history_path)
+        dest = tmp_path / "dest"
+        dest.mkdir()
+        (dest / "a.jpg").write_bytes(b"x" * 1000)
+        backup_manager.save_profile(
+            profiles_path,
+            backup_manager.BackupProfile(name="nightly", sources=["/sdcard/a.jpg", "/sdcard/b.jpg"], dest=str(dest)),
+        )
+        backup_manager.append_history(
+            history_path,
+            backup_manager.BackupRecord("nightly", "2026-06-01T00:00:00+00:00", 2, 2000, 1.0, str(dest), True),
+        )
+
+        result = reports_ops.generate_report(None, None, "backup-verification", "txt", profile="nightly")
+
+        assert "MISMATCH" in result["content"]
 
 
 from tests.test_cli_whatsapp import DETECT_NONE, DETECT_WA_ONLY, SCAN_OUTPUT
