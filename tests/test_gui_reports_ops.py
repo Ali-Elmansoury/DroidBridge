@@ -353,7 +353,7 @@ class TestGenerateReportWhatsApp:
             reports_ops.generate_report(client, "SERIAL", "whatsapp-cutoff", "txt")
             assert False, "expected ValueError"
         except ValueError as exc:
-            assert "cutoff" in str(exc).lower()
+            assert str(exc) == "Error: --cutoff is required for --type whatsapp-cutoff."
 
     def test_cutoff_rejects_invalid_date_format(self):
         client = _make_fake_client([DETECT_WA_ONLY, SCAN_OUTPUT])

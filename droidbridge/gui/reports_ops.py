@@ -89,16 +89,19 @@ def _select_installs(installs, app):
     return [install for install in installs if install.package == package]
 
 
+def _scan_media_files(client, serial, installs):
+    media_files = []
+    for install in installs:
+        media_files.extend(whatsapp_module.scan_media(client, serial, install))
+    return media_files
+
+
 def _build_whatsapp_media_files(client, serial, app):
     installs = whatsapp_module.detect_installs(client, serial)
     installs = _select_installs(installs, app)
     if not installs:
         raise ValueError("No WhatsApp or WhatsApp Business installation found on this device.")
-
-    media_files = []
-    for install in installs:
-        media_files.extend(whatsapp_module.scan_media(client, serial, install))
-    return media_files
+    return _scan_media_files(client, serial, installs)
 
 
 def _build_full_report(client, serial, app, top_n):
@@ -118,9 +121,7 @@ def _build_full_report(client, serial, app, top_n):
     installs = whatsapp_module.detect_installs(client, serial)
     installs = _select_installs(installs, app)
     if installs:
-        media_files = []
-        for install in installs:
-            media_files.extend(whatsapp_module.scan_media(client, serial, install))
+        media_files = _scan_media_files(client, serial, installs)
         sections.extend(whatsapp_reports.build_media_inventory_report(media_files).sections)
 
     backup_history = backup_module.load_history(backup_module.DEFAULT_HISTORY_PATH)
