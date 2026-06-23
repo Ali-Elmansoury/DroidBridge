@@ -5,9 +5,17 @@ Wraps the same logic as `droidbridge.cli.main`'s `report generate` command:
 `droidbridge.reports.generators`.
 """
 
+from datetime import datetime
 from pathlib import Path
 
 from droidbridge.gui import backup_ops
+from droidbridge.modules import search as search_module
+from droidbridge.modules import storage as storage_module
+from droidbridge.reports import storage_reports
+from droidbridge.reports.generators import to_csv, to_html, to_json, to_txt
+from droidbridge.utils.format import parse_size
+
+_RENDERERS = {"txt": to_txt, "html": to_html, "csv": to_csv, "json": to_json}
 
 REPORT_TYPES = (
     {"id": "full", "label": "Full Report", "needs_device": True,
@@ -49,3 +57,28 @@ def save_report(content, path):
     out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(content, encoding="utf-8")
+
+
+def generate_report(client, serial, report_type, report_format, top_n=20, min_size=None, cutoff=None, profile=None, app="all"):
+    if report_type == "storage":
+        overview = storage_module.get_storage_overview(client, serial)
+        storage_reports.record_storage_snapshot(overview, path=storage_reports.DEFAULT_TREND_PATH)
+        report = storage_reports.build_storage_overview_report(overview)
+    elif report_type == "top-apps":
+        apps = storage_module.get_app_storage(client, serial)
+        report = storage_reports.build_top_apps_report(apps, top=top_n)
+    elif report_type == "large-files":
+        threshold = parse_size(min_size) if min_size else search_module.LARGE_FILE_THRESHOLD
+        results = storage_module.find_large_files(client, serial, threshold=threshold)
+        report = storage_reports.build_large_files_report(results)
+    elif report_type == "storage-trend":
+        history = storage_reports.load_storage_history(storage_reports.DEFAULT_TREND_PATH)
+        if not history:
+            raise ValueError("No storage history recorded yet. Run a Storage Breakdown report first.")
+        report = storage_reports.build_storage_trend_report(history)
+    else:
+        raise ValueError(f"Unknown report type: {report_type!r}")
+
+    content = _RENDERERS[report_format](report)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return {"content": content, "default_filename": f"{report_type}_{timestamp}.{report_format}"}

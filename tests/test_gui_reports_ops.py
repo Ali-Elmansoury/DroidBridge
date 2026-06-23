@@ -59,3 +59,112 @@ class TestSaveReport:
         reports_ops.save_report("{}", str(out))
         assert out.exists()
         assert out.read_text(encoding="utf-8") == "{}"
+
+
+from datetime import date
+from unittest.mock import MagicMock
+
+from droidbridge.modules.storage import StorageOverview
+from droidbridge.reports import storage_reports
+
+
+class TestGenerateReportStorage:
+    def test_storage_type_builds_report_and_records_snapshot(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(storage_reports, "DEFAULT_TREND_PATH", tmp_path / "history.json")
+        overview = StorageOverview(total_kb=1000, used_kb=400, free_kb=600, categories={})
+        monkeypatch.setattr(reports_ops.storage_module, "get_storage_overview", lambda c, s: overview)
+
+        result = reports_ops.generate_report(MagicMock(), "SERIAL", "storage", "txt")
+
+        assert "Storage Breakdown Report" in result["content"]
+        assert result["default_filename"].startswith("storage_")
+        assert result["default_filename"].endswith(".txt")
+        history = storage_reports.load_storage_history(tmp_path / "history.json")
+        assert len(history) == 1
+
+    def test_top_apps_type_passes_top_n_through(self, monkeypatch):
+        apps = [MagicMock(package=f"com.app{i}", total_size=i) for i in range(3)]
+        captured = {}
+
+        def fake_build_top_apps(apps_arg, top=20):
+            captured["top"] = top
+            # Return a Report-like object with a title; don't call the real function
+            # to avoid infinite recursion (the real build_top_apps_report has been replaced by this function)
+            return MagicMock(title="Top Apps by Size Report", to_txt=lambda: "Top Apps by Size Report\n")
+
+        monkeypatch.setattr(reports_ops.storage_module, "get_app_storage", lambda c, s: apps)
+        monkeypatch.setattr(reports_ops.storage_reports, "build_top_apps_report", fake_build_top_apps)
+
+        result = reports_ops.generate_report(MagicMock(), "SERIAL", "top-apps", "txt", top_n=1)
+
+        assert captured["top"] == 1
+        assert "Top Apps by Size Report" in result["content"]
+
+    def test_large_files_type_uses_default_threshold_when_min_size_blank(self, monkeypatch):
+        captured = {}
+
+        def fake_find_large_files(client, serial, threshold=None):
+            captured["threshold"] = threshold
+            return []
+
+        monkeypatch.setattr(reports_ops.storage_module, "find_large_files", fake_find_large_files)
+
+        reports_ops.generate_report(MagicMock(), "SERIAL", "large-files", "txt")
+
+        assert captured["threshold"] == reports_ops.search_module.LARGE_FILE_THRESHOLD
+
+    def test_large_files_type_parses_min_size(self, monkeypatch):
+        captured = {}
+
+        def fake_find_large_files(client, serial, threshold=None):
+            captured["threshold"] = threshold
+            return []
+
+        monkeypatch.setattr(reports_ops.storage_module, "find_large_files", fake_find_large_files)
+
+        reports_ops.generate_report(MagicMock(), "SERIAL", "large-files", "txt", min_size="10MB")
+
+        assert captured["threshold"] == 10 * 1024 * 1024
+
+    def test_storage_trend_type_raises_when_no_history(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(storage_reports, "DEFAULT_TREND_PATH", tmp_path / "history.json")
+
+        try:
+            reports_ops.generate_report(None, None, "storage-trend", "txt")
+            assert False, "expected ValueError"
+        except ValueError as exc:
+            assert "no storage history" in str(exc).lower()
+
+    def test_storage_trend_type_builds_report_from_history(self, tmp_path, monkeypatch):
+        history_path = tmp_path / "history.json"
+        monkeypatch.setattr(storage_reports, "DEFAULT_TREND_PATH", history_path)
+        storage_reports.record_storage_snapshot(
+            StorageOverview(total_kb=1000, used_kb=400, free_kb=600, categories={}),
+            path=history_path, timestamp="2026-06-01T00:00:00+00:00",
+        )
+        storage_reports.record_storage_snapshot(
+            StorageOverview(total_kb=1000, used_kb=500, free_kb=500, categories={}),
+            path=history_path, timestamp="2026-06-08T00:00:00+00:00",
+        )
+
+        result = reports_ops.generate_report(None, None, "storage-trend", "txt")
+
+        assert "Storage Trend Report" in result["content"]
+
+    def test_json_format_renders_json(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(storage_reports, "DEFAULT_TREND_PATH", tmp_path / "history.json")
+        overview = StorageOverview(total_kb=1000, used_kb=400, free_kb=600, categories={})
+        monkeypatch.setattr(reports_ops.storage_module, "get_storage_overview", lambda c, s: overview)
+
+        result = reports_ops.generate_report(MagicMock(), "SERIAL", "storage", "json")
+
+        import json
+        data = json.loads(result["content"])
+        assert data["title"] == "Storage Breakdown Report"
+
+    def test_unknown_report_type_raises(self):
+        try:
+            reports_ops.generate_report(None, None, "not-a-type", "txt")
+            assert False, "expected ValueError"
+        except ValueError as exc:
+            assert "not-a-type" in str(exc)
