@@ -61,7 +61,6 @@ class TestSaveReport:
         assert out.read_text(encoding="utf-8") == "{}"
 
 
-from datetime import date
 from unittest.mock import MagicMock
 
 from droidbridge.modules.storage import StorageOverview
@@ -83,14 +82,13 @@ class TestGenerateReportStorage:
         assert len(history) == 1
 
     def test_top_apps_type_passes_top_n_through(self, monkeypatch):
-        apps = [MagicMock(package=f"com.app{i}", total_size=i) for i in range(3)]
+        apps = [MagicMock(package=f"com.app{i}", apk_size=1000, data_size=2000, cache_size=500, total_size=i) for i in range(3)]
         captured = {}
+        real_build_top_apps = storage_reports.build_top_apps_report
 
         def fake_build_top_apps(apps_arg, top=20):
             captured["top"] = top
-            # Return a Report-like object with a title; don't call the real function
-            # to avoid infinite recursion (the real build_top_apps_report has been replaced by this function)
-            return MagicMock(title="Top Apps by Size Report", to_txt=lambda: "Top Apps by Size Report\n")
+            return real_build_top_apps(apps_arg, top=top)
 
         monkeypatch.setattr(reports_ops.storage_module, "get_app_storage", lambda c, s: apps)
         monkeypatch.setattr(reports_ops.storage_reports, "build_top_apps_report", fake_build_top_apps)
@@ -133,7 +131,7 @@ class TestGenerateReportStorage:
             reports_ops.generate_report(None, None, "storage-trend", "txt")
             assert False, "expected ValueError"
         except ValueError as exc:
-            assert "no storage history" in str(exc).lower()
+            assert str(exc) == "No storage history recorded yet. Run `report generate --type storage` first."
 
     def test_storage_trend_type_builds_report_from_history(self, tmp_path, monkeypatch):
         history_path = tmp_path / "history.json"

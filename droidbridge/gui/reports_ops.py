@@ -74,7 +74,7 @@ def generate_report(client, serial, report_type, report_format, top_n=20, min_si
     elif report_type == "storage-trend":
         history = storage_reports.load_storage_history(storage_reports.DEFAULT_TREND_PATH)
         if not history:
-            raise ValueError("No storage history recorded yet. Run a Storage Breakdown report first.")
+            raise ValueError("No storage history recorded yet. Run `report generate --type storage` first.")
         report = storage_reports.build_storage_trend_report(history)
     else:
         raise ValueError(f"Unknown report type: {report_type!r}")
