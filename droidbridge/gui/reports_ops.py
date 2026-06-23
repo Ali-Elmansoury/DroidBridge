@@ -9,8 +9,11 @@ from datetime import datetime
 from pathlib import Path
 
 from droidbridge.gui import backup_ops
+from droidbridge.modules import backup_manager as backup_module
 from droidbridge.modules import search as search_module
 from droidbridge.modules import storage as storage_module
+from droidbridge.modules import transfer as transfer_module
+from droidbridge.reports import backup_reports
 from droidbridge.reports import storage_reports
 from droidbridge.reports.generators import to_csv, to_html, to_json, to_txt
 from droidbridge.utils.format import parse_size
@@ -59,6 +62,24 @@ def save_report(content, path):
     out.write_text(content, encoding="utf-8")
 
 
+def _build_backup_verification(profile_name):
+    profile = backup_module.get_profile(backup_module.DEFAULT_PROFILES_PATH, profile_name)
+    if profile is None:
+        raise ValueError(f"Error: profile {profile_name!r} not found.")
+
+    history = backup_module.load_history(backup_module.DEFAULT_HISTORY_PATH)
+    record = backup_module.last_backup(history, profile_name)
+    if record is None:
+        raise ValueError(f"No backups recorded for profile {profile_name!r}. Run `backup run --profile {profile_name}` first.")
+
+    actual_files, actual_bytes = backup_module.measure_destination(record.destination)
+    result = transfer_module.VerificationResult(
+        expected_files=record.file_count, expected_bytes=record.total_bytes,
+        actual_files=actual_files, actual_bytes=actual_bytes,
+    )
+    return backup_reports.build_backup_verification_report(profile_name, result)
+
+
 def generate_report(client, serial, report_type, report_format, top_n=20, min_size=None, cutoff=None, profile=None, app="all"):
     if report_type == "storage":
         overview = storage_module.get_storage_overview(client, serial)
@@ -76,6 +97,23 @@ def generate_report(client, serial, report_type, report_format, top_n=20, min_si
         if not history:
             raise ValueError("No storage history recorded yet. Run `report generate --type storage` first.")
         report = storage_reports.build_storage_trend_report(history)
+    elif report_type == "backup-history":
+        history = backup_module.load_history(backup_module.DEFAULT_HISTORY_PATH)
+        if profile:
+            history = [r for r in history if r.profile == profile]
+        report = backup_reports.build_backup_history_report(history)
+    elif report_type == "backup-summary":
+        if not profile:
+            raise ValueError("Error: --profile is required for --type backup-summary.")
+        history = backup_module.load_history(backup_module.DEFAULT_HISTORY_PATH)
+        record = backup_module.last_backup(history, profile)
+        if record is None:
+            raise ValueError(f"No backups recorded for profile {profile!r}.")
+        report = backup_reports.build_backup_summary_report(record)
+    elif report_type == "backup-verification":
+        if not profile:
+            raise ValueError("Error: --profile is required for --type backup-verification.")
+        report = _build_backup_verification(profile)
     else:
         raise ValueError(f"Unknown report type: {report_type!r}")
 

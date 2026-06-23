@@ -166,3 +166,119 @@ class TestGenerateReportStorage:
             assert False, "expected ValueError"
         except ValueError as exc:
             assert "not-a-type" in str(exc)
+
+
+from droidbridge.modules.transfer import VerificationResult
+
+
+class TestGenerateReportBackup:
+    def test_backup_history_lists_all_when_no_profile_filter(self, tmp_path, monkeypatch):
+        history_path = tmp_path / "history.json"
+        monkeypatch.setattr(backup_manager, "DEFAULT_HISTORY_PATH", history_path)
+        backup_manager.append_history(
+            history_path,
+            backup_manager.BackupRecord("nightly", "2026-06-01T00:00:00+00:00", 5, 5000, 10.0, "/dest", True),
+        )
+
+        result = reports_ops.generate_report(None, None, "backup-history", "txt")
+
+        assert "nightly" in result["content"]
+
+    def test_backup_history_filters_by_profile(self, tmp_path, monkeypatch):
+        history_path = tmp_path / "history.json"
+        monkeypatch.setattr(backup_manager, "DEFAULT_HISTORY_PATH", history_path)
+        backup_manager.append_history(
+            history_path,
+            backup_manager.BackupRecord("nightly", "2026-06-01T00:00:00+00:00", 5, 5000, 10.0, "/dest", True),
+        )
+        backup_manager.append_history(
+            history_path,
+            backup_manager.BackupRecord("weekly", "2026-06-02T00:00:00+00:00", 1, 100, 1.0, "/dest2", True),
+        )
+
+        result = reports_ops.generate_report(None, None, "backup-history", "txt", profile="weekly")
+
+        assert "weekly" in result["content"]
+        assert "nightly" not in result["content"]
+
+    def test_backup_summary_requires_profile(self):
+        try:
+            reports_ops.generate_report(None, None, "backup-summary", "txt")
+            assert False, "expected ValueError"
+        except ValueError as exc:
+            assert "profile is required" in str(exc).lower()
+
+    def test_backup_summary_raises_when_no_backups_for_profile(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(backup_manager, "DEFAULT_HISTORY_PATH", tmp_path / "history.json")
+
+        try:
+            reports_ops.generate_report(None, None, "backup-summary", "txt", profile="nightly")
+            assert False, "expected ValueError"
+        except ValueError as exc:
+            assert "no backups recorded" in str(exc).lower()
+
+    def test_backup_summary_builds_report(self, tmp_path, monkeypatch):
+        history_path = tmp_path / "history.json"
+        monkeypatch.setattr(backup_manager, "DEFAULT_HISTORY_PATH", history_path)
+        backup_manager.append_history(
+            history_path,
+            backup_manager.BackupRecord("nightly", "2026-06-01T00:00:00+00:00", 5, 5000, 10.0, "/dest", True),
+        )
+
+        result = reports_ops.generate_report(None, None, "backup-summary", "txt", profile="nightly")
+
+        assert "Backup Summary" in result["content"]
+
+    def test_backup_verification_requires_profile(self):
+        try:
+            reports_ops.generate_report(None, None, "backup-verification", "txt")
+            assert False, "expected ValueError"
+        except ValueError as exc:
+            assert "profile is required" in str(exc).lower()
+
+    def test_backup_verification_raises_when_profile_not_found(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(backup_manager, "DEFAULT_PROFILES_PATH", tmp_path / "profiles.json")
+        monkeypatch.setattr(backup_manager, "DEFAULT_HISTORY_PATH", tmp_path / "history.json")
+
+        try:
+            reports_ops.generate_report(None, None, "backup-verification", "txt", profile="nope")
+            assert False, "expected ValueError"
+        except ValueError as exc:
+            assert "not found" in str(exc).lower()
+
+    def test_backup_verification_raises_when_no_backups_for_profile(self, tmp_path, monkeypatch):
+        profiles_path = tmp_path / "profiles.json"
+        monkeypatch.setattr(backup_manager, "DEFAULT_PROFILES_PATH", profiles_path)
+        monkeypatch.setattr(backup_manager, "DEFAULT_HISTORY_PATH", tmp_path / "history.json")
+        backup_manager.save_profile(
+            profiles_path,
+            backup_manager.BackupProfile(name="nightly", sources=["/sdcard/a.jpg"], dest=str(tmp_path / "dest")),
+        )
+
+        try:
+            reports_ops.generate_report(None, None, "backup-verification", "txt", profile="nightly")
+            assert False, "expected ValueError"
+        except ValueError as exc:
+            assert "no backups recorded" in str(exc).lower()
+
+    def test_backup_verification_builds_report_with_no_device(self, tmp_path, monkeypatch):
+        profiles_path = tmp_path / "profiles.json"
+        history_path = tmp_path / "history.json"
+        monkeypatch.setattr(backup_manager, "DEFAULT_PROFILES_PATH", profiles_path)
+        monkeypatch.setattr(backup_manager, "DEFAULT_HISTORY_PATH", history_path)
+        dest = tmp_path / "dest"
+        dest.mkdir()
+        (dest / "a.jpg").write_bytes(b"x" * 1000)
+        backup_manager.save_profile(
+            profiles_path,
+            backup_manager.BackupProfile(name="nightly", sources=["/sdcard/a.jpg"], dest=str(dest)),
+        )
+        backup_manager.append_history(
+            history_path,
+            backup_manager.BackupRecord("nightly", "2026-06-01T00:00:00+00:00", 1, 1000, 1.0, str(dest), True),
+        )
+
+        result = reports_ops.generate_report(None, None, "backup-verification", "txt", profile="nightly")
+
+        assert "Backup Verification" in result["content"]
+        assert "nightly" in result["content"]
