@@ -1,6 +1,11 @@
 from unittest.mock import MagicMock
 
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QFileDialog
+
+from droidbridge.gui import reports_ops
 from droidbridge.gui.device_context import DeviceContext
+from droidbridge.gui.pages.reports import ReportsPage
 from droidbridge.gui.viewmodels.reports import ReportsViewModel
 from tests.test_gui_viewmodels_device import FakeWorker
 
@@ -137,3 +142,134 @@ class TestReportsViewModelSave:
         vm.save("hello", "/no/such/dir/report.txt")
 
         assert logs == [("denied", "ERROR")]
+
+
+class TestReportsPageSkeleton:
+    def test_type_combo_has_thirteen_items_matching_labels(self, qtbot):
+        vm = ReportsViewModel(_connected_ctx())
+        panel = ReportsPage(vm)
+        qtbot.addWidget(panel)
+
+        assert panel.type_combo.count() == 13
+        assert panel.type_combo.itemText(0) == reports_ops.REPORT_TYPES[0]["label"]
+        assert panel.type_combo.itemText(1) == reports_ops.REPORT_TYPES[1]["label"]
+
+    def test_format_combo_has_four_items(self, qtbot):
+        vm = ReportsViewModel(_connected_ctx())
+        panel = ReportsPage(vm)
+        qtbot.addWidget(panel)
+
+        assert panel.format_combo.count() == 4
+
+    def test_save_button_disabled_until_report_generated(self, qtbot):
+        vm = ReportsViewModel(_connected_ctx())
+        panel = ReportsPage(vm)
+        qtbot.addWidget(panel)
+
+        assert not panel.save_button.isEnabled()
+
+    def test_generate_button_calls_viewmodel_with_selected_type_and_format(self, qtbot, monkeypatch):
+        vm = ReportsViewModel(_connected_ctx())
+        panel = ReportsPage(vm)
+        qtbot.addWidget(panel)
+        panel.type_combo.setCurrentIndex(1)  # "storage", the first type with empty params
+        panel.format_combo.setCurrentIndex(2)  # "csv"
+        calls = []
+        monkeypatch.setattr(panel.viewmodel, "generate", lambda *a, **kw: calls.append((a, kw)))
+
+        qtbot.mouseClick(panel.generate_button, Qt.MouseButton.LeftButton)
+
+        assert calls == [(("storage", "csv"), {})]
+
+    def test_busy_shows_hides_progress_bar_and_disables_generate(self, qtbot):
+        vm = ReportsViewModel(_connected_ctx())
+        panel = ReportsPage(vm)
+        qtbot.addWidget(panel)
+        panel.show()
+
+        panel.viewmodel.busyChanged.emit(True)
+        assert panel.progress_bar.isVisible()
+        assert not panel.generate_button.isEnabled()
+
+        panel.viewmodel.busyChanged.emit(False)
+        assert not panel.progress_bar.isVisible()
+        assert panel.generate_button.isEnabled()
+
+    def test_report_generated_with_txt_format_sets_plain_text_and_enables_save(self, qtbot):
+        vm = ReportsViewModel(_connected_ctx())
+        panel = ReportsPage(vm)
+        qtbot.addWidget(panel)
+
+        panel.viewmodel.reportGenerated.emit({"content": "hello", "default_filename": "f.txt", "format": "txt"})
+
+        assert panel.preview_text.toPlainText() == "hello"
+        assert panel.save_button.isEnabled()
+
+    def test_report_generated_with_html_format_calls_set_html(self, qtbot, monkeypatch):
+        vm = ReportsViewModel(_connected_ctx())
+        panel = ReportsPage(vm)
+        qtbot.addWidget(panel)
+        calls = []
+        monkeypatch.setattr(panel.preview_text, "setHtml", lambda html: calls.append(html))
+
+        panel.viewmodel.reportGenerated.emit({"content": "<p>hi</p>", "default_filename": "f.html", "format": "html"})
+
+        assert calls == ["<p>hi</p>"]
+
+    def test_save_button_does_nothing_before_any_report_generated(self, qtbot, monkeypatch):
+        vm = ReportsViewModel(_connected_ctx())
+        panel = ReportsPage(vm)
+        qtbot.addWidget(panel)
+        panel.save_button.setEnabled(True)  # force-enable to exercise the guard directly
+        calls = []
+        monkeypatch.setattr(panel.viewmodel, "save", lambda *a, **kw: calls.append((a, kw)))
+
+        panel._on_save()
+
+        assert calls == []
+
+    def test_save_button_opens_dialog_and_calls_viewmodel_save(self, qtbot, monkeypatch, tmp_path):
+        vm = ReportsViewModel(_connected_ctx())
+        panel = ReportsPage(vm)
+        qtbot.addWidget(panel)
+        panel.viewmodel.reportGenerated.emit({"content": "hello", "default_filename": "f.txt", "format": "txt"})
+
+        chosen_path = str(tmp_path / "f.txt")
+        monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *a, **kw: (chosen_path, ""))
+        calls = []
+        monkeypatch.setattr(panel.viewmodel, "save", lambda content, path: calls.append((content, path)))
+
+        qtbot.mouseClick(panel.save_button, Qt.MouseButton.LeftButton)
+
+        assert calls == [("hello", chosen_path)]
+
+    def test_save_button_does_nothing_when_dialog_cancelled(self, qtbot, monkeypatch):
+        vm = ReportsViewModel(_connected_ctx())
+        panel = ReportsPage(vm)
+        qtbot.addWidget(panel)
+        panel.viewmodel.reportGenerated.emit({"content": "hello", "default_filename": "f.txt", "format": "txt"})
+
+        monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *a, **kw: ("", ""))
+        calls = []
+        monkeypatch.setattr(panel.viewmodel, "save", lambda *a, **kw: calls.append((a, kw)))
+
+        qtbot.mouseClick(panel.save_button, Qt.MouseButton.LeftButton)
+
+        assert calls == []
+
+    def test_status_changed_updates_status_label(self, qtbot):
+        vm = ReportsViewModel(_connected_ctx())
+        panel = ReportsPage(vm)
+        qtbot.addWidget(panel)
+
+        panel.viewmodel.statusChanged.emit("Generated txt report.")
+
+        assert panel.status_label.text() == "Generated txt report."
+
+    def test_all_interactive_widgets_have_tooltips(self, qtbot):
+        vm = ReportsViewModel(_connected_ctx())
+        panel = ReportsPage(vm)
+        qtbot.addWidget(panel)
+
+        for widget in (panel.type_combo, panel.format_combo, panel.generate_button, panel.save_button):
+            assert widget.toolTip() != ""
