@@ -5,6 +5,8 @@ from PyQt6.QtWidgets import (
     QProgressBar, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 from droidbridge.gui.viewmodels.storage.media import MediaViewModel
+from droidbridge.gui.widgets.export_button import export_report
+from droidbridge.reports.generators import Report, ReportSection
 from droidbridge.modules import search as search_module
 
 _CATEGORY_COLS = ["Type", "Count", "Size"]
@@ -17,6 +19,7 @@ class MediaPanel(QWidget):
         super().__init__(parent)
         self.viewmodel = MediaViewModel(context)
         self._duplicate_groups = []
+        self._last_result = None
         self._build_ui()
         self._connect()
 
@@ -38,6 +41,10 @@ class MediaPanel(QWidget):
         self.scan_button = QPushButton("Scan")
         self.scan_button.setToolTip("Scan the device for media files, categorize them, and find duplicates.")
         row.addWidget(self.scan_button)
+        self.export_button = QPushButton("Export...")
+        self.export_button.setToolTip("Export the media scan results to TXT, CSV, HTML, or JSON.")
+        self.export_button.setEnabled(False)
+        row.addWidget(self.export_button)
         layout.addLayout(row)
 
         self.progress_bar = QProgressBar()
@@ -82,6 +89,7 @@ class MediaPanel(QWidget):
     def _connect(self):
         self.before_checkbox.toggled.connect(self.before_date_edit.setEnabled)
         self.scan_button.clicked.connect(self._on_scan)
+        self.export_button.clicked.connect(self._on_export_clicked)
         self.duplicates_table.itemSelectionChanged.connect(self._on_group_selected)
         self.viewmodel.busyChanged.connect(self._on_busy)
         self.viewmodel.statusChanged.connect(self.status_label.setText)
@@ -100,6 +108,8 @@ class MediaPanel(QWidget):
         self.scan_button.setEnabled(not busy)
 
     def _populate(self, result):
+        self._last_result = result
+        self.export_button.setEnabled(True)
         self.summary_label.setText(f"{result['total_count']} file(s), {result['total_size_str']}")
 
         categories = result["categories"]
@@ -135,3 +145,28 @@ class MediaPanel(QWidget):
             return
         group = self._duplicate_groups[rows[0].row()]
         self.duplicates_paths_list.addItems(group["paths"])
+
+    def _on_export_clicked(self):
+        if self._last_result is None:
+            return
+        result = self._last_result
+        cat_section = ReportSection(
+            title="Categories",
+            headers=_CATEGORY_COLS,
+            rows=[[cat["type"], str(cat["count"]), cat["size_str"]] for cat in result["categories"]],
+        )
+        largest_section = ReportSection(
+            title="Largest Files",
+            headers=_LARGEST_COLS,
+            rows=[[item["size_str"], item["path"]] for item in result["largest_files"]],
+        )
+        dups_section = ReportSection(
+            title="Duplicate Groups",
+            headers=_DUPLICATE_COLS,
+            rows=[[g["name"], g["size_str"], str(g["count"])] for g in result["duplicate_groups"]],
+        )
+        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        export_report(
+            self, "Export Media Scan", f"media_scan_{ts}.txt",
+            Report(title="Media Scan", sections=[cat_section, largest_section, dups_section]),
+        )
