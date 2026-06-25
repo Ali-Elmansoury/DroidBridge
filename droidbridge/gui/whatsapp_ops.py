@@ -1,11 +1,37 @@
 """Plain-Python WhatsApp GUI operations (sub-phase 6.3) — no Qt imports."""
 
 import os
+import shutil
+import subprocess
 import tempfile
 
 from droidbridge.modules import whatsapp as wa_module
 from droidbridge.modules import transfer as transfer_module
 from droidbridge.utils import format as format_utils
+
+
+_VIDEO_EXTS = {"mp4", "3gp", "mkv", "avi", "mov"}
+
+
+def _try_video_thumb(local_path, ext):
+    """Extract first frame of a local video as a JPEG thumbnail. Returns path or None."""
+    if ext not in _VIDEO_EXTS:
+        return None
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        return None
+    thumb = local_path + "_thumb.jpg"
+    if os.path.exists(thumb):
+        return thumb
+    try:
+        r = subprocess.run(
+            [ffmpeg, "-y", "-loglevel", "error", "-i", local_path,
+             "-ss", "0", "-vframes", "1", thumb],
+            capture_output=True, timeout=10,
+        )
+        return thumb if r.returncode == 0 and os.path.exists(thumb) else None
+    except Exception:
+        return None
 
 
 def _select_installs(installs, app):
@@ -116,8 +142,11 @@ def pull_statuses_to_temp(client, serial, app, progress_callback=None):
         for item in plan.items:
             filename = os.path.basename(item.source)
             ext = os.path.splitext(filename)[1].lower().lstrip(".")
-            items.append({"local_path": item.dest, "remote_path": item.source,
-                          "extension": ext, "filename": filename})
+            items.append({
+                "local_path": item.dest, "remote_path": item.source,
+                "extension": ext, "filename": filename,
+                "thumb_path": _try_video_thumb(item.dest, ext),
+            })
     return temp_dir, items
 
 

@@ -2,12 +2,13 @@ import os
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import (
-    QCheckBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel,
+    QCheckBox, QFileDialog, QFrame, QGridLayout, QHBoxLayout, QLabel,
     QProgressBar, QPushButton, QScrollArea, QVBoxLayout, QWidget, QLineEdit,
 )
 from droidbridge.gui.viewmodels.whatsapp.save_status import SaveStatusViewModel
 
 _IMAGE_EXTS = {"jpg", "jpeg", "png", "gif", "webp"}
+_VIDEO_EXTS = {"mp4", "3gp", "mkv", "avi", "mov"}
 _THUMB_SIZE = 120
 _GRID_COLS = 4
 
@@ -52,6 +53,8 @@ class SaveStatusPanel(QWidget):
         scroll.setWidgetResizable(True)
         grid_widget = QWidget()
         self._grid_layout = QGridLayout(grid_widget)
+        self._grid_layout.setSpacing(8)
+        self._grid_layout.setContentsMargins(8, 8, 8, 8)
         scroll.setWidget(grid_widget)
         layout.addWidget(scroll)
 
@@ -100,7 +103,9 @@ class SaveStatusPanel(QWidget):
                 child.widget().deleteLater()
 
         for idx, item in enumerate(items):
-            cell = QWidget()
+            cell = QFrame()
+            cell.setFrameShape(QFrame.Shape.StyledPanel)
+            cell.setFrameShadow(QFrame.Shadow.Raised)
             cell_layout = QVBoxLayout(cell)
             cell_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -108,14 +113,19 @@ class SaveStatusPanel(QWidget):
             thumb.setFixedSize(_THUMB_SIZE, _THUMB_SIZE)
             thumb.setAlignment(Qt.AlignmentFlag.AlignCenter)
             ext = item["extension"].lower()
+            thumb_src = None
             if ext in _IMAGE_EXTS and os.path.exists(item["local_path"]):
-                pix = QPixmap(item["local_path"]).scaled(
+                thumb_src = item["local_path"]
+            elif item.get("thumb_path") and os.path.exists(item["thumb_path"]):
+                thumb_src = item["thumb_path"]
+            if thumb_src:
+                pix = QPixmap(thumb_src).scaled(
                     _THUMB_SIZE, _THUMB_SIZE, Qt.AspectRatioMode.KeepAspectRatio,
                     Qt.TransformationMode.SmoothTransformation,
                 )
                 thumb.setPixmap(pix)
             else:
-                thumb.setText("▶")
+                thumb.setText("▶" if ext in _VIDEO_EXTS else "?")
             cell_layout.addWidget(thumb)
 
             name_label = QLabel(item["filename"])
