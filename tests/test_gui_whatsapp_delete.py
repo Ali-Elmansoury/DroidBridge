@@ -13,6 +13,9 @@ def _connected_ctx():
     return ctx
 
 
+_PREVIEW_ROWS = [{"path": "/sdcard/WhatsApp/Media/file.jpg", "folder_type": "Images", "size_str": "2 MB"}]
+
+
 class TestDeleteViewModel:
     def test_preview_emits_results_and_status(self, qtbot, monkeypatch):
         vm = DeleteViewModel(_connected_ctx(), worker_factory=FakeWorker)
@@ -119,3 +122,38 @@ class TestDeletePanel:
                              lambda app, before, keep_types, backup_dir: calls.append(keep_types))
         panel._on_preview()
         assert calls == [[BACKUP_TYPES["voice_notes"]]]
+
+    def test_export_button_exists_and_disabled_initially(self, qtbot):
+        panel = DeletePanel(_connected_ctx(), lambda: "whatsapp")
+        qtbot.addWidget(panel)
+        assert hasattr(panel, "export_button")
+        assert not panel.export_button.isEnabled()
+
+    def test_export_button_enabled_after_non_empty_preview(self, qtbot):
+        panel = DeletePanel(_connected_ctx(), lambda: "whatsapp")
+        qtbot.addWidget(panel)
+        panel.viewmodel.resultsChanged.emit(_PREVIEW_ROWS)
+        assert panel.export_button.isEnabled()
+
+    def test_export_button_disabled_after_empty_preview(self, qtbot):
+        panel = DeletePanel(_connected_ctx(), lambda: "whatsapp")
+        qtbot.addWidget(panel)
+        panel.viewmodel.resultsChanged.emit(_PREVIEW_ROWS)
+        panel.viewmodel.resultsChanged.emit([])
+        assert not panel.export_button.isEnabled()
+
+    def test_export_writes_csv_with_preview_rows(self, qtbot, tmp_path):
+        import csv
+        from unittest.mock import patch
+        panel = DeletePanel(_connected_ctx(), lambda: "whatsapp")
+        qtbot.addWidget(panel)
+        panel.viewmodel.resultsChanged.emit(_PREVIEW_ROWS)
+        out = str(tmp_path / "out.csv")
+        with patch("droidbridge.gui.widgets.export_button.QFileDialog.getSaveFileName", return_value=(out, "")):
+            with patch("droidbridge.gui.widgets.export_button.QMessageBox.information"):
+                panel._on_export_clicked()
+        with open(out, newline="", encoding="utf-8") as f:
+            all_rows = list(csv.reader(f))
+        assert ["Path", "Folder Type", "Size"] in all_rows
+        paths = [r[0] for r in all_rows if r and r[0].startswith("/sdcard")]
+        assert "/sdcard/WhatsApp/Media/file.jpg" in paths

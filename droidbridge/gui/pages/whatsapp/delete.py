@@ -7,6 +7,8 @@ from PyQt6.QtWidgets import (
 )
 from droidbridge.gui.viewmodels.whatsapp.delete import DeleteViewModel
 from droidbridge.modules.whatsapp import BACKUP_TYPES
+from droidbridge.gui.widgets.export_button import export_report
+from droidbridge.reports.generators import Report, ReportSection
 
 _PREVIEW_COLS = ["Path", "Folder Type", "Size"]
 _PREVIEW_KEYS = ["path", "folder_type", "size_str"]
@@ -17,6 +19,7 @@ class DeletePanel(QWidget):
         super().__init__(parent)
         self._get_app = get_app
         self.viewmodel = DeleteViewModel(context)
+        self._rows = []
         self._build_ui()
         self._connect()
 
@@ -61,6 +64,13 @@ class DeletePanel(QWidget):
         self.delete_button.setEnabled(False)
         self.delete_button.setToolTip("Run preview first. Will ask for 'YES DELETE' confirmation.")
         btn_row.addWidget(self.delete_button)
+        self.export_button = QPushButton("Export...")
+        self.export_button.setToolTip(
+            "Export the delete preview to TXT, CSV, HTML, or JSON — "
+            "save a record before confirming deletion."
+        )
+        self.export_button.setEnabled(False)
+        btn_row.addWidget(self.export_button)
         btn_row.addStretch()
         layout.addLayout(btn_row)
 
@@ -81,6 +91,7 @@ class DeletePanel(QWidget):
     def _connect(self):
         self.preview_button.clicked.connect(self._on_preview)
         self.delete_button.clicked.connect(self._on_delete)
+        self.export_button.clicked.connect(self._on_export_clicked)
         self.viewmodel.busyChanged.connect(self._on_busy)
         self.viewmodel.statusChanged.connect(self.status_label.setText)
         self.viewmodel.resultsChanged.connect(self._populate)
@@ -111,9 +122,25 @@ class DeletePanel(QWidget):
         self.progress_bar.setVisible(busy)
         self.preview_button.setEnabled(not busy)
 
+    def _on_export_clicked(self):
+        if not self._rows:
+            return
+        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        section = ReportSection(
+            title="Delete Preview",
+            headers=_PREVIEW_COLS,
+            rows=[[str(row.get(k, "")) for k in _PREVIEW_KEYS] for row in self._rows],
+        )
+        export_report(
+            self, "Export Delete Preview", f"delete_preview_{ts}.txt",
+            Report(title="Delete Preview", sections=[section]),
+        )
+
     def _populate(self, rows):
+        self._rows = rows
         has_rows = bool(rows)
         self.delete_button.setEnabled(has_rows)
+        self.export_button.setEnabled(has_rows)
         self.preview_table.setVisible(has_rows)
         self.preview_table.setRowCount(len(rows))
         for r, row in enumerate(rows):
