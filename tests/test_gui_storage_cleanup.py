@@ -123,3 +123,38 @@ class TestCleanupPanel:
         assert panel.progress_bar.isVisible()
         panel.viewmodel.busyChanged.emit(False)
         assert not panel.progress_bar.isVisible()
+
+    def test_export_button_exists_and_disabled_initially(self, qtbot):
+        panel = CleanupPanel(_connected_ctx())
+        qtbot.addWidget(panel)
+        assert hasattr(panel, "export_button")
+        assert not panel.export_button.isEnabled()
+
+    def test_export_button_enabled_after_results(self, qtbot):
+        panel = CleanupPanel(_connected_ctx())
+        qtbot.addWidget(panel)
+        panel.viewmodel.resultChanged.emit(_RESULT)
+        assert panel.export_button.isEnabled()
+
+    def test_export_button_disabled_after_empty_results(self, qtbot):
+        panel = CleanupPanel(_connected_ctx())
+        qtbot.addWidget(panel)
+        panel.viewmodel.resultChanged.emit(_RESULT)
+        panel.viewmodel.resultChanged.emit({"suggestions": [], "total_str": "0 B"})
+        assert not panel.export_button.isEnabled()
+
+    def test_export_writes_csv_with_suggestions(self, qtbot, tmp_path):
+        import csv
+        from unittest.mock import patch
+        panel = CleanupPanel(_connected_ctx())
+        qtbot.addWidget(panel)
+        panel.viewmodel.resultChanged.emit(_RESULT)
+        out = str(tmp_path / "out.csv")
+        with patch("droidbridge.gui.widgets.export_button.QFileDialog.getSaveFileName", return_value=(out, "")):
+            with patch("droidbridge.gui.widgets.export_button.QMessageBox.information"):
+                panel._on_export_clicked()
+        with open(out, newline="", encoding="utf-8") as f:
+            all_rows = list(csv.reader(f))
+        assert ["Title", "Description", "Estimated Recoverable", "Item Count"] in all_rows
+        titles = [r[0] for r in all_rows if r]
+        assert "Clear app caches" in titles
