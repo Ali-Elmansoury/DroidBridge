@@ -358,3 +358,37 @@ class TestGetLauncherLabels:
         result = apps.get_launcher_labels(client, "SERIAL123")
 
         assert result == {}
+
+
+class TestExtractLabelFromApk:
+    def test_returns_label_from_badging_output(self, tmp_path, monkeypatch):
+        fake_apk = tmp_path / "base.apk"
+        fake_apk.write_bytes(b"")
+
+        def fake_run(cmd, **kwargs):
+            class R:
+                stdout = "application-label:'WhatsApp'\napplication-label-en:'WhatsApp'\n"
+                returncode = 0
+            return R()
+
+        monkeypatch.setattr(apps.subprocess, "run", fake_run)
+        assert apps.extract_label_from_apk("/fake/aapt2", str(fake_apk)) == "WhatsApp"
+
+    def test_returns_none_on_subprocess_error(self, tmp_path, monkeypatch):
+        fake_apk = tmp_path / "base.apk"
+        fake_apk.write_bytes(b"")
+        monkeypatch.setattr(apps.subprocess, "run", lambda *a, **kw: (_ for _ in ()).throw(OSError("no aapt2")))
+        assert apps.extract_label_from_apk("/fake/aapt2", str(fake_apk)) is None
+
+    def test_returns_none_when_label_not_in_output(self, tmp_path, monkeypatch):
+        fake_apk = tmp_path / "base.apk"
+        fake_apk.write_bytes(b"")
+
+        def fake_run(cmd, **kwargs):
+            class R:
+                stdout = "package: name='com.example' versionCode='1'\n"
+                returncode = 0
+            return R()
+
+        monkeypatch.setattr(apps.subprocess, "run", fake_run)
+        assert apps.extract_label_from_apk("/fake/aapt2", str(fake_apk)) is None

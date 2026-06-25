@@ -1,6 +1,8 @@
 """Plain-Python Apps GUI operations (sub-phase 6.5 part 2) - no Qt imports."""
 
 import json
+import os
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -156,3 +158,122 @@ def restore_apk(client, serial, bundle_dir, allow_downgrade=False):
     apk_paths = [str(Path(bundle_dir) / f["filename"]) for f in manifest["apk_files"]]
     apps_module.install_apk(client, serial, apk_paths, allow_downgrade=allow_downgrade)
     return manifest
+
+
+# ── App display-name resolution (aapt2 + disk cache) ─────────────────────────
+
+def _label_cache_path(serial):
+    cache_dir = Path.home() / ".local" / "share" / "droidbridge" / "label_cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return cache_dir / f"{serial}.json"
+
+
+def load_label_cache(serial):
+    """Return cached {package: label} dict for the given serial, or {} on miss/error."""
+    p = _label_cache_path(serial)
+    try:
+        return json.loads(p.read_text()) if p.exists() else {}
+    except Exception:
+        return {}
+
+
+def _save_label_cache(serial, labels):
+    try:
+        _label_cache_path(serial).write_text(json.dumps(labels))
+    except Exception:
+        pass
+
+
+def _parse_launcher_packages(output):
+    """Parse `pm query-activities --brief` output → set of package names."""
+    packages = set()
+    for line in output.splitlines():
+        line = line.strip()
+        # Component lines look like "com.example/.Activity" — contain "/" but not "="
+        if "/" in line and "=" not in line and "." in line and not line[0].isdigit():
+            pkg = line.split("/")[0]
+            if "." in pkg:
+                packages.add(pkg)
+    return packages
+
+
+def _parse_apk_paths(output):
+    """Parse `pm list packages -f` output → {package: base_apk_path}."""
+    paths = {}
+    for line in output.splitlines():
+        line = line.strip()
+        if line.startswith("package:"):
+            rest = line[len("package:"):]
+            if "=" in rest:
+                apk_path, pkg = rest.rsplit("=", 1)
+                # Only keep the first entry (base.apk) if package appears twice
+                if pkg not in paths:
+                    paths[pkg] = apk_path
+    return paths
+
+
+def resolve_app_labels(client, serial, packages, progress_callback=None):
+    """Resolve display labels for launcher apps using host-side aapt2.
+
+    Reads the disk cache first; pulls and aapt2-parses only uncached packages.
+    Writes the cache after each resolved label for crash-safe progress.
+    Calls progress_callback(done, total) from the calling thread if provided.
+    Returns the updated {package: label} cache dict.
+    """
+    aapt2 = apps_module.find_aapt2()
+    if aapt2 is None:
+        return load_label_cache(serial)
+
+    cache = load_label_cache(serial)
+
+    # Packages with launcher icons only
+    try:
+        pm_out = client.shell(
+            serial,
+            ["pm", "query-activities", "--brief",
+             "-a", "android.intent.action.MAIN",
+             "-c", "android.intent.category.LAUNCHER"],
+        )
+        launcher_pkgs = _parse_launcher_packages(pm_out)
+    except Exception:
+        return cache
+
+    # Resolve only what's not cached AND has a launcher icon
+    package_set = set(packages)
+    to_resolve = [p for p in packages if p in launcher_pkgs and p not in cache]
+    if not to_resolve:
+        return cache
+
+    # Get APK paths for all packages in one call
+    try:
+        paths_out = client.shell(serial, ["pm", "list", "packages", "-f"])
+        apk_paths = _parse_apk_paths(paths_out)
+    except Exception:
+        return cache
+
+    total = len(to_resolve)
+    done = 0
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        local_apk = os.path.join(tmp_dir, "base.apk")
+        for package in to_resolve:
+            apk_path = apk_paths.get(package)
+            if apk_path:
+                try:
+                    client.pull(serial, apk_path, local_apk)
+                    label = apps_module.extract_label_from_apk(aapt2, local_apk)
+                    if label:
+                        cache[package] = label
+                        _save_label_cache(serial, cache)
+                except Exception:
+                    pass
+                finally:
+                    try:
+                        os.unlink(local_apk)
+                    except OSError:
+                        pass
+            done += 1
+            if progress_callback:
+                progress_callback(done, total)
+
+    return cache

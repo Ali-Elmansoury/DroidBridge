@@ -11,6 +11,7 @@ class ListingViewModel(QObject):
     statusChanged = pyqtSignal(str)
     resultsChanged = pyqtSignal(list)
     logMessage = pyqtSignal(str, str)
+    labelsResolved = pyqtSignal(dict)
 
     def __init__(self, context, worker_factory=Worker):
         super().__init__()
@@ -29,6 +30,24 @@ class ListingViewModel(QObject):
     def _on_results(self, rows):
         self.resultsChanged.emit(rows)
         self.statusChanged.emit(f"Loaded {len(rows)} app(s).")
+
+    def resolve_labels(self, packages):
+        """Start background aapt2 label resolution; emits labelsResolved when done."""
+        client, serial = self.context.client, self.context.serial
+
+        def _progress(done, total):
+            self.statusChanged.emit(f"Resolving app names... {done}/{total}")
+
+        fn = functools.partial(
+            apps_ops.resolve_app_labels, client, serial, list(packages),
+            progress_callback=_progress,
+        )
+        self._run(fn, self._on_labels_resolved)
+
+    def _on_labels_resolved(self, labels):
+        resolved = sum(1 for p, v in labels.items() if v and not p == v)
+        self.statusChanged.emit(f"Ready. Resolved {resolved} display name(s).")
+        self.labelsResolved.emit(labels)
 
     def _run(self, fn, on_finished):
         self.busyChanged.emit(True)

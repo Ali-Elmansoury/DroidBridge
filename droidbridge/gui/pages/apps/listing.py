@@ -80,6 +80,7 @@ class ListingPanel(QWidget):
         self.viewmodel.busyChanged.connect(self._on_busy)
         self.viewmodel.statusChanged.connect(self.status_label.setText)
         self.viewmodel.resultsChanged.connect(self._populate)
+        self.viewmodel.labelsResolved.connect(self._on_labels_resolved)
 
     def _on_refresh(self):
         filter_kind = _FILTER_VALUES[self.filter_combo.currentIndex()]
@@ -103,6 +104,17 @@ class ListingPanel(QWidget):
         for r, row in enumerate(rows):
             for c, key in enumerate(_KEYS):
                 self.apps_table.setItem(r, c, QTableWidgetItem(str(row.get(key, ""))))
+        if rows:
+            self.viewmodel.resolve_labels([row["package"] for row in rows])
+
+    def _on_labels_resolved(self, labels):
+        pkg_to_row = {row["package"]: r for r, row in enumerate(self._rows)}
+        name_col = _KEYS.index("app_label")
+        for pkg, label in labels.items():
+            r = pkg_to_row.get(pkg)
+            if r is not None and label:
+                self._rows[r]["app_label"] = label
+                self.apps_table.setItem(r, name_col, QTableWidgetItem(label))
 
     def _on_selection_changed(self):
         selected_rows = {item.row() for item in self.apps_table.selectedItems()}

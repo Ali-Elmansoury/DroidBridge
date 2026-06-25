@@ -317,3 +317,91 @@ class TestRestoreApk:
 
         assert result["package"] == "com.a"
         assert calls == [("S1", [str(bundle_dir / "base.apk")], True)]
+
+
+class TestParseLauncherPackages:
+    def test_extracts_packages_from_brief_output(self):
+        output = (
+            "3 activities found:\n"
+            "  Activity #0:\n"
+            "    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\n"
+            "    com.android.chrome/com.google.android.apps.chrome.Main\n"
+            "  Activity #1:\n"
+            "    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\n"
+            "    com.whatsapp/.HomeActivity\n"
+            "  Activity #2:\n"
+            "    priority=0 preferredOrder=0 match=0x108000 specificIndex=-1 isDefault=true\n"
+            "    com.android.contacts/.DialtactsActivityAlias\n"
+        )
+        result = apps_ops._parse_launcher_packages(output)
+        assert result == {"com.android.chrome", "com.whatsapp", "com.android.contacts"}
+
+    def test_empty_output_returns_empty_set(self):
+        assert apps_ops._parse_launcher_packages("") == set()
+
+
+class TestParseApkPaths:
+    def test_extracts_package_to_apk_mapping(self):
+        output = (
+            "package:/data/app/~~abc==/com.whatsapp-xyz==/base.apk=com.whatsapp\n"
+            "package:/system/app/Chrome/Chrome.apk=com.android.chrome\n"
+        )
+        result = apps_ops._parse_apk_paths(output)
+        assert result["com.whatsapp"] == "/data/app/~~abc==/com.whatsapp-xyz==/base.apk"
+        assert result["com.android.chrome"] == "/system/app/Chrome/Chrome.apk"
+
+    def test_first_entry_wins_for_duplicate_package(self):
+        output = (
+            "package:/data/app/base.apk=com.pkg\n"
+            "package:/data/app/split.apk=com.pkg\n"
+        )
+        result = apps_ops._parse_apk_paths(output)
+        assert result["com.pkg"] == "/data/app/base.apk"
+
+
+class TestResolveAppLabels:
+    def test_returns_cache_immediately_when_no_aapt2(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(apps_ops.apps_module, "find_aapt2", lambda: None)
+        monkeypatch.setattr(apps_ops, "load_label_cache", lambda s: {"com.a": "App A"})
+        result = apps_ops.resolve_app_labels(MagicMock(), "S1", ["com.a"])
+        assert result == {"com.a": "App A"}
+
+    def test_skips_already_cached_packages(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(apps_ops.apps_module, "find_aapt2", lambda: "/fake/aapt2")
+        monkeypatch.setattr(apps_ops, "load_label_cache", lambda s: {"com.a": "App A"})
+        monkeypatch.setattr(apps_ops, "_save_label_cache", lambda s, c: None)
+        client = MagicMock()
+        client.shell.return_value = "1 activities found:\n    com.a/.Main\n"
+        result = apps_ops.resolve_app_labels(client, "S1", ["com.a"])
+        # pull should not have been called since com.a is cached
+        client.pull.assert_not_called()
+        assert result["com.a"] == "App A"
+
+    def test_resolves_uncached_launcher_package(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(apps_ops.apps_module, "find_aapt2", lambda: "/fake/aapt2")
+        monkeypatch.setattr(apps_ops, "load_label_cache", lambda s: {})
+        saved = {}
+        monkeypatch.setattr(apps_ops, "_save_label_cache", lambda s, c: saved.update(c))
+        monkeypatch.setattr(apps_ops.apps_module, "extract_label_from_apk",
+                            lambda aapt2, apk: "WhatsApp")
+        client = MagicMock()
+        client.shell.side_effect = [
+            "1 activities found:\n    com.whatsapp/.HomeActivity\n",   # launcher query
+            "package:/data/app/base.apk=com.whatsapp\n",              # pm list packages -f
+        ]
+        result = apps_ops.resolve_app_labels(client, "S1", ["com.whatsapp"])
+        assert result.get("com.whatsapp") == "WhatsApp"
+        assert saved.get("com.whatsapp") == "WhatsApp"
+
+    def test_skips_non_launcher_packages(self, monkeypatch):
+        monkeypatch.setattr(apps_ops.apps_module, "find_aapt2", lambda: "/fake/aapt2")
+        monkeypatch.setattr(apps_ops, "load_label_cache", lambda s: {})
+        monkeypatch.setattr(apps_ops, "_save_label_cache", lambda s, c: None)
+        client = MagicMock()
+        client.shell.side_effect = [
+            # launcher query returns only com.launcher
+            "1 activities found:\n    com.launcher/.Main\n",
+            "package:/data/app/base.apk=com.background\n",
+        ]
+        result = apps_ops.resolve_app_labels(client, "S1", ["com.background"])
+        client.pull.assert_not_called()

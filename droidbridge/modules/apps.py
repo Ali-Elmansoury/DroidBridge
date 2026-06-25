@@ -1,9 +1,13 @@
 """Module 8 - App Manager: app listing, cache management, uninstall, APK extraction, bloatware."""
 
+import glob
+import os
 import re
 import shlex
+import subprocess
 from dataclasses import dataclass
 from datetime import datetime
+from shutil import which
 from typing import Optional
 
 from droidbridge.core.adb import AdbCommandError
@@ -80,6 +84,46 @@ class AppInfo:
     @property
     def total_size(self):
         return self.apk_size + self.data_size + self.cache_size
+
+
+def find_aapt2():
+    """Return path to aapt2 binary on the host, or None if not found."""
+    path = which("aapt2")
+    if path:
+        return path
+    for env_var in ("ANDROID_HOME", "ANDROID_SDK_ROOT"):
+        root = os.environ.get(env_var)
+        if root:
+            candidates = glob.glob(os.path.join(root, "build-tools", "*", "aapt2"))
+            if candidates:
+                return sorted(candidates)[-1]
+    home = os.path.expanduser("~")
+    # Gradle transform cache: ~/.gradle/caches/*/transforms/*/transformed/aapt2-*/aapt2
+    gradle_candidates = glob.glob(
+        os.path.join(home, ".gradle", "caches", "*", "transforms", "*", "transformed", "aapt2-*", "aapt2")
+    )
+    if gradle_candidates:
+        return sorted(gradle_candidates)[-1]
+    return None
+
+
+_AAPT2_BASE_LABEL_RE = re.compile(r"^application-label:'(.+)'$")
+
+
+def extract_label_from_apk(aapt2_path, local_apk_path):
+    """Run `aapt2 dump badging` on a local APK and return the app label, or None."""
+    try:
+        result = subprocess.run(
+            [aapt2_path, "dump", "badging", local_apk_path],
+            capture_output=True, text=True, timeout=30,
+        )
+        for line in result.stdout.splitlines():
+            m = _AAPT2_BASE_LABEL_RE.match(line)
+            if m:
+                return m.group(1)
+    except Exception:
+        pass
+    return None
 
 
 def parse_launcher_labels(output):
