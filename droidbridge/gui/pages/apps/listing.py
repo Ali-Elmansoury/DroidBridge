@@ -1,3 +1,4 @@
+from datetime import datetime
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import (
     QAbstractItemView, QCheckBox, QComboBox, QHBoxLayout, QLabel,
@@ -5,6 +6,8 @@ from PyQt6.QtWidgets import (
 )
 
 from droidbridge.gui.viewmodels.apps.listing import ListingViewModel
+from droidbridge.gui.widgets.export_button import export_report
+from droidbridge.reports.generators import Report, ReportSection
 
 _COLS = ["Package", "Version", "Installed", "Updated", "APK", "Data", "Cache", "Total", "Kind", "Status"]
 _KEYS = [
@@ -47,6 +50,10 @@ class ListingPanel(QWidget):
         self.refresh_button.setToolTip("Refresh the installed app list with the current filter and sort.")
         row.addWidget(self.refresh_button)
         row.addStretch()
+        self.export_button = QPushButton("Export...")
+        self.export_button.setToolTip("Export the current app list to TXT, CSV, HTML, or JSON.")
+        self.export_button.setEnabled(False)
+        row.addWidget(self.export_button)
         layout.addLayout(row)
 
         self.progress_bar = QProgressBar()
@@ -67,6 +74,7 @@ class ListingPanel(QWidget):
 
     def _connect(self):
         self.refresh_button.clicked.connect(self._on_refresh)
+        self.export_button.clicked.connect(self._on_export_clicked)
         self.apps_table.itemSelectionChanged.connect(self._on_selection_changed)
         self.viewmodel.busyChanged.connect(self._on_busy)
         self.viewmodel.statusChanged.connect(self.status_label.setText)
@@ -89,6 +97,7 @@ class ListingPanel(QWidget):
 
     def _populate(self, rows):
         self._rows = rows
+        self.export_button.setEnabled(bool(rows))
         self.apps_table.setRowCount(len(rows))
         for r, row in enumerate(rows):
             for c, key in enumerate(_KEYS):
@@ -114,3 +123,17 @@ class ListingPanel(QWidget):
                 row["status"] = status
                 self.apps_table.setItem(r, _KEYS.index("status"), QTableWidgetItem(status))
                 return
+
+    def _on_export_clicked(self):
+        if not self._rows:
+            return
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        section = ReportSection(
+            title="App List",
+            headers=_COLS,
+            rows=[[str(row.get(k, "")) for k in _KEYS] for row in self._rows],
+        )
+        export_report(
+            self, "Export App List", f"app_list_{ts}.txt",
+            Report(title="App List", sections=[section]),
+        )

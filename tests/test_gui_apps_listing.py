@@ -162,3 +162,38 @@ class TestListingPanel:
         assert panel.progress_bar.isVisible()
         panel.viewmodel.busyChanged.emit(False)
         assert not panel.progress_bar.isVisible()
+
+    def test_export_button_exists_and_disabled_initially(self, qtbot):
+        panel = ListingPanel(_connected_ctx())
+        qtbot.addWidget(panel)
+        assert hasattr(panel, "export_button")
+        assert not panel.export_button.isEnabled()
+
+    def test_export_button_enabled_after_results(self, qtbot):
+        panel = ListingPanel(_connected_ctx())
+        qtbot.addWidget(panel)
+        panel.viewmodel.resultsChanged.emit(_rows(2))
+        assert panel.export_button.isEnabled()
+
+    def test_export_button_disabled_after_empty_results(self, qtbot):
+        panel = ListingPanel(_connected_ctx())
+        qtbot.addWidget(panel)
+        panel.viewmodel.resultsChanged.emit(_rows(2))
+        panel.viewmodel.resultsChanged.emit([])
+        assert not panel.export_button.isEnabled()
+
+    def test_export_writes_csv_with_app_rows(self, qtbot, tmp_path):
+        import csv
+        from unittest.mock import patch
+        panel = ListingPanel(_connected_ctx())
+        qtbot.addWidget(panel)
+        panel.viewmodel.resultsChanged.emit(_rows(1))
+        out = str(tmp_path / "out.csv")
+        with patch("droidbridge.gui.widgets.export_button.QFileDialog.getSaveFileName", return_value=(out, "")):
+            with patch("droidbridge.gui.widgets.export_button.QMessageBox.information"):
+                panel._on_export_clicked()
+        with open(out, newline="", encoding="utf-8") as f:
+            all_rows = list(csv.reader(f))
+        assert ["Package", "Version", "Installed", "Updated", "APK", "Data", "Cache", "Total", "Kind", "Status"] in all_rows
+        packages = [r[0] for r in all_rows if r and r[0].startswith("com.")]
+        assert "com.app0" in packages
