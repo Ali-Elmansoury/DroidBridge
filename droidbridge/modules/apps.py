@@ -166,19 +166,31 @@ def get_launcher_labels(client, serial):
 
 def get_apps(client, serial):
     """Return AppInfo for every installed package: sizes (diskstats), version/install
-    metadata (dumpsys package packages), and system/disabled flags (pm list packages)."""
+    metadata (dumpsys package packages), and system/disabled flags (pm list packages).
+
+    Uses `pm list packages` as the authoritative package enumeration so that freshly
+    installed apps (not yet in diskstats) always appear; sizes default to 0 when
+    diskstats hasn't scanned the package yet.
+    """
     diskstats_output = client.shell(serial, ["dumpsys", "diskstats"])
     package_dump = client.shell(serial, ["dumpsys", "package", "packages"], timeout=60)
+    all_output = client.shell(serial, ["pm", "list", "packages"])
     system_output = client.shell(serial, ["pm", "list", "packages", "-s"])
     disabled_output = client.shell(serial, ["pm", "list", "packages", "-d"])
 
     metadata = parse_package_dump(package_dump)
+    all_packages = storage_module.parse_package_list(all_output)
     system_packages = storage_module.parse_package_list(system_output)
     disabled_packages = storage_module.parse_package_list(disabled_output)
+    sizes = {
+        pkg: (apk, data, cache)
+        for pkg, apk, data, cache in storage_module.parse_diskstats_apps(diskstats_output)
+    }
 
     apps = []
-    for package, apk_size, data_size, cache_size in storage_module.parse_diskstats_apps(diskstats_output):
+    for package in all_packages:
         meta = metadata.get(package, {})
+        apk_size, data_size, cache_size = sizes.get(package, (0, 0, 0))
         apps.append(
             AppInfo(
                 package=package,

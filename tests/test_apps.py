@@ -25,6 +25,7 @@ PACKAGE_DUMP_OUTPUT = (
     "    lastUpdateTime=2024-01-10 08:00:05\n"
 )
 
+PM_LIST_ALL_OUTPUT = "package:com.whatsapp\npackage:com.android.chrome\n"
 PM_LIST_DISABLED_OUTPUT = "package:com.android.chrome\n"
 
 
@@ -71,6 +72,8 @@ class TestGetApps:
                 return DISKSTATS_OUTPUT
             if command[:3] == ["dumpsys", "package", "packages"]:
                 return PACKAGE_DUMP_OUTPUT
+            if command == ["pm", "list", "packages"]:
+                return PM_LIST_ALL_OUTPUT
             if command[:4] == ["pm", "list", "packages", "-s"]:
                 return PM_LIST_SYSTEM_OUTPUT
             if command[:4] == ["pm", "list", "packages", "-d"]:
@@ -96,6 +99,35 @@ class TestGetApps:
 
         assert chrome.is_system is True
         assert chrome.is_disabled is True
+
+    def test_includes_apps_missing_from_diskstats(self):
+        """Apps in pm list packages but absent from diskstats still appear with zero sizes."""
+        client = MagicMock()
+        # diskstats only has whatsapp; "com.google.android.apps.wallet" is newly installed
+        all_pkgs = "package:com.whatsapp\npackage:com.google.android.apps.wallet\n"
+
+        def fake_shell(serial, command, timeout=None):
+            if command[:2] == ["dumpsys", "diskstats"]:
+                return DISKSTATS_OUTPUT  # only com.whatsapp
+            if command[:3] == ["dumpsys", "package", "packages"]:
+                return PACKAGE_DUMP_OUTPUT
+            if command == ["pm", "list", "packages"]:
+                return all_pkgs
+            if command[:4] == ["pm", "list", "packages", "-s"]:
+                return ""
+            if command[:4] == ["pm", "list", "packages", "-d"]:
+                return ""
+            raise AssertionError(f"Unexpected shell command: {command}")
+
+        client.shell.side_effect = fake_shell
+        app_list = apps.get_apps(client, "SERIAL123")
+
+        packages = {a.package for a in app_list}
+        assert "com.google.android.apps.wallet" in packages
+        wallet = next(a for a in app_list if a.package == "com.google.android.apps.wallet")
+        assert wallet.apk_size == 0
+        assert wallet.data_size == 0
+        assert wallet.cache_size == 0
 
 
 def _make_app(package, total=(0, 0, 0), is_system=False, first_install=None, last_update=None):

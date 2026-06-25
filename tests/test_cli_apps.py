@@ -6,7 +6,7 @@ from click.testing import CliRunner
 
 from droidbridge.cli import main
 from droidbridge.core.adb import AdbCommandError, Device
-from tests.test_apps import PACKAGE_DUMP_OUTPUT, PM_LIST_DISABLED_OUTPUT
+from tests.test_apps import PACKAGE_DUMP_OUTPUT, PM_LIST_ALL_OUTPUT, PM_LIST_DISABLED_OUTPUT
 from tests.test_storage import DISKSTATS_OUTPUT, PM_LIST_SYSTEM_OUTPUT
 
 READY_DEVICE = [Device(serial="SERIAL123", state="device", model="Pixel_7")]
@@ -27,6 +27,8 @@ def _apps_fake_shell(serial, command, timeout=None):
         return DISKSTATS_OUTPUT
     if command[:3] == ["dumpsys", "package", "packages"]:
         return PACKAGE_DUMP_OUTPUT
+    if command == ["pm", "list", "packages"]:
+        return PM_LIST_ALL_OUTPUT
     if command[:4] == ["pm", "list", "packages", "-s"]:
         return PM_LIST_SYSTEM_OUTPUT
     if command[:4] == ["pm", "list", "packages", "-d"]:
