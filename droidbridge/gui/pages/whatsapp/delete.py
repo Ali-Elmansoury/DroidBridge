@@ -86,6 +86,7 @@ class DeletePanel(QWidget):
         layout.addWidget(self.preview_table)
 
         self.status_label = QLabel()
+        self.status_label.setWordWrap(True)
         layout.addWidget(self.status_label)
 
     def _connect(self):

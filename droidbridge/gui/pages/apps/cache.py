@@ -45,6 +45,7 @@ class CachePanel(QWidget):
         reset_box = QGroupBox("Reset App Data")
         reset_layout = QVBoxLayout(reset_box)
         self.acting_on_label = QLabel(_NO_SELECTION_TEXT)
+        self.acting_on_label.setWordWrap(True)
         reset_layout.addWidget(self.acting_on_label)
         self.warning_label = QLabel()
         self.warning_label.setWordWrap(True)
@@ -61,6 +62,7 @@ class CachePanel(QWidget):
         layout.addWidget(reset_box)
 
         self.status_label = QLabel()
+        self.status_label.setWordWrap(True)
         layout.addWidget(self.status_label)
         layout.addStretch()
 

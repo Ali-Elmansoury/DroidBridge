@@ -61,6 +61,7 @@ class CleanupPanel(QWidget):
         layout.addWidget(self.total_label)
 
         self.status_label = QLabel()
+        self.status_label.setWordWrap(True)
         layout.addWidget(self.status_label)
 
     def _connect(self):

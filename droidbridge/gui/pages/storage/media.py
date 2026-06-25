@@ -53,6 +53,7 @@ class MediaPanel(QWidget):
         layout.addWidget(self.progress_bar)
 
         self.summary_label = QLabel()
+        self.summary_label.setWordWrap(True)
         layout.addWidget(self.summary_label)
 
         self.categories_table = QTableWidget(0, len(_CATEGORY_COLS))
@@ -75,6 +76,7 @@ class MediaPanel(QWidget):
         layout.addWidget(self.duplicates_table)
 
         self.duplicates_overflow_label = QLabel()
+        self.duplicates_overflow_label.setWordWrap(True)
         self.duplicates_overflow_label.setVisible(False)
         layout.addWidget(self.duplicates_overflow_label)
 
@@ -84,6 +86,7 @@ class MediaPanel(QWidget):
         layout.addWidget(self.duplicates_paths_list)
 
         self.status_label = QLabel()
+        self.status_label.setWordWrap(True)
         layout.addWidget(self.status_label)
 
     def _connect(self):

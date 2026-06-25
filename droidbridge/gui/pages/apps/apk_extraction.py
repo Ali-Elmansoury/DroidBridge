@@ -24,6 +24,7 @@ class ApkExtractionPanel(QWidget):
         layout.addWidget(self.progress_bar)
 
         self.acting_on_label = QLabel(_NO_SELECTION_TEXT)
+        self.acting_on_label.setWordWrap(True)
         layout.addWidget(self.acting_on_label)
 
         self.files_list = QListWidget()
@@ -39,6 +40,7 @@ class ApkExtractionPanel(QWidget):
         layout.addLayout(row)
 
         self.status_label = QLabel()
+        self.status_label.setWordWrap(True)
         layout.addWidget(self.status_label)
 
     def _connect(self):

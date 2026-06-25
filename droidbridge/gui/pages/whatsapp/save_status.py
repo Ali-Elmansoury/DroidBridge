@@ -56,6 +56,7 @@ class SaveStatusPanel(QWidget):
         layout.addWidget(scroll)
 
         self.status_label = QLabel()
+        self.status_label.setWordWrap(True)
         layout.addWidget(self.status_label)
 
     def _connect(self):

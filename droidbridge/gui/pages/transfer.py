@@ -172,10 +172,13 @@ class TransferPage(QWidget):
         action_row.addStretch()
 
         self.plan_label = QLabel()
+        self.plan_label.setWordWrap(True)
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_label = QLabel()
+        self.progress_label.setWordWrap(True)
         self.verification_label = QLabel()
+        self.verification_label.setWordWrap(True)
 
         self.history_table = QTableWidget(0, len(_HISTORY_COLUMNS))
         self.history_table.setHorizontalHeaderLabels(_HISTORY_COLUMNS)

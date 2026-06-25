@@ -26,6 +26,7 @@ class UninstallPanel(QWidget):
         layout.addWidget(self.progress_bar)
 
         self.acting_on_label = QLabel(_NO_SELECTION_TEXT)
+        self.acting_on_label.setWordWrap(True)
         layout.addWidget(self.acting_on_label)
 
         self.keep_data_checkbox = QCheckBox("Keep data and cache (-k)")
@@ -41,6 +42,7 @@ class UninstallPanel(QWidget):
         layout.addLayout(row)
 
         self.status_label = QLabel()
+        self.status_label.setWordWrap(True)
         layout.addWidget(self.status_label)
         layout.addStretch()
 

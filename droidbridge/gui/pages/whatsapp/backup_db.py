@@ -63,9 +63,11 @@ class BackupDbPanel(QWidget):
         layout.addWidget(self.progress_bar)
 
         self.progress_label = QLabel()
+        self.progress_label.setWordWrap(True)
         layout.addWidget(self.progress_label)
 
         self.status_label = QLabel()
+        self.status_label.setWordWrap(True)
         layout.addWidget(self.status_label)
         layout.addStretch()
 
