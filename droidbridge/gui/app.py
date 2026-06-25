@@ -19,7 +19,12 @@ def main(argv=None):
 
     session_logger = SessionLogger.start()
     window = MainWindow(session_logger=session_logger)
-    window.resize(1280, 720)
+    screen = app.primaryScreen()
+    avail = screen.availableGeometry()
+    w = min(1280, avail.width())
+    h = min(720, avail.height())
+    window.resize(w, h)
+    window.move(avail.x() + (avail.width() - w) // 2, avail.y() + (avail.height() - h) // 2)
     window.show()
 
     return app.exec()
