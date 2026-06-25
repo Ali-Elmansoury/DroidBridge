@@ -121,7 +121,38 @@ over time." No implementation. Would need:
 
 ---
 
-### 1.7 "Detect If Backup Is Outdated" Alert
+### 1.7 Transfer Engine — 500-File ADB Batching Not Implemented
+
+**Scope:** `droidbridge/modules/transfer.py` `execute_plan` (pull/push).
+
+Spec §6.2/§15 calls for "batch pull/push (500 files per ADB call)."
+The current engine issues one `adb pull` / `adb push` call **per file** —
+necessary because three design invariants are incompatible with batching:
+
+1. **Per-file retry** — ADB returns one exit code for the whole batch with no
+   signal on which individual file failed; `--retry N` logic can't know what
+   to re-try.
+2. **Per-file progress** — no in-batch progress event, so the progress bar
+   would freeze for the full duration of each 500-file batch.
+3. **Per-file cancel** — a cancel check can only fire at batch boundaries,
+   not mid-batch.
+
+The deletion engine **does** use 500-file batching (`rm -f <500 quoted paths>`
+per shell call) because deletion produces no per-file feedback signal and
+doesn't need retry or mid-operation progress updates.
+
+**Possible future path:** an optional `--batch` flag on `transfer pull/push`
+that sets `retry_count=0` and updates progress only at batch boundaries —
+sacrificing per-file granularity for throughput when the user explicitly
+opts in.
+
+**Reference:** PROGRESS.md 2026-06-18 deferred-items pass "S1 — ADB
+500-file batching"; `docs/superpowers/specs/2026-06-18-deferred-items-pass-design.md`
+§ADB Batching.
+
+---
+
+### 1.8 "Detect If Backup Is Outdated" Alert
 
 **Scope:** GUI Backup Manager + CLI `backup history`.
 
@@ -136,7 +167,7 @@ a warning in the Backup Manager's History tab when a profile is stale.
 
 ---
 
-### 1.8 Session Logs Auto-Sync to Backup Destination
+### 1.9 Session Logs Auto-Sync to Backup Destination
 
 **Scope:** `core/session.py` + `backup run`.
 
@@ -151,7 +182,7 @@ the CLI/GUI layer) that pushes the session's log file to `<dest>/session_logs/`.
 
 ---
 
-### 1.9 `apps clear-cache` Target Accepts Raw Bytes Only
+### 1.10 `apps clear-cache` Target Accepts Raw Bytes Only
 
 **Scope:** CLI `apps clear-cache --target`.
 
@@ -167,7 +198,7 @@ callback (one line).
 
 ---
 
-### 1.10 Before/After Cleanup Comparison Report
+### 1.11 Before/After Cleanup Comparison Report
 
 **Scope:** CLI `report generate` + GUI Reports page.
 
@@ -181,7 +212,7 @@ before-snapshot and the deletion result and shows the delta.
 
 ---
 
-### 1.11 Mirror-Mode Real-Device Validation
+### 1.12 Mirror-Mode Real-Device Validation
 
 **Scope:** CLI `transfer mirror-pull` / `transfer mirror-push`.
 
@@ -508,6 +539,7 @@ Cross-check of every spec module against the current codebase.
 | §2.4 File operations | Pull, rename, delete, right-click menu, copy path | ✅ |
 | §3.1 Transfer pull/push | Batch, progress, speed, ETA | ✅ |
 | §3.2 Conflict resolution | skip/overwrite/rename | ✅; "ask each time" / "remember" deferred |
+| §3/§15 Batch pull/push | 500 files per ADB call | ❌ Deferred (§1.7); deletion batching ✅ |
 | §3.3 Resume | Skip already-present files on re-run | ✅ |
 | §3.4 Mirror mode | plan_mirror_pull/push, execute_mirror | ✅ CLI; real-device validation pending |
 | §3.5 Verification | Count + size post-transfer check | ✅ |
@@ -530,7 +562,7 @@ Cross-check of every spec module against the current codebase.
 | §6.2 Backup execution | Run, incremental, sleep inhibitor | ✅; direct-to-external-drive untested |
 | §6.3 Verification | Count + size check | ✅ |
 | §6.4 Backup history | Log, browse, compare runs | ✅ |
-| §6.4 Outdated detection | Alert when last backup > N days | ❌ Deferred (§1.7) |
+| §6.4 Outdated detection | Alert when last backup > N days | ❌ Deferred (§1.8) |
 | §6.5 Restore | Push backup back to device | ✅ |
 | §6.6 Contacts & Call Log | Export vCard/CSV (backup only) | ✅; restore out of scope (§3.5) |
 | §7.1 Search | Name/ext/size/date/MIME/regex/presets | ✅ CLI; GUI missing date+size (§1.3) |
@@ -546,14 +578,14 @@ Cross-check of every spec module against the current codebase.
 | §9.2 Storage reports | Overview, top apps, large files | ✅ |
 | §9.2 Storage trend | Compare reports across sessions | ❌ Deferred (§1.6) |
 | §9.3 Backup reports | Summary, verification, history | ✅ |
-| §9.4 Deletion reports | Preview + post-deletion | ✅; before/after comparison deferred (§1.10) |
+| §9.4 Deletion reports | Preview + post-deletion | ✅; before/after comparison deferred (§1.11) |
 | §9.5 Report formats | TXT, HTML, CSV, JSON | ✅ |
 | §9.6 Session logs | Create, write, summarize per operation | ✅ |
-| §9.6 Log auto-sync | Copy session log to backup destination | ❌ Deferred (§1.8) |
+| §9.6 Log auto-sync | Copy session log to backup destination | ❌ Deferred (§1.9) |
 | §14 GUI tooltips | All interactive widgets have tooltips | ✅ |
 | §14 Keyboard shortcuts | Global + page-level shortcuts | ✅ |
 | §14 Dark/light mode | Theme toggle | ✅ |
-| §14 Cancel buttons | All long-running ops have Cancel | 🔶 Storage only (§1.2); others deferred (§5.1) |
+| §14 Cancel buttons | All long-running ops have Cancel | 🔶 Storage only (§1.2); others deferred (§5.1 future) |
 | §14 Color-coded status | Error/warning/success in status bar | ✅ |
 | §15 Windows/macOS support | Full validation on real hardware | ❌ Deferred (§4.3) |
 | §15 Transfer speed | 3–5× faster than MTP | 🔶 Not formally benchmarked |
