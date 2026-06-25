@@ -12,6 +12,11 @@ def _connected_ctx():
     return ctx
 
 
+_RESTORE_RESULTS = [
+    {"source": "/sdcard/DCIM", "done": 5, "total": 5, "failed": 0, "verified": True}
+]
+
+
 class TestRestoreViewModel:
     def test_list_sources_returns_profile_sources(self, qtbot, monkeypatch):
         vm = RestoreViewModel(_connected_ctx(), worker_factory=FakeWorker)
@@ -112,3 +117,31 @@ class TestRestorePanel:
         panel.viewmodel.resultsChanged.emit([{"source": "/sdcard/DCIM", "done": 3, "total": 3, "failed": 0, "verified": True}])
         assert panel.results_table.rowCount() == 1
         assert panel.results_table.item(0, 0).text() == "/sdcard/DCIM"
+
+    def test_export_button_exists_and_disabled_initially(self, qtbot):
+        panel = RestorePanel(_connected_ctx(), lambda: "nightly")
+        qtbot.addWidget(panel)
+        assert hasattr(panel, "export_button")
+        assert not panel.export_button.isEnabled()
+
+    def test_export_button_enabled_after_restore_results(self, qtbot):
+        panel = RestorePanel(_connected_ctx(), lambda: "nightly")
+        qtbot.addWidget(panel)
+        panel.viewmodel.resultsChanged.emit(_RESTORE_RESULTS)
+        assert panel.export_button.isEnabled()
+
+    def test_export_writes_csv_with_result_rows(self, qtbot, tmp_path):
+        import csv
+        from unittest.mock import patch
+        panel = RestorePanel(_connected_ctx(), lambda: "nightly")
+        qtbot.addWidget(panel)
+        panel.viewmodel.resultsChanged.emit(_RESTORE_RESULTS)
+        out = str(tmp_path / "out.csv")
+        with patch("droidbridge.gui.widgets.export_button.QFileDialog.getSaveFileName", return_value=(out, "")):
+            with patch("droidbridge.gui.widgets.export_button.QMessageBox.information"):
+                panel._on_export_clicked()
+        with open(out, newline="", encoding="utf-8") as f:
+            all_rows = list(csv.reader(f))
+        assert ["Source", "Done", "Total", "Failed", "Verified"] in all_rows
+        sources = [r[0] for r in all_rows if r and r[0].startswith("/sdcard")]
+        assert "/sdcard/DCIM" in sources

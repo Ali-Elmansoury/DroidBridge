@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from PyQt6.QtCore import QDate, Qt
 from PyQt6.QtWidgets import (
     QCheckBox, QComboBox, QDateEdit, QHBoxLayout, QLabel, QListWidget,
@@ -5,6 +7,8 @@ from PyQt6.QtWidgets import (
 )
 
 from droidbridge.gui.viewmodels.backup.restore import RestoreViewModel
+from droidbridge.gui.widgets.export_button import export_report
+from droidbridge.reports.generators import Report, ReportSection
 
 _CONFLICT_OPTIONS = ["(profile default)", "skip", "overwrite", "rename"]
 _RESULT_COLUMNS = ["Source", "Done", "Total", "Failed", "Verified"]
@@ -15,6 +19,7 @@ class RestorePanel(QWidget):
         super().__init__(parent)
         self._get_profile = get_profile
         self.viewmodel = RestoreViewModel(context)
+        self._results = []
         self._build_ui()
         self._connect()
 
@@ -60,6 +65,10 @@ class RestorePanel(QWidget):
         self.restore_button = QPushButton("Restore")
         self.restore_button.setToolTip("Push the checked sources from the backup back to the device.")
         btn_row.addWidget(self.restore_button)
+        self.export_button = QPushButton("Export...")
+        self.export_button.setToolTip("Export the restore results to TXT, CSV, HTML, or JSON.")
+        self.export_button.setEnabled(False)
+        btn_row.addWidget(self.export_button)
         btn_row.addStretch()
         layout.addLayout(btn_row)
 
@@ -76,6 +85,7 @@ class RestorePanel(QWidget):
         self.viewmodel.busyChanged.connect(lambda busy: self.restore_button.setEnabled(not busy))
         self.viewmodel.statusChanged.connect(self.status_label.setText)
         self.viewmodel.resultsChanged.connect(self._on_results)
+        self.export_button.clicked.connect(self._on_export_clicked)
 
     def refresh_sources(self):
         self.sources_list.clear()
@@ -102,8 +112,27 @@ class RestorePanel(QWidget):
         )
 
     def _on_results(self, results):
+        self._results = results
+        self.export_button.setEnabled(bool(results))
         self.results_table.setRowCount(len(results))
         for row, result in enumerate(results):
             values = [result["source"], str(result["done"]), str(result["total"]), str(result["failed"]), str(result["verified"])]
             for col, value in enumerate(values):
                 self.results_table.setItem(row, col, QTableWidgetItem(value))
+
+    def _on_export_clicked(self):
+        if not self._results:
+            return
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        section = ReportSection(
+            title="Restore Results",
+            headers=_RESULT_COLUMNS,
+            rows=[
+                [r["source"], str(r["done"]), str(r["total"]), str(r["failed"]), str(r["verified"])]
+                for r in self._results
+            ],
+        )
+        export_report(
+            self, "Export Restore Results", f"restore_results_{ts}.txt",
+            Report(title="Restore Results", sections=[section]),
+        )
