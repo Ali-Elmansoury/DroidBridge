@@ -149,7 +149,7 @@ class TestDeletePanel:
         qtbot.addWidget(panel)
         panel.viewmodel.resultsChanged.emit(_PREVIEW_ROWS)
         out = str(tmp_path / "out.csv")
-        with patch("droidbridge.gui.widgets.export_button.QFileDialog.getSaveFileName", return_value=(out, "")):
+        with patch("droidbridge.gui.widgets.export_button.QFileDialog.getSaveFileName", return_value=(out, "CSV (*.csv)")):
             with patch("droidbridge.gui.widgets.export_button.QMessageBox.information"):
                 panel._on_export_clicked()
         with open(out, newline="", encoding="utf-8") as f:

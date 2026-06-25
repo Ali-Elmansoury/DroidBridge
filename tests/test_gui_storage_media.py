@@ -160,7 +160,7 @@ class TestMediaPanel:
         qtbot.addWidget(panel)
         panel.viewmodel.resultChanged.emit(_RESULT)
         out = str(tmp_path / "out.csv")
-        with patch("droidbridge.gui.widgets.export_button.QFileDialog.getSaveFileName", return_value=(out, "")):
+        with patch("droidbridge.gui.widgets.export_button.QFileDialog.getSaveFileName", return_value=(out, "CSV (*.csv)")):
             with patch("droidbridge.gui.widgets.export_button.QMessageBox.information"):
                 panel._on_export_clicked()
         with open(out, newline="", encoding="utf-8") as f:

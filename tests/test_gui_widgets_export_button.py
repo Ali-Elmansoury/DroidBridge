@@ -13,9 +13,9 @@ _REPORT = Report(
 
 
 class TestExportReport:
-    def test_txt_extension_writes_txt_format(self, tmp_path):
+    def test_txt_filter_writes_txt_format(self, tmp_path):
         out = str(tmp_path / "out.txt")
-        with patch("droidbridge.gui.widgets.export_button.QFileDialog.getSaveFileName", return_value=(out, "")):
+        with patch("droidbridge.gui.widgets.export_button.QFileDialog.getSaveFileName", return_value=(out, "Text (*.txt)")):
             with patch("droidbridge.gui.widgets.export_button.QMessageBox.information"):
                 export_report(None, "Title", "out.txt", _REPORT)
         content = Path(out).read_text()
@@ -23,9 +23,9 @@ class TestExportReport:
         assert "== Data ==" in content
         assert "x\ty" in content
 
-    def test_csv_extension_writes_csv_format(self, tmp_path):
+    def test_csv_filter_writes_csv_format(self, tmp_path):
         out = str(tmp_path / "out.csv")
-        with patch("droidbridge.gui.widgets.export_button.QFileDialog.getSaveFileName", return_value=(out, "")):
+        with patch("droidbridge.gui.widgets.export_button.QFileDialog.getSaveFileName", return_value=(out, "CSV (*.csv)")):
             with patch("droidbridge.gui.widgets.export_button.QMessageBox.information"):
                 export_report(None, "Title", "out.txt", _REPORT)
         with open(out, newline="", encoding="utf-8") as f:
@@ -34,22 +34,34 @@ class TestExportReport:
         assert ["A", "B"] in rows
         assert ["x", "y"] in rows
 
-    def test_html_extension_writes_html_format(self, tmp_path):
+    def test_html_filter_writes_html_format(self, tmp_path):
         out = str(tmp_path / "out.html")
-        with patch("droidbridge.gui.widgets.export_button.QFileDialog.getSaveFileName", return_value=(out, "")):
+        with patch("droidbridge.gui.widgets.export_button.QFileDialog.getSaveFileName", return_value=(out, "HTML (*.html)")):
             with patch("droidbridge.gui.widgets.export_button.QMessageBox.information"):
                 export_report(None, "Title", "out.txt", _REPORT)
         content = Path(out).read_text()
         assert "<html" in content
         assert "Test Report" in content
 
-    def test_json_extension_writes_json_format(self, tmp_path):
+    def test_json_filter_writes_json_format(self, tmp_path):
         out = str(tmp_path / "out.json")
-        with patch("droidbridge.gui.widgets.export_button.QFileDialog.getSaveFileName", return_value=(out, "")):
+        with patch("droidbridge.gui.widgets.export_button.QFileDialog.getSaveFileName", return_value=(out, "JSON (*.json)")):
             with patch("droidbridge.gui.widgets.export_button.QMessageBox.information"):
                 export_report(None, "Title", "out.txt", _REPORT)
         data = json.loads(Path(out).read_text())
         assert data["title"] == "Test Report"
+
+    def test_filter_overrides_typed_extension(self, tmp_path):
+        # Qt doesn't update the name field when the user changes the filter dropdown.
+        # If the user types "out.txt" but selects the HTML filter, we must save as HTML.
+        out_txt = str(tmp_path / "out.txt")
+        out_html = str(tmp_path / "out.html")
+        with patch("droidbridge.gui.widgets.export_button.QFileDialog.getSaveFileName", return_value=(out_txt, "HTML (*.html)")):
+            with patch("droidbridge.gui.widgets.export_button.QMessageBox.information"):
+                export_report(None, "Title", "out.txt", _REPORT)
+        assert not Path(out_txt).exists()
+        content = Path(out_html).read_text()
+        assert "<html" in content
 
     def test_cancelled_dialog_writes_nothing(self, tmp_path):
         out = str(tmp_path / "out.txt")
@@ -59,7 +71,7 @@ class TestExportReport:
 
     def test_oserror_triggers_critical_not_information(self, tmp_path):
         bad_path = str(tmp_path / "no_dir" / "out.txt")
-        with patch("droidbridge.gui.widgets.export_button.QFileDialog.getSaveFileName", return_value=(bad_path, "")):
+        with patch("droidbridge.gui.widgets.export_button.QFileDialog.getSaveFileName", return_value=(bad_path, "Text (*.txt)")):
             with patch("droidbridge.gui.widgets.export_button.QMessageBox.critical") as mock_crit:
                 with patch("droidbridge.gui.widgets.export_button.QMessageBox.information") as mock_info:
                     export_report(None, "Title", "out.txt", _REPORT)
