@@ -15,7 +15,7 @@ def _connected_ctx():
 def _rows(n):
     return [
         {
-            "package": f"com.app{i}", "version_name": "1.0", "version_code": i,
+            "app_label": f"App {i}", "package": f"com.app{i}", "version_name": "1.0", "version_code": i,
             "installed_str": "2024-01-01 00:00", "updated_str": "2024-01-01 00:00",
             "apk_size": 10, "apk_size_str": "10 B", "data_size": 20, "data_size_str": "20 B",
             "cache_size": 5, "cache_size_str": "5 B", "total_size_str": "35 B",
@@ -119,7 +119,8 @@ class TestListingPanel:
         panel.viewmodel.resultsChanged.emit(_rows(2))
 
         assert panel.apps_table.rowCount() == 2
-        assert panel.apps_table.item(0, 0).text() == "com.app0"
+        assert panel.apps_table.item(0, 0).text() == "App 0"
+        assert panel.apps_table.item(0, 1).text() == "com.app0"
 
     def test_selecting_row_emits_app_selected_with_package(self, qtbot):
         panel = ListingPanel(_connected_ctx())
@@ -151,7 +152,7 @@ class TestListingPanel:
 
         panel.update_row_status("com.app0", is_disabled=True)
 
-        assert panel.apps_table.item(0, 9).text() == "Disabled"
+        assert panel.apps_table.item(0, 10).text() == "Disabled"
 
     def test_busy_shows_hides_progress_bar(self, qtbot):
         panel = ListingPanel(_connected_ctx())
@@ -194,6 +195,6 @@ class TestListingPanel:
                 panel._on_export_clicked()
         with open(out, newline="", encoding="utf-8") as f:
             all_rows = list(csv.reader(f))
-        assert ["Package", "Version", "Installed", "Updated", "APK", "Data", "Cache", "Total", "Kind", "Status"] in all_rows
-        packages = [r[0] for r in all_rows if r and r[0].startswith("com.")]
+        assert ["Name", "Package", "Version", "Installed", "Updated", "APK", "Data", "Cache", "Total", "Kind", "Status"] in all_rows
+        packages = [r[1] for r in all_rows if len(r) > 1 and r[1].startswith("com.")]
         assert "com.app0" in packages

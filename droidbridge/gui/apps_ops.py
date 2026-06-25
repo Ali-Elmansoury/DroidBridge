@@ -14,8 +14,9 @@ def _format_date(dt):
     return dt.strftime("%Y-%m-%d %H:%M") if dt else ""
 
 
-def _format_app_row(app):
+def _format_app_row(app, label=None):
     return {
+        "app_label": label if label is not None else app.package,
         "package": app.package,
         "version_name": app.version_name,
         "version_code": app.version_code,
@@ -37,9 +38,10 @@ def _format_app_row(app):
 
 def get_apps(client, serial, filter_kind="all", sort_by="name", reverse=False):
     apps = apps_module.get_apps(client, serial)
+    labels = apps_module.get_launcher_labels(client, serial)
     apps = apps_module.filter_apps(apps, kind=filter_kind)
     apps = apps_module.sort_apps(apps, by=sort_by, reverse=reverse)
-    return [_format_app_row(a) for a in apps]
+    return [_format_app_row(a, labels.get(a.package)) for a in apps]
 
 
 def get_app_info(client, serial, package):

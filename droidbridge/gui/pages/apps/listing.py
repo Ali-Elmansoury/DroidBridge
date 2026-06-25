@@ -9,9 +9,9 @@ from droidbridge.gui.viewmodels.apps.listing import ListingViewModel
 from droidbridge.gui.widgets.export_button import export_report
 from droidbridge.reports.generators import Report, ReportSection
 
-_COLS = ["Package", "Version", "Installed", "Updated", "APK", "Data", "Cache", "Total", "Kind", "Status"]
+_COLS = ["Name", "Package", "Version", "Installed", "Updated", "APK", "Data", "Cache", "Total", "Kind", "Status"]
 _KEYS = [
-    "package", "version_name", "installed_str", "updated_str",
+    "app_label", "package", "version_name", "installed_str", "updated_str",
     "apk_size_str", "data_size_str", "cache_size_str", "total_size_str", "kind", "status",
 ]
 _FILTER_LABELS = ["All", "System", "User"]

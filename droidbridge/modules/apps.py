@@ -15,6 +15,9 @@ _VERSION_NAME_RE = re.compile(r"^\s*versionName=(.*)$")
 _FIRST_INSTALL_RE = re.compile(r"^\s*firstInstallTime=(.+)$")
 _LAST_UPDATE_RE = re.compile(r"^\s*lastUpdateTime=(.+)$")
 
+_LAUNCHER_PKG_RE = re.compile(r"^\s+packageName=(\S+)$")
+_LAUNCHER_LABEL_RE = re.compile(r"^\s+nonLocalizedLabel=(.+)$")
+
 _TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
@@ -77,6 +80,44 @@ class AppInfo:
     @property
     def total_size(self):
         return self.apk_size + self.data_size + self.cache_size
+
+
+def parse_launcher_labels(output):
+    """Parse `cmd activity query-intents` output into {package: display_label}.
+
+    Only packages with a resolved nonLocalizedLabel are included; callers fall
+    back to the package name for the rest.
+    """
+    labels = {}
+    current_pkg = None
+    for line in output.splitlines():
+        m = _LAUNCHER_PKG_RE.match(line)
+        if m:
+            current_pkg = m.group(1)
+            continue
+        m = _LAUNCHER_LABEL_RE.match(line)
+        if m and current_pkg and current_pkg not in labels:
+            label = m.group(1).strip()
+            if label and label != "null":
+                labels[current_pkg] = label
+    return labels
+
+
+def get_launcher_labels(client, serial):
+    """Return {package: display_label} for apps that have a launcher icon.
+
+    One ADB call; returns an empty dict on error or unsupported Android version.
+    """
+    try:
+        output = client.shell(
+            serial,
+            ["cmd", "activity", "query-intents",
+             "-a", "android.intent.action.MAIN",
+             "-c", "android.intent.category.LAUNCHER"],
+        )
+        return parse_launcher_labels(output)
+    except Exception:
+        return {}
 
 
 def get_apps(client, serial):

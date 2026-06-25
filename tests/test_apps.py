@@ -292,3 +292,69 @@ class TestInstallApk:
         client.install.assert_called_once_with(
             "SERIAL123", ["/local/base.apk"], allow_downgrade=True
         )
+
+
+_QUERY_INTENTS_OUTPUT = (
+    "Activities:\n"
+    "  ActivityInfo:\n"
+    "    name=com.whatsapp.HomeActivity\n"
+    "    packageName=com.whatsapp\n"
+    "    nonLocalizedLabel=WhatsApp\n"
+    "  ActivityInfo:\n"
+    "    name=com.google.android.apps.photos.MainActivity\n"
+    "    packageName=com.google.android.apps.photos\n"
+    "    nonLocalizedLabel=Photos\n"
+    "  ActivityInfo:\n"
+    "    name=com.example.noLabel.MainActivity\n"
+    "    packageName=com.example.noLabel\n"
+)
+
+
+class TestParseLauncherLabels:
+    def test_extracts_package_label_pairs(self):
+        result = apps.parse_launcher_labels(_QUERY_INTENTS_OUTPUT)
+        assert result["com.whatsapp"] == "WhatsApp"
+        assert result["com.google.android.apps.photos"] == "Photos"
+
+    def test_skips_packages_without_label(self):
+        result = apps.parse_launcher_labels(_QUERY_INTENTS_OUTPUT)
+        assert "com.example.noLabel" not in result
+
+    def test_ignores_null_label(self):
+        output = "  ActivityInfo:\n    packageName=com.bad\n    nonLocalizedLabel=null\n"
+        assert apps.parse_launcher_labels(output) == {}
+
+    def test_first_label_wins_for_duplicate_packages(self):
+        output = (
+            "  ActivityInfo:\n    packageName=com.pkg\n    nonLocalizedLabel=First\n"
+            "  ActivityInfo:\n    packageName=com.pkg\n    nonLocalizedLabel=Second\n"
+        )
+        result = apps.parse_launcher_labels(output)
+        assert result["com.pkg"] == "First"
+
+    def test_empty_output_returns_empty_dict(self):
+        assert apps.parse_launcher_labels("") == {}
+
+
+class TestGetLauncherLabels:
+    def test_calls_shell_with_correct_command_and_returns_parsed_labels(self):
+        client = MagicMock()
+        client.shell.return_value = _QUERY_INTENTS_OUTPUT
+
+        result = apps.get_launcher_labels(client, "SERIAL123")
+
+        client.shell.assert_called_once_with(
+            "SERIAL123",
+            ["cmd", "activity", "query-intents",
+             "-a", "android.intent.action.MAIN",
+             "-c", "android.intent.category.LAUNCHER"],
+        )
+        assert result["com.whatsapp"] == "WhatsApp"
+
+    def test_returns_empty_dict_on_adb_error(self):
+        client = MagicMock()
+        client.shell.side_effect = RuntimeError("device offline")
+
+        result = apps.get_launcher_labels(client, "SERIAL123")
+
+        assert result == {}

@@ -22,6 +22,7 @@ class TestGetApps:
         a = _app("com.a", apk=10, data=20, cache=5, first_install=datetime(2024, 1, 1, 9, 0))
         b = _app("com.b", apk=100, data=200, cache=50, is_system=True, is_disabled=True)
         monkeypatch.setattr(apps_ops.apps_module, "get_apps", lambda c, s: [a, b])
+        monkeypatch.setattr(apps_ops.apps_module, "get_launcher_labels", lambda c, s: {"com.a": "App A"})
         captured = {}
         monkeypatch.setattr(
             apps_ops.apps_module, "filter_apps",
@@ -36,6 +37,7 @@ class TestGetApps:
 
         assert captured["filter_kind"] == "system"
         assert captured["sort"] == ("total", True)
+        assert result[0]["app_label"] == "App A"
         assert result[0]["package"] == "com.a"
         assert result[0]["apk_size"] == 10
         assert result[0]["apk_size_str"] == "10 B"
@@ -46,6 +48,7 @@ class TestGetApps:
         assert result[0]["is_system"] is False
         assert result[0]["installed_str"] == "2024-01-01 09:00"
         assert result[0]["updated_str"] == ""
+        assert result[1]["app_label"] == "com.b"   # no label → falls back to package
         assert result[1]["kind"] == "system"
         assert result[1]["status"] == "Disabled"
         assert result[1]["is_disabled"] is True
@@ -53,6 +56,7 @@ class TestGetApps:
     def test_default_filter_and_sort_args(self, monkeypatch):
         captured = {}
         monkeypatch.setattr(apps_ops.apps_module, "get_apps", lambda c, s: [])
+        monkeypatch.setattr(apps_ops.apps_module, "get_launcher_labels", lambda c, s: {})
         monkeypatch.setattr(
             apps_ops.apps_module, "filter_apps",
             lambda apps, kind: captured.setdefault("filter_kind", kind) and apps,
