@@ -35,6 +35,30 @@ class TestBuildStorageOverviewReport:
         assert "Apps" in rows_by_category
         assert "Photos" in rows_by_category
 
+    def test_omits_zero_byte_categories(self):
+        overview = StorageOverview(
+            total_kb=100_000_000,
+            used_kb=80_000_000,
+            free_kb=20_000_000,
+            categories={"Apps": 1_000_000_000, "Downloads": 0},
+        )
+
+        report = build_storage_overview_report(overview)
+
+        categories_section = report.sections[1]
+        rows_by_category = dict(categories_section.rows)
+        assert "Apps" in rows_by_category
+        assert "Downloads" not in rows_by_category
+
+    def test_omits_categories_section_when_all_zero(self):
+        overview = StorageOverview(
+            total_kb=100_000_000, used_kb=80_000_000, free_kb=20_000_000, categories={"Downloads": 0}
+        )
+
+        report = build_storage_overview_report(overview)
+
+        assert len(report.sections) == 1
+
 
 class TestBuildTopAppsReport:
     def test_sorts_by_total_size_descending(self):

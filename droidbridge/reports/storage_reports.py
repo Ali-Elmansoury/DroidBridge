@@ -40,13 +40,10 @@ def build_storage_overview_report(overview):
             ),
         ),
     ]
-    if overview.categories:
+    category_rows = [[category, format_bytes(size)] for category, size in overview.categories.items() if size]
+    if category_rows:
         sections.append(
-            ReportSection(
-                title="Categories",
-                headers=["Category", "Size"],
-                rows=[[category, format_bytes(size)] for category, size in overview.categories.items()],
-            )
+            ReportSection(title="Categories", headers=["Category", "Size"], rows=category_rows)
         )
     return Report(title="Storage Breakdown Report", sections=sections)
 
