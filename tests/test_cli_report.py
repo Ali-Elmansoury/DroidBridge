@@ -35,6 +35,8 @@ def _device_fake_shell(serial, command, timeout=None):
         if command[:3] == ["pm", "list", "packages"]:
             return PM_LIST_SYSTEM_OUTPUT
         raise AssertionError(command)
+    if isinstance(command, str) and command.startswith("find -L"):
+        return ""
     # detect_installs sends a single combined shell string
     return DETECT_NONE
 
@@ -360,3 +362,35 @@ class TestReportGenerateFull:
         assert result.exit_code == 0
         assert "DroidBridge Full Report" in result.output
         assert "Top" in result.output
+        assert "Large Files" in result.output
+
+    def test_includes_whatsapp_breakdowns_when_installed(self, monkeypatch, tmp_path):
+        def fake_shell(serial, command, timeout=None):
+            if isinstance(command, list):
+                if command[0] == "df":
+                    return DF_OUTPUT
+                if command[:2] == ["dumpsys", "diskstats"]:
+                    return DISKSTATS_OUTPUT
+                if command[:3] == ["pm", "list", "packages"]:
+                    return PM_LIST_SYSTEM_OUTPUT
+                raise AssertionError(command)
+            if isinstance(command, str) and command.startswith("find -L"):
+                return ""
+            if not hasattr(fake_shell, "_calls"):
+                fake_shell._calls = 0
+            fake_shell._calls += 1
+            return DETECT_WA_ONLY if fake_shell._calls == 1 else SCAN_OUTPUT
+
+        client = make_fake_client(READY_DEVICE, shell=fake_shell)
+        monkeypatch.setattr(main, "_build_client", lambda: client)
+        monkeypatch.setattr(storage_reports, "DEFAULT_TREND_PATH", tmp_path / "storage_history.json")
+        monkeypatch.setattr(backup_manager, "DEFAULT_HISTORY_PATH", tmp_path / "backup_history.json")
+        monkeypatch.chdir(tmp_path)
+
+        result = CliRunner().invoke(main.cli, ["report", "generate"])
+
+        assert result.exit_code == 0
+        assert "Large Files" in result.output
+        assert "File Types" in result.output
+        assert "By Section" in result.output
+        assert "Documents by Category" in result.output

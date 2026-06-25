@@ -413,6 +413,8 @@ class TestGenerateReportFull:
                 if command[:3] == ["pm", "list", "packages"]:
                     return PM_LIST_SYSTEM_OUTPUT
                 raise AssertionError(command)
+            if isinstance(command, str) and command.startswith("find -L"):
+                return ""
             if not hasattr(fake_shell, "_calls"):
                 fake_shell._calls = 0
             fake_shell._calls += 1
@@ -425,3 +427,7 @@ class TestGenerateReportFull:
 
         assert "DroidBridge Full Report" in result["content"]
         assert "Top" in result["content"]
+        assert "Large Files" in result["content"]
+        assert "File Types" in result["content"]
+        assert "By Section" in result["content"]
+        assert "Documents by Category" in result["content"]

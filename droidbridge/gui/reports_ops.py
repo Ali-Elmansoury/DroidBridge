@@ -118,11 +118,17 @@ def _build_full_report(client, serial, app, top_n):
     if len(history) >= 2:
         sections.extend(storage_reports.build_storage_trend_report(history).sections)
 
+    large_files = storage_module.find_large_files(client, serial, threshold=search_module.LARGE_FILE_THRESHOLD)
+    sections.extend(storage_reports.build_large_files_report(large_files).sections)
+
     installs = whatsapp_module.detect_installs(client, serial)
     installs = _select_installs(installs, app)
     if installs:
         media_files = _scan_media_files(client, serial, installs)
         sections.extend(whatsapp_reports.build_media_inventory_report(media_files).sections)
+        sections.extend(whatsapp_reports.build_file_type_breakdown_report(media_files).sections)
+        sections.extend(whatsapp_reports.build_section_breakdown_report(media_files).sections)
+        sections.extend(whatsapp_reports.build_documents_categorization_report(media_files).sections)
 
     backup_history = backup_module.load_history(backup_module.DEFAULT_HISTORY_PATH)
     if backup_history:
