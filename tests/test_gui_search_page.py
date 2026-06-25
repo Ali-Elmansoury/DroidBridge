@@ -624,7 +624,6 @@ class TestExportButton:
     def test_export_csv_writes_file(self, qtbot, tmp_path):
         import csv
         from unittest.mock import patch
-        from PyQt6.QtWidgets import QMessageBox
 
         page, vm, _context = _make_page()
         qtbot.addWidget(page)
@@ -634,18 +633,18 @@ class TestExportButton:
         vm.resultsChanged.emit(rows)
 
         out_path = str(tmp_path / "results.csv")
-        with patch("droidbridge.gui.pages.search.QFileDialog.getSaveFileName",
+        with patch("droidbridge.gui.widgets.export_button.QFileDialog.getSaveFileName",
                    return_value=(out_path, "CSV (*.csv)")):
-            with patch("droidbridge.gui.pages.search.QMessageBox.information"):
+            with patch("droidbridge.gui.widgets.export_button.QMessageBox.information"):
                 page._on_export_clicked()
 
-        with open(out_path, newline="") as f:
-            reader = csv.reader(f)
-            header = next(reader)
-            data = next(reader)
-        assert header == ["path", "size", "date", "extension"]
-        assert data[0] == "/sdcard/photo.jpg"
-        assert data[3] == "jpg"
+        with open(out_path, newline="", encoding="utf-8") as f:
+            all_rows = list(csv.reader(f))
+        assert all_rows[0] == ["Search Results"]
+        assert ["Path", "Size", "Date", "Extension"] in all_rows
+        data_rows = [r for r in all_rows if r and r[0] == "/sdcard/photo.jpg"]
+        assert data_rows, "data row with path not found"
+        assert data_rows[0][3] == "jpg"
 
 
 class TestSearchViewModelNewParams:

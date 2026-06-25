@@ -24,10 +24,14 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from datetime import datetime
+
 from droidbridge.gui import files_ops
 from droidbridge.gui.widgets import delete_flow
+from droidbridge.gui.widgets.export_button import export_report
 from droidbridge.gui.widgets.deselectable_table import DeselectableTableWidget
 from droidbridge.modules import search as search_module
+from droidbridge.reports.generators import Report, ReportSection
 from droidbridge.utils.format import format_bytes
 
 _COLUMNS = ("Path", "Size", "Date Modified", "Extension")
@@ -188,7 +192,7 @@ class SearchPage(QWidget):
         )
         self.export_button = QPushButton("Export...")
         self.export_button.setEnabled(False)
-        self.export_button.setToolTip("Export the search results to CSV or TXT format.")
+        self.export_button.setToolTip("Export the search results to TXT, CSV, HTML, or JSON.")
 
         selection_bar = QHBoxLayout()
         selection_bar.addWidget(self.select_all_button)
@@ -466,35 +470,21 @@ class SearchPage(QWidget):
     def _on_export_clicked(self):
         if not self._rows:
             return
-        path, _ = QFileDialog.getSaveFileName(
-            self, "Export Search Results", "", "CSV (*.csv);;Text (*.txt)"
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        section = ReportSection(
+            title="Search Results",
+            headers=["Path", "Size", "Date", "Extension"],
+            rows=[
+                [
+                    row["path"],
+                    format_bytes(row["size"]),
+                    row["mtime"].strftime("%Y-%m-%d %H:%M"),
+                    row.get("extension") or "",
+                ]
+                for row in self._rows
+            ],
         )
-        if not path:
-            return
-        fmt = "csv" if path.lower().endswith(".csv") else "txt"
-        try:
-            if fmt == "csv":
-                import csv
-                with open(path, "w", newline="", encoding="utf-8") as f:
-                    writer = csv.writer(f)
-                    writer.writerow(["path", "size", "date", "extension"])
-                    for row in self._rows:
-                        writer.writerow([
-                            row["path"],
-                            row["size"],
-                            row["mtime"].strftime("%Y-%m-%d %H:%M"),
-                            row.get("extension") or "",
-                        ])
-            else:
-                with open(path, "w", encoding="utf-8") as f:
-                    f.write("      size  date                ext         path\n")
-                    for row in self._rows:
-                        size = format_bytes(row["size"])
-                        date = row["mtime"].strftime("%Y-%m-%d %H:%M")
-                        ext = row.get("extension") or "(none)"
-                        f.write(f"{size:>10}  {date}  {ext:<10}  {row['path']}\n")
-            QMessageBox.information(
-                self, "Export Complete", f"Exported {len(self._rows)} result(s) to {path}."
-            )
-        except OSError as exc:
-            QMessageBox.critical(self, "Export Failed", str(exc))
+        export_report(
+            self, "Export Search Results", f"search_results_{ts}.txt",
+            Report(title="Search Results", sections=[section]),
+        )
