@@ -1070,3 +1070,132 @@ The highest-value items to pursue after the current release:
 5. **500-file batch pull/push** — decoupling progress signals from per-file granularity would unlock the §3.2 speed target.
 
 ---
+
+---
+
+## 21. Architecture Overview
+
+DroidBridge uses a **shared-core, dual-interface** architecture: both the CLI and the GUI call the same Python modules — no logic is duplicated. The only difference is the presentation layer.
+
+### 21.1 Shared Core
+
+```
+droidbridge/
+  core/
+    adb.py          # ADB wrapper: devices(), shell(), pull(), push()
+    platform/       # OS-specific sleep inhibitor, path helpers
+  modules/
+    device.py       # Module 1 — Device Manager
+    files.py        # Module 2 — File Browser
+    transfer.py     # Module 3 — Smart Transfer Engine
+    whatsapp.py     # Module 4 — WhatsApp Toolkit
+    storage.py      # Module 5 — Storage Analyzer
+    backup.py       # Module 6 — Backup Manager
+    search.py       # Module 7 — Search & Discovery
+    apps.py         # Module 8 — App Manager
+    reports.py      # Module 9 — Reports & Analysis
+  reports/          # TXT / HTML / CSV / JSON generators
+  utils/            # Size formatting, date parsing, helpers
+```
+
+### 21.2 CLI Architecture
+
+```
+  User Terminal
+       |
+  droidbridge <command> [args]       (cli/main.py — Click framework)
+       |
+  +----------+----------+-----------+----------+----------+
+  | device   | files    | transfer  | whatsapp | storage  |
+  | connect  | browse   | pull/push | scan     | analyze  |
+  | info     | search   |           | backup   | large    |
+  |          |          |           | organize | apps     |
+  |          |          |           | delete   |          |
+  +----------+----------+-----------+----------+----------+
+                              |
+                    Core Modules (shared)
+                    modules/*.py
+                              |
+                         core/adb.py           (ADB Wrapper)
+                              |
+                    platform-tools/adb         (bundled binary)
+                              |
+                       Android Device          (USB)
+```
+
+**Data flow:** the CLI handler validates user input, calls the relevant module function, and prints the returned data structure. All output goes to stdout; session logs go to `session_logs/`. No GUI state is touched.
+
+### 21.3 GUI Architecture
+
+```
+  User (mouse / keyboard)
+         |
+   MainWindow (PyQt6)              gui/main_window.py
+   |  Sidebar (QListWidget)        9 module entries + About
+   |  QStackedWidget               one Page per module
+   |  DeviceContext                shared ADB state (serial, model)
+   |  LogPanel                     live session log viewer
+         |
+   Page (active module)            gui/pages/*.py
+   |  Signals / Slots              Qt event bus
+   |  QTableWidget / QTreeWidget   results display
+   |  Export button                CSV / TXT / HTML / JSON
+         |
+   Worker (QThread)                gui/workers/*.py
+   |  progress / result signals    emitted back to the Page
+   |  cancel support               via _cancelled flag
+         |
+   Core Modules (shared)           modules/*.py
+         |
+   core/adb.py                     (ADB Wrapper — same as CLI)
+         |
+   Android Device (USB)
+```
+
+**Key design rule:** workers and pages never call `adb` directly — they always go through `core/adb.py`. This means every operation is automatically testable from the CLI without running the GUI.
+
+### 21.4 Layered Component Map
+
+```
+  ┌──────────────────────────────────────────────────────┐
+  │  Presentation Layer                                   │
+  │  CLI (Click)              GUI (PyQt6)                │
+  └──────────────┬───────────────────┬───────────────────┘
+                 │                   │
+  ┌──────────────▼───────────────────▼───────────────────┐
+  │  Application Layer                                    │
+  │  modules/device  modules/whatsapp  modules/storage   │
+  │  modules/files   modules/search    modules/apps      │
+  │  modules/backup  modules/reports   modules/transfer  │
+  └──────────────────────────┬───────────────────────────┘
+                             │
+  ┌──────────────────────────▼───────────────────────────┐
+  │  Infrastructure Layer                                 │
+  │  core/adb.py      core/platform/      utils/         │
+  │  reports/ (formatters)   session_logs/               │
+  └──────────────────────────┬───────────────────────────┘
+                             │  USB  (ADB protocol)
+  ┌──────────────────────────▼───────────────────────────┐
+  │  Android Device                                       │
+  │  bundled platform-tools/adb  (Google v37.0.0)        │
+  └──────────────────────────────────────────────────────┘
+```
+
+---
+
+## 22. About the Developer
+
+DroidBridge was designed and built by:
+
+| Field | Details |
+|---|---|
+| Name | Ali Elmansoury |
+| Title | Junior Embedded Software / Android Automotive Engineer |
+| Email | ali.elmansoury21@gmail.com |
+| GitHub | https://github.com/Ali-Elmansoury |
+| LinkedIn | https://www.linkedin.com/in/ali-elmansoury/ |
+
+DroidBridge grew out of a personal frustration with the painfully slow MTP transfers and the lack of good offline tools for managing large WhatsApp media archives on Android devices. Every feature in the tool was driven by real-world usage on real data.
+
+The project is open source (MIT License). Contributions, issues, and feedback are welcome on GitHub.
+
