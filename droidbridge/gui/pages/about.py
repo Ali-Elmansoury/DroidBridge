@@ -43,7 +43,7 @@ def _row(label_text: str, value_text: str, is_link: bool = False) -> QWidget:
 
     lbl = QLabel(label_text + ":")
     lbl.setFixedWidth(90)
-    lbl.setStyleSheet("font-weight: bold; color: #555555;")
+    lbl.setStyleSheet("font-weight: bold;")
     lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
     if is_link:
@@ -95,12 +95,12 @@ class AboutPage(QWidget):
 
         tagline = QLabel("ADB-Powered Android Device Management Tool")
         tagline.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        tagline.setStyleSheet("font-size: 13px; color: #555555; margin-bottom: 4px;")
+        tagline.setStyleSheet("font-size: 13px; margin-bottom: 4px;")
         lay.addWidget(tagline)
 
         ver_lbl = QLabel(f"Version {_VERSION}  ·  {_LICENSE}  ·  Open Source")
         ver_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        ver_lbl.setStyleSheet("font-size: 11px; color: #888888; margin-bottom: 8px;")
+        ver_lbl.setStyleSheet("font-size: 11px; margin-bottom: 8px;")
         lay.addWidget(ver_lbl)
 
         lay.addWidget(_divider())
@@ -115,7 +115,7 @@ class AboutPage(QWidget):
             "generation — all without requiring internet access or cloud services."
         )
         desc.setWordWrap(True)
-        desc.setStyleSheet("font-size: 12px; color: #333333; margin-top: 4px;")
+        desc.setStyleSheet("font-size: 12px; margin-top: 4px;")
         lay.addWidget(desc)
 
         lay.addWidget(_divider())
@@ -146,7 +146,7 @@ class AboutPage(QWidget):
         )
         stack_lbl = QLabel(stack_text)
         stack_lbl.setWordWrap(True)
-        stack_lbl.setStyleSheet("font-size: 12px; color: #555555; margin-top: 4px;")
+        stack_lbl.setStyleSheet("font-size: 12px; margin-top: 4px;")
         lay.addWidget(stack_lbl)
 
         lay.addStretch()
