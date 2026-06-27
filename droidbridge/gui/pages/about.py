@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
 )
 
 _VERSION = "1.0.0"
-_LICENSE = "MIT License"
+_LICENSE = "Source-Available — Free for personal use"
 _GITHUB  = "https://github.com/Ali-Elmansoury"
 _LINKEDIN = "https://www.linkedin.com/in/ali-elmansoury/"
 _EMAIL   = "ali.elmansoury21@gmail.com"
@@ -124,7 +124,7 @@ class AboutPage(QWidget):
         lay.addWidget(_section_label("Project"))
         lay.addWidget(_row("Source code", _REPO, is_link=True))
         lay.addWidget(_row("Issues", _REPO + "/issues", is_link=True))
-        lay.addWidget(_row("License", "MIT — free for personal and commercial use"))
+        lay.addWidget(_row("License", "Free for personal use · Commercial license required for business use"))
 
         lay.addWidget(_divider())
 

@@ -1,21 +1,43 @@
-MIT License
+DroidBridge Proprietary Source-Available License
+Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 
-Copyright (c) 2026 DroidBridge Contributors
+This software and its source code are made publicly available for transparency
+and portfolio purposes under the following terms:
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+YOU MAY:
+  - View and study the source code
+  - Run the compiled binaries for personal, non-commercial use
+  - Fork the repository for personal learning or to submit contributions
+  - Submit bug reports, feature requests, and pull requests
+    (all accepted contributions become the intellectual property of Ali Elmansoury)
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+YOU MAY NOT:
+  - Redistribute this software or its source code, in whole or in part,
+    in original or modified form, without written permission
+  - Use this software or any portion of it for commercial purposes
+    without a valid commercial license
+  - Sell, sublicense, rent, or otherwise monetize this software or
+    any product derived from it
+  - Create or distribute a competing product based on this code
+  - Remove or alter this copyright notice or any proprietary markings
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+COMMERCIAL USE:
+  Any use of DroidBridge in a commercial context — including but not limited
+  to selling the software, using it as part of a paid service, or deploying
+  it in a business environment — requires a separate written commercial
+  license agreement.
+
+  For commercial licensing inquiries, contact:
+    Ali Elmansoury <ali.elmansoury21@gmail.com>
+
+CONTRIBUTIONS:
+  By submitting a pull request or patch, you agree that your contribution
+  is made under these same terms and that all intellectual property rights
+  in the contribution are transferred to Ali Elmansoury.
+
+DISCLAIMER:
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+  OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT. IN NO EVENT SHALL
+  ALI ELMANSOURY BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY
+  ARISING FROM USE OF OR INABILITY TO USE THIS SOFTWARE.

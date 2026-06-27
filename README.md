@@ -1,146 +1,188 @@
 # DroidBridge
 
-**ADB-powered Android device management — 3–5× faster than MTP, complete WhatsApp toolkit, storage analysis, app manager, and rich reports. 100% offline. No cloud. MIT licensed.**
+### The Android device manager your phone deserves.
 
-> Version 1.0.0 | Linux · Windows · macOS
+**3–5× faster than MTP. Complete WhatsApp toolkit. Storage analyzer. App manager. Rich reports. 100% offline — no cloud, no account, no subscription.**
+
+> Works on Linux · Windows · macOS — GUI and CLI included.
 
 ---
 
-## Features
+## The problem DroidBridge solves
 
-| Module | What it does |
-|--------|-------------|
-| **Device Manager** | Auto-detect devices, show model/Android version/storage/battery |
-| **File Browser** | Browse, preview, rename, delete, and download device files |
-| **Transfer Engine** | Batch ADB pull/push with conflict resolution, resume, and verification |
-| **Search & Discovery** | Search by name (glob/regex), MIME type, date range, size range |
-| **WhatsApp Toolkit** | Scan, backup, restore, organize, delete, save statuses, backup databases |
-| **Storage Analyzer** | Full breakdown by category, top apps, large files, cleanup suggestions |
-| **Backup Manager** | Named profiles, incremental backup, history, restore, contacts/call log export |
-| **App Manager** | List all apps, clear cache, uninstall, extract APKs, manage bloatware |
-| **Reports** | 13 structured report types in TXT / CSV / HTML / JSON |
+If you've ever tried to manage files on an Android phone from a computer, you know the pain:
 
-Every results table has an **Export…** button — save what you see in any format.
+- **MTP is painfully slow** — copying a few GB of photos takes forever, and it randomly disconnects mid-transfer
+- **WhatsApp media piles up with no good way to manage it** — years of images, videos, and voice notes with no tools to analyze, organize, or clean them up
+- **Android file management on Linux is almost broken** — MTP support is unreliable, and the few tools that exist are clunky
+- **ADB is powerful but intimidating** — it's a command-line tool with no documentation for everyday users
+
+DroidBridge wraps ADB in a clean desktop interface that makes all of this fast, safe, and accessible — without requiring any Android SDK or cloud services.
+
+---
+
+## What DroidBridge can do
+
+### Files & Transfer
+- Browse the device filesystem like a regular file manager
+- Batch transfer files at **3–5× the speed of MTP** using ADB's pull/push engine
+- Resume interrupted transfers — pick up where you left off
+- Post-transfer verification — confirm every file copied correctly
+- Search by name (glob/regex), MIME type, date range, or size
+
+### WhatsApp Toolkit
+The most complete WhatsApp media management tool available outside of WhatsApp itself:
+- **Scan** — instant inventory of every media folder (Images, Video, Voice Notes, Documents, Stickers, and more) with counts and sizes
+- **Analyze** — compare media before vs. after a cutoff date — see exactly how much space you'd reclaim
+- **Backup** — selective backup by media type, with verification
+- **Restore** — push a backup back to the device
+- **Organize** — sort media by date or category, fix broken file extensions
+- **Delete** — preview exactly what will be deleted, then confirm with a mandatory phrase before anything is removed
+- **Save Statuses** — capture WhatsApp/Business Status media before it expires (24h)
+- **Backup Databases** — back up the WhatsApp message database and account files
+
+### Storage Analyzer
+- Full storage breakdown by category (Apps, Images, Video, Audio, Documents, Downloads, System)
+- App storage table sorted by total size — find what's eating your space
+- Large file finder with a configurable size threshold
+- Cleanup suggestions — cache, leftover APK installers, thumbnail caches
+
+### Backup Manager
+- Named backup profiles — define a backup job once, re-run it in one click
+- Incremental backups — only transfer what changed
+- Backup history — see every run with timestamps, file counts, and sizes
+- Backup verification — confirm a backup is complete before deleting originals
+- **Contacts & Call Log export** — export as vCard, CSV, or JSON
+
+### App Manager
+- Full app listing with display names, package IDs, APK/data/cache sizes
+- Clear app cache (individual or all apps)
+- Uninstall user apps
+- Extract APKs — back up an app before uninstalling
+- Bloatware manager — disable pre-installed manufacturer apps without rooting
+
+### Reports
+13 structured report types in TXT / CSV / HTML / JSON:
+Full Report, Storage Breakdown, Top Apps by Size, Large Files, Storage Trend, WhatsApp Media Inventory, WhatsApp Pre/Post Cutoff, WhatsApp File Types, WhatsApp Sections, WhatsApp Documents, Backup History, Backup Summary, Backup Verification.
+
+---
+
+## No Android SDK required
+
+DroidBridge bundles ADB (Google platform-tools v37) for all three platforms. You don't need to install the Android SDK, Android Studio, or anything from Google. Just plug in your phone.
 
 ---
 
 ## Screenshots
 
-> _Screenshots will be added for the v1.0.0 release._
+> Screenshots and demo video coming with the v1.0.0 launch.
 
 ---
 
 ## Install
 
-### Linux — .deb (Ubuntu 20.04+, amd64)
+Download the latest release for your platform from the [Releases](../../releases) page.
+
+### Linux — .deb (Ubuntu 20.04+, amd64) — recommended
 
 ```bash
 sudo dpkg -i droidbridge_1.0.0_amd64.deb
-droidbridge-gui          # GUI
-droidbridge --help       # CLI
+droidbridge-gui          # launch the GUI
+droidbridge --help       # use the CLI
 ```
 
 ### Linux — tarball (any distro, glibc 2.35+)
 
 ```bash
-sudo tar -xzf droidbridge-linux-x86_64.tar.gz -C /opt/droidbridge --strip-components=1
-sudo ln -s /opt/droidbridge/droidbridge-gui /usr/local/bin/droidbridge-gui
-sudo ln -s /opt/droidbridge/droidbridge     /usr/local/bin/droidbridge
+tar -xzf droidbridge-linux-x86_64.tar.gz
+./droidbridge-linux/droidbridge-gui
 ```
 
 ### Windows 10/11 (x64)
 
-Extract `droidbridge-windows-x64.zip` anywhere and run `droidbridge-gui.exe`.
-Add the folder to `PATH` for CLI access.
+Extract `droidbridge-windows-x64.zip` and run `droidbridge-gui.exe`.
+Add the folder to `PATH` for CLI access from any terminal.
 
-### macOS 12+ (Intel / Apple Silicon)
+### macOS (Apple Silicon / Intel)
 
 ```bash
-unzip droidbridge-macos-universal.zip -d /Applications/DroidBridge
-/Applications/DroidBridge/droidbridge-gui
+unzip droidbridge-macos-universal.zip
+./droidbridge-macos/droidbridge-gui
 ```
 
-First launch: **System Settings → Privacy & Security → Open Anyway**, or:
-```bash
-xattr -dr com.apple.quarantine /Applications/DroidBridge/
-```
-
-See **[docs/INSTALL.md](docs/INSTALL.md)** for full install instructions, driver notes, and build-from-source guide.
+> First launch: macOS may block the app. Go to **System Settings → Privacy & Security → Open Anyway**, or run:
+> ```bash
+> xattr -dr com.apple.quarantine ./droidbridge-macos/
+> ```
 
 ---
 
-## Quick Start
+## Quick start
 
-### Enable USB Debugging on your phone
+**1. Enable USB Debugging on your Android phone**
 
-1. **Settings → About phone** → tap **Build number** 7 times
-2. **Developer options → USB debugging** → enable it
-3. Plug in via USB → tap **Allow** on the phone
+Settings → About phone → tap **Build number** 7 times → back → **Developer options** → enable **USB debugging**.
 
-### GUI
+**2. Plug in your phone and launch DroidBridge**
 
 ```bash
 droidbridge-gui
 ```
 
-The device status dot in the top-left turns **green** when your phone is detected.
-Use **Ctrl+1–9** to switch between modules. Hover any control for a tooltip.
+The status dot in the top bar turns **green** when your phone is detected. Tap **Allow** on the phone if a USB debugging dialog appears.
 
-### CLI
+**3. Use `Ctrl+1` through `Ctrl+9`** to switch between modules. Hover any button for a tooltip.
+
+---
+
+## CLI examples
 
 ```bash
-droidbridge device info                                    # device info
-droidbridge whatsapp scan                                  # WhatsApp media scan
-droidbridge whatsapp backup --dest /media/drive/backup/   # full WhatsApp backup
-droidbridge transfer pull /sdcard/DCIM ~/Pictures/        # pull photos
-droidbridge report generate --type full --format html     # HTML report
+droidbridge device info
+droidbridge whatsapp scan
+droidbridge whatsapp analyze --cutoff 2024-01-01
+droidbridge whatsapp backup --dest /media/drive/WA_backup/
+droidbridge transfer pull /sdcard/DCIM ~/Pictures/
+droidbridge storage large-files --min-size 100MB
+droidbridge report generate --type full --format html --output ~/report.html
 ```
+
+Full CLI reference: [docs/USER_GUIDE.md](docs/USER_GUIDE.md)
 
 ---
 
 ## Documentation
 
 | Document | Contents |
-|----------|----------|
-| [docs/INSTALL.md](docs/INSTALL.md) | Full install guide for all platforms |
-| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | Per-module walkthroughs, CLI reference, shortcuts |
-| [docs/DroidBridge_Project_Document.md](docs/DroidBridge_Project_Document.md) | Full spec and architecture |
-| [docs/DEFERRED_AND_FUTURE_WORK.md](docs/DEFERRED_AND_FUTURE_WORK.md) | Known gaps, blocked items, future ideas |
+|---|---|
+| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | Full GUI and CLI reference, all modules, keyboard shortcuts |
+| [docs/USER_GUIDE.pdf](docs/USER_GUIDE.pdf) | Same guide as a formatted PDF |
+| [docs/DroidBridge_Project_Document.pdf](docs/DroidBridge_Project_Document.pdf) | Architecture, design decisions, implementation notes |
 
 ---
 
-## Build from Source
+## Tech stack
 
-```bash
-git clone https://github.com/your-org/droidbridge.git
-cd droidbridge
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev,gui]"
-pip install pyinstaller
-
-# Run from source
-droidbridge --help
-droidbridge-gui
-
-# Run tests (1647 tests)
-pytest
-
-# Build Linux bundle + .deb
-bash scripts/package-linux.sh
-```
-
----
-
-## Tech Stack
-
-- **Python 3.10+** — core logic, CLI, GUI
-- **PyQt6** — cross-platform desktop GUI
-- **Click** — CLI argument parsing
-- **ADB** — bundled Google platform-tools v37 (no Android SDK needed)
-- **PyInstaller** — self-contained directory bundle per platform
+Python 3.10 · PyQt6 · Click · ADB platform-tools v37 · PyInstaller · SQLite
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+DroidBridge is **free for personal, non-commercial use**.
+
+Commercial use (business deployment, resale, integration into paid products) requires a commercial license. See [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md) for tiers and pricing.
+
+Source code is publicly available for transparency and review. See [LICENSE](LICENSE) for the full terms.
+
+---
+
+## Contact & commercial licensing
+
+**Ali Elmansoury** — Junior Embedded Software / Android Automotive Engineer
+
+- Email: ali.elmansoury21@gmail.com
+- GitHub: [@Ali-Elmansoury](https://github.com/Ali-Elmansoury)
+- LinkedIn: [ali-elmansoury](https://www.linkedin.com/in/ali-elmansoury/)
+
+For commercial licensing inquiries, bug reports, or feature requests, open a [GitHub Issue](../../issues) or email directly.
