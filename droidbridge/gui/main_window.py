@@ -28,6 +28,7 @@ from droidbridge.gui.pages.backup import BackupManagerPage
 from droidbridge.gui.pages.whatsapp import WhatsAppPage
 from droidbridge.gui.pages.storage import StoragePage
 from droidbridge.gui.pages.reports import ReportsPage
+from droidbridge.gui.pages.about import AboutPage
 from droidbridge.gui.viewmodels.device import DeviceViewModel
 from droidbridge.gui.viewmodels.files import FilesViewModel
 from droidbridge.gui.viewmodels.search import SearchViewModel
@@ -48,6 +49,7 @@ MODULES = [
     "Backup",
     "Apps",
     "Reports",
+    "About",
 ]
 
 _STATUS_BAR_COLORS = {"WARNING": "orange", "ERROR": "red"}
@@ -62,6 +64,7 @@ _SIDEBAR_TOOLTIPS = {
     "Backup": "Backup Manager: profiles, run, verify, history, restore, and Contacts/Call Log export. Shortcut: Ctrl+7.",
     "Apps": "App Manager: listing, cache management, uninstall, APK extraction, bloatware manager, and APK backup/restore. Shortcut: Ctrl+8.",
     "Reports": "Reports: generate storage, WhatsApp, backup, and full reports, then preview and save them. Shortcut: Ctrl+9.",
+    "About": "About DroidBridge — project info, developer contact, and links.",
 }
 
 
@@ -104,10 +107,11 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.apps_page)
         self.reports_page = ReportsPage(self.reports_viewmodel)
         self.stack.addWidget(self.reports_page)
+        self.stack.addWidget(AboutPage())
         self.sidebar.currentRowChanged.connect(self.stack.setCurrentIndex)
         self.sidebar.setCurrentRow(0)
 
-        for _i in range(len(MODULES)):
+        for _i in range(min(len(MODULES), 9)):   # Ctrl+1–9 only
             _sc = QShortcut(QKeySequence(f"Ctrl+{_i + 1}"), self)
             _sc.activated.connect(lambda idx=_i: self.sidebar.setCurrentRow(idx))
 
