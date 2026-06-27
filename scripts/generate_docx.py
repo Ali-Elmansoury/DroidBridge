@@ -150,16 +150,16 @@ def _title_page(doc, title: str, subtitle: str, version: str):
         r2.font.size = Pt(16)
         p2.paragraph_format.space_after = Pt(12)
 
-    # blue decorative bar (left-aligned, ~2.5" wide)
+    # blue decorative separator bar — centered, taller
     p_bar = doc.add_paragraph()
-    p_bar.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    p_bar.paragraph_format.left_indent = Inches(0)
-    p_bar.paragraph_format.right_indent = Inches(3.5)
-    p_bar.paragraph_format.space_before = Pt(0)
+    p_bar.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_bar.paragraph_format.left_indent = Inches(1.5)
+    p_bar.paragraph_format.right_indent = Inches(1.5)
+    p_bar.paragraph_format.space_before = Pt(4)
     p_bar.paragraph_format.space_after = Pt(14)
     _shade_para(p_bar, "2E75B6")
     r_bar = p_bar.add_run(" ")
-    r_bar.font.size = Pt(5)
+    r_bar.font.size = Pt(18)
 
     # document-type subtitle (italic)
     clean = re.sub(r"\*+", "", subtitle).strip()
