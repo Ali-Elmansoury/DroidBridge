@@ -10,3 +10,4 @@ session_logs/
 .DS_Store
 .claude/
 .worktrees/
+releases/
