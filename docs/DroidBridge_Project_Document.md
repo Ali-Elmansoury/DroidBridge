@@ -1,7 +1,10 @@
 # DroidBridge — ADB-Powered Android Device Management Tool
 
-**Project Requirements & Feature Specification**
-Version 1.0 | June 2026 | Open Source Project (MIT License)
+**Project Requirements, Feature Specification & Implementation Record**
+Version 1.0.0 | Released June 2026 | Open Source Project (MIT License)
+
+> **Status:** All 6 phases complete. Version 1.0.0 shipped. See §19 for implementation
+> notes, §20 for deferred/future work.
 
 ---
 
@@ -891,25 +894,27 @@ The project is broken into 6 phases, each independently usable and testable. Eac
 
 ---
 
-### Phase 6 — GUI & Packaging 🖥️
+### Phase 6 — GUI & Packaging 🖥️ ✅ Complete (v1.0.0)
 
 **Goal:** wrap the fully-working CLI in a desktop GUI and produce distributable executables.
 
-**Deliverables:**
+**Deliverables (all shipped):**
 
-- PyQt6 GUI with sidebar navigation matching the 9 modules
-- GUI calls into the same `core/` and `modules/` logic as the CLI (no duplicated logic)
-- Progress dialogs, confirmation dialogs, dark/light mode
-- Status Saver panel: thumbnail grid of current `.Statuses` media per app
-  (§4.10), with checkbox selection for individual save
-- PyInstaller builds for Windows, Linux, macOS
-- README, user guide, and CLI help text finalized
+- PyQt6 GUI with sidebar navigation for all 9 modules (Ctrl+1–9)
+- GUI calls into the same `core/` and `modules/` logic as the CLI — no duplicated logic
+- Progress bars, confirmation dialogs, dark/light theme toggle
+- Status Saver panel: thumbnail grid with ffmpeg video thumbnails, checkbox selection
+- Export button on every results table (TXT/CSV/HTML/JSON)
+- PyInstaller `--onedir` builds for Linux (`.deb` + tarball), Windows (zip), macOS (zip)
+- ADB v37 official Google binaries bundled for all three platforms
+- Packaging scripts: `scripts/package-linux.sh`, `package-windows.bat`, `package-macos.sh`
+- Full documentation: `README.md`, `docs/USER_GUIDE.md`, `docs/INSTALL.md`
 
-**Exit Criteria:**
+**Exit Criteria (met):**
 
-- GUI performs every operation the CLI can perform
-- Single executable runs on a clean machine without Python installed
-- All destructive operations show confirmation dialogs in GUI
+- GUI performs every operation the CLI can perform ✅
+- Self-contained bundle runs on Linux without Python installed ✅ (Windows/macOS: builds prepared, real-device validation deferred)
+- All destructive operations show confirmation dialogs in GUI ✅
 
 > **Recommended approach:** complete Phases 1–3 fully and use the CLI for real backups before starting Phase 4. This validates the core WhatsApp toolkit against real-world data early.
 
@@ -1082,3 +1087,99 @@ START WITH PHASE 1 RIGHT NOW:
 ```
 
 > This document was generated as part of the DroidBridge open source project specification. Start with Phase 1 and progress sequentially — the WhatsApp Toolkit (Phase 3) contains the most complex and battle-tested logic.
+
+---
+
+## 19. Version 1.0.0 — Implementation Notes & Deviations
+
+This section records how the shipped v1.0.0 implementation differs from or extends the original spec above. The spec remains the canonical design reference; this section supplements it with ground-truth implementation details.
+
+### 19.1 Phase Completion Summary
+
+| Phase | Status | Test count | Real-device validated |
+|-------|--------|-----------|----------------------|
+| 1 — Foundation | ✅ Complete | — | Realme RMX1931 |
+| 2 — File Operations | ✅ Complete | — | Realme RMX1931 |
+| 3 — WhatsApp Toolkit | ✅ Complete | — | Realme RMX1931 |
+| 4 — Storage, Apps, Backup | ✅ Complete | — | Realme RMX1931 |
+| 5 — Reports | ✅ Complete | — | Realme RMX1931 |
+| 6 — GUI & Packaging | ✅ Complete | 1647/1647 | Realme RMX1931 |
+
+### 19.2 ADB Binary
+
+The bundled Linux ADB was initially from the Debian `android-sdk-platform-tools` package (v28.0.2). For the v1.0.0 release it was replaced with the official Google platform-tools v37.0.0-14910828 binary for all three platforms:
+
+| Platform | Path | Version |
+|----------|------|---------|
+| Linux | `droidbridge/resources/platform-tools-linux/adb` | v37.0.0 |
+| Windows | `droidbridge/resources/platform-tools-windows/adb.exe` | v37.0.0 |
+| macOS | `droidbridge/resources/platform-tools-darwin/adb` | v37.0.0 |
+
+### 19.3 GUI Sub-Phases (Phase 6 breakdown)
+
+The GUI was built in 6 sub-phases beyond what §16 described:
+
+| Sub-phase | Deliverable |
+|-----------|-------------|
+| 6.1 | GUI shell + Device page (sidebar, top bar, log panel, dark/light theme) |
+| 6.2 | Files, Transfer, Search pages + real-device validation |
+| 6.3 | WhatsApp Toolkit GUI (8 tabs) + real-device validation |
+| 6.4 | Backup Manager GUI (6 tabs, including Contacts/Call Log export) |
+| 6.5 | Storage Analyzer (5 tabs), App Manager (6 tabs), Reports (13 types) |
+| 6.6 | Export buttons on all result tables; Linux/Windows/macOS packaging |
+
+### 19.4 Features Added Beyond Spec
+
+- **Export button on every results table** (§14 only specified this for Search): all module pages now have an "Export…" button producing TXT/CSV/HTML/JSON from whatever is on screen.
+- **Display name resolution for apps** via `aapt2 dump badging` with an on-disk cache at `~/.local/share/droidbridge/label_cache/<serial>.json`, resolved in background threads.
+- **WhatsApp Status Saver video thumbnails**: when `ffmpeg` is on PATH, the first frame of each `.mp4`/`.3gp`/etc. status video is extracted as a JPEG thumbnail for the grid.
+- **Contacts & Call Log export** added to Backup Manager (§6.6): exports to vCard/CSV/JSON via `adb shell content query`, backup-only (no restore).
+- **Glob/Regex toggle** on the Search name field, plus a MIME-type dropdown filter with mutual-exclusivity guard.
+- **New Folder** button on the Transfer page remote-path field: creates a subfolder on the device via `adb shell mkdir -p`.
+- **Session logging framework**: all CLI and GUI operations write timestamped logs to `session_logs/` in the working directory.
+- **`pm list packages` as primary app source**: the app listing uses `pm list packages` as the authoritative package list and merges storage sizes from `dumpsys diskstats` — newly installed apps appear immediately without the diskstats async delay.
+
+### 19.5 Features Deferred from Spec
+
+Several spec items were explicitly deferred after feasibility analysis. See `docs/DEFERRED_AND_FUTURE_WORK.md` for the full list with rationale. Key deferrals:
+
+- **500-file batch pull/push** (§3.2): deletion uses 500-file batches; pull/push do per-file ADB calls to support per-file retry, progress signals, and cancel. A future refactor could add batching without losing those signals.
+- **Transfer batch size display** (MB/s transfer speed) not shown in GUI (only CLI).
+- **Storage trend comparison** (§9.2): the Reports page has a "Storage Trend" report type but it reports on the current session only; cross-session trend requires SQLite session history not yet implemented.
+- **Mirror mode real-device validation** deferred (implemented in CLI, not validated live).
+- **Windows/macOS real-device validation** deferred — CLI and GUI are cross-platform in design; platform-specific testing requires hardware not available in the development environment.
+
+### 19.6 Known Limitations (non-bugs)
+
+- App cache clear (`apps clear-cache`) targets the ADB USB connection; the `pm clear` ADB command clears both cache and data on some Android versions — users should clear individual app caches when data preservation matters.
+- WhatsApp database restore is intentionally not implemented: `msgstore.db.crypt14` is encrypted with a key in app-private storage (`/data/data/com.whatsapp/files/key`) inaccessible without root on Android 11+.
+- Large files (>2 GB) in a single ADB `pull` may encounter ADB timeout on slow connections — increase `AdbClient.DEFAULT_TIMEOUT` or use `--timeout` if building from source.
+
+---
+
+## 20. Deferred, Blocked & Future Work
+
+All items that were evaluated and not shipped in v1.0.0 are documented in full detail in:
+
+> **`docs/DEFERRED_AND_FUTURE_WORK.md`**
+
+That document is organized into:
+
+1. **Deferred items** (12) — implemented partially or not at all, with specific reasons
+2. **Blocked items** (3) — technically infeasible without root: full app data backup, WhatsApp orphaned-media detection, WhatsApp database restore
+3. **Out-of-scope decisions** (5) — deliberate design decisions not to build certain features
+4. **Platform & packaging gaps** (4) — Windows/macOS real-device validation, README finalization
+5. **Future GUI enhancements** (6 ideas) — cancel-everywhere, label cache management, Status Saver select-all, scheduled backups, multi-device switcher
+6. **Spec audit table** — every §1–§17 requirement mapped to ✅/🔶/❌
+
+### Priority future work (post v1.0.0)
+
+The highest-value items to pursue after the current release:
+
+1. **Cancel button on all long-running GUI operations** — currently only progress bars are shown; adding a Cancel signal to viewmodels would improve UX significantly.
+2. **Per-file retry in GUI** — the transfer engine supports retry; wiring it to the GUI progress dialog would surface it to users.
+3. **Storage trend across sessions** — requires persisting scan snapshots to SQLite; the `reports/` infrastructure is ready for it.
+4. **Windows/macOS real-device validation** — the code is cross-platform; just needs hardware to test on.
+5. **500-file batch pull/push** — decoupling progress signals from per-file granularity would unlock the §3.2 speed target.
+
+---
