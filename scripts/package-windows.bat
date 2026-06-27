@@ -10,7 +10,7 @@ REM Output: dist\droidbridge-windows\   (~400 MB)
 REM         releases\droidbridge-windows-x64.zip
 
 setlocal
-set VERSION=1.0.0
+if "%VERSION%"=="" set VERSION=1.0.0
 
 echo === DroidBridge Windows Packaging (v%VERSION%) ===
 

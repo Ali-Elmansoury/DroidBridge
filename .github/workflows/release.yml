@@ -1,0 +1,167 @@
+name: Release
+
+# Triggered by pushing a version tag: git tag v1.0.1 && git push --tags
+on:
+  push:
+    tags:
+      - 'v[0-9]*'
+
+jobs:
+  # ── Linux ──────────────────────────────────────────────────────────────────
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install pyinstaller
+          pip install -e ".[gui]"
+          sudo apt-get install -y fakeroot dpkg-dev
+
+      - name: Build
+        run: VERSION="${GITHUB_REF_NAME#v}" bash scripts/package-linux.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-tarball
+          path: releases/droidbridge-linux-x86_64.tar.gz
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-deb
+          path: releases/droidbridge_*_amd64.deb
+
+  # ── Windows ────────────────────────────────────────────────────────────────
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install pyinstaller
+          pip install -e ".[gui]"
+
+      - name: Extract version
+        run: |
+          $ver = "${{ github.ref_name }}" -replace '^v', ''
+          echo "VERSION=$ver" >> $env:GITHUB_ENV
+        shell: pwsh
+
+      - name: Build
+        run: scripts\package-windows.bat
+        shell: cmd
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-zip
+          path: releases\droidbridge-windows-x64.zip
+
+  # ── macOS ──────────────────────────────────────────────────────────────────
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install pyinstaller
+          pip install -e ".[gui]"
+
+      - name: Make bundled ADB executable
+        run: chmod +x droidbridge/resources/platform-tools-darwin/adb
+
+      - name: Build
+        run: VERSION="${GITHUB_REF_NAME#v}" bash scripts/package-macos.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-zip
+          path: releases/droidbridge-macos-universal.zip
+
+  # ── Create GitHub Release ─────────────────────────────────────────────────
+  release:
+    needs: [build-linux, build-windows, build-macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+
+          cat > notes.md << EOF
+          ## DroidBridge ${GITHUB_REF_NAME}
+
+          ADB-powered Android device management tool — GUI + CLI, 100% offline.
+
+          ### Downloads
+
+          | Platform | File | Notes |
+          |---|---|---|
+          | Linux (x86_64) | \`droidbridge-linux-x86_64.tar.gz\` | Portable — extract and run |
+          | Linux (x86_64) | \`droidbridge_${VERSION}_amd64.deb\` | Debian/Ubuntu package |
+          | Windows (x64) | \`droidbridge-windows-x64.zip\` | Portable — extract and run |
+          | macOS (arm64) | \`droidbridge-macos-universal.zip\` | Portable — extract and run |
+
+          ### Install
+
+          **Linux (.deb — recommended)**
+          \`\`\`bash
+          sudo dpkg -i droidbridge_${VERSION}_amd64.deb
+          droidbridge-gui          # GUI
+          droidbridge --help       # CLI
+          \`\`\`
+
+          **Linux (tar.gz)**
+          \`\`\`bash
+          tar -xzf droidbridge-linux-x86_64.tar.gz
+          ./droidbridge-linux/droidbridge-gui
+          \`\`\`
+
+          **Windows**
+          Extract the zip and run \`droidbridge-gui.exe\`.
+          Add the folder to PATH to use the \`droidbridge\` CLI from any terminal.
+
+          **macOS**
+          \`\`\`bash
+          unzip droidbridge-macos-universal.zip
+          ./droidbridge-macos/droidbridge-gui
+          \`\`\`
+          > If Gatekeeper blocks it: \`xattr -dr com.apple.quarantine ./droidbridge-macos/\`
+
+          ### Requirements
+          - A USB cable that carries data (not charge-only)
+          - Android device with USB Debugging enabled (Settings → Developer Options)
+          - No Android SDK, no ADB installation required — ADB is bundled
+          EOF
+
+          gh release create "${GITHUB_REF_NAME}" \
+            --repo "${{ github.repository }}" \
+            --title "DroidBridge ${GITHUB_REF_NAME}" \
+            --notes-file notes.md \
+            artifacts/droidbridge-linux-x86_64.tar.gz \
+            artifacts/droidbridge_${VERSION}_amd64.deb \
+            artifacts/droidbridge-windows-x64.zip \
+            artifacts/droidbridge-macos-universal.zip
