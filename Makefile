@@ -13,8 +13,9 @@ VERSION ?= 1.0.0
 release: docs build package
 
 docs:
-	@echo "[docs] Regenerating project document..."
+	@echo "[docs] Regenerating project document (.docx + .pdf)..."
 	python3 scripts/generate_docx.py
+	python3 scripts/generate_pdf.py
 
 build:
 	@echo "[build] Running PyInstaller..."
