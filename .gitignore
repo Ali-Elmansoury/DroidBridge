@@ -11,3 +11,4 @@ session_logs/
 .claude/
 .worktrees/
 releases/
+docs/CLAUDE_CODE_PROMPT.md
