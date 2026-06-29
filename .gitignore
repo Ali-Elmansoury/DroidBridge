@@ -11,4 +11,10 @@ session_logs/
 .claude/
 .worktrees/
 releases/
+
+# AI dev tooling — internal, not for public repo
+CLAUDE.md
+PROGRESS.md
 docs/CLAUDE_CODE_PROMPT.md
+docs/MARKETING.md
+docs/superpowers/
