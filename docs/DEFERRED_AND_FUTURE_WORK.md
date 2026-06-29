@@ -51,25 +51,7 @@ that becomes visible during a scan and hides on completion.
 
 ---
 
-### 1.3 Files GUI — Date/Size Range Filters Not Exposed
-
-**Scope:** GUI Files page (Browse/Search).
-
-`droidbridge/modules/search.py`'s `search_files` and `filter_results` fully
-support `after`, `before`, `min_size`, and `max_size` parameters, and the CLI
-exposes all four. The GUI Search page only exposes name, extension, and preset
-filters — date and size range inputs were deferred from the GUI Files Polish
-pass.
-
-**What's needed:** four additional filter controls (date-from, date-to,
-min-size, max-size) in the Search page's filter row; already wired to the
-viewmodel's search call.
-
-**Reference:** PROGRESS.md 2026-06-17 GUI Files Polish "Not in scope / deferred".
-
----
-
-### 1.4 Files GUI — Tree View, Bookmarks, Audio Metadata
+### 1.3 Files GUI — Tree View, Bookmarks, Audio Metadata
 
 **Scope:** GUI Files page.
 
