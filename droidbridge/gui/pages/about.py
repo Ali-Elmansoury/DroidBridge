@@ -98,7 +98,7 @@ class AboutPage(QWidget):
         tagline.setStyleSheet("font-size: 13px; color: palette(window-text); margin-bottom: 4px;")
         lay.addWidget(tagline)
 
-        ver_lbl = QLabel(f"Version {_VERSION}  ·  {_LICENSE}  ·  Open Source")
+        ver_lbl = QLabel(f"Version {_VERSION}  ·  {_LICENSE}")
         ver_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
         ver_lbl.setStyleSheet("font-size: 11px; color: palette(window-text); margin-bottom: 8px;")
         lay.addWidget(ver_lbl)
@@ -108,7 +108,7 @@ class AboutPage(QWidget):
         # ── Description ────────────────────────────────────────────────
         lay.addWidget(_section_label("About"))
         desc = QLabel(
-            "DroidBridge is an open-source, cross-platform desktop tool for managing "
+            "DroidBridge is a source-available, cross-platform desktop tool for managing "
             "Android devices via ADB. It provides significantly faster file transfers "
             "than standard MTP, intelligent media analysis and organization, a complete "
             "WhatsApp backup and cleanup toolkit, app management, and rich report "
@@ -124,7 +124,7 @@ class AboutPage(QWidget):
         lay.addWidget(_section_label("Project"))
         lay.addWidget(_row("Source code", _REPO, is_link=True))
         lay.addWidget(_row("Issues", _REPO + "/issues", is_link=True))
-        lay.addWidget(_row("License", "Free for personal use · Commercial license required for business use"))
+        lay.addWidget(_row("License", "Proprietary source-available · Free for personal use · Commercial license required for business use"))
 
         lay.addWidget(_divider())
 
