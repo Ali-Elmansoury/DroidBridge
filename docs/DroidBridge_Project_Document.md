@@ -1,7 +1,7 @@
 # DroidBridge — ADB-Powered Android Device Management Tool
 
 **Project Requirements, Feature Specification & Implementation Record**
-Version 1.0.0 | Released June 2026 | Open Source Project (MIT License)
+Version 1.0.0 | Released June 2026 | Proprietary Source-Available License
 
 > **Status:** All 6 phases complete. Version 1.0.0 shipped. See §19 for implementation
 > notes, §20 for deferred/future work.
@@ -57,7 +57,7 @@ The tool was born from a real need: Android users face painfully slow MTP transf
 | Report Generation | Jinja2 + HTML/PDF | Rich formatted reports |
 | Data Storage | SQLite | Local session and backup metadata |
 | Packaging | PyInstaller | Single executable per platform |
-| Version Control | Git + GitHub | Open source collaboration |
+| Version Control | Git + GitHub | Source control and collaboration |
 
 > **Note:** The tool bundles ADB platform-tools for Windows, Linux, and macOS. Users do not need to install Android SDK separately.
 
@@ -722,7 +722,7 @@ The GUI provides all features in a clean desktop application suitable for genera
 | ADB Dependency | Bundled — no user installation required |
 | Internet Required | None — fully offline |
 | Privacy | No telemetry, no analytics, no cloud |
-| License | MIT Open Source License |
+| License | Proprietary Source-Available — free for personal use, commercial license required for business use |
 | Language | Python 3.10+ (CLI), PyQt6 or Tkinter (GUI) |
 | Packaging | Single executable via PyInstaller per platform |
 | Documentation | README, CLI help text, in-app tooltips |
@@ -958,7 +958,7 @@ etc.) do — Android→Android and Android→iOS?
   building/distributing one carries real reverse-engineering/ToS exposure.
 
 **Conclusion**: out of scope for DroidBridge as designed (ADB-only, fully
-offline, MIT, Android-focused CLI/GUI). If ever pursued, it would be a
+offline, source-available, Android-focused CLI/GUI). If ever pursued, it would be a
 **separate companion project**, not a DroidBridge module — DroidBridge's
 existing `backup`/`backup-db`/`restore` commands already cover the
 Android-side data extraction such a project would need as input.
@@ -1197,5 +1197,5 @@ DroidBridge was designed and built by:
 
 DroidBridge grew out of a personal frustration with the painfully slow MTP transfers and the lack of good offline tools for managing large WhatsApp media archives on Android devices. Every feature in the tool was driven by real-world usage on real data.
 
-The project is open source (MIT License). Contributions, issues, and feedback are welcome on GitHub.
+DroidBridge is released under a proprietary source-available license — free for personal use, with a commercial license required for business use. Source code is publicly visible on GitHub. Contributions, issues, and feedback are welcome.
 

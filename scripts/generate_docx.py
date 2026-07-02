@@ -14,8 +14,27 @@ except ImportError:
     print("Install python-docx first: pip install python-docx")
     sys.exit(1)
 
-SRC = Path(__file__).parent.parent / "docs" / "DroidBridge_Project_Document.md"
-DST = Path(__file__).parent.parent / "docs" / "DroidBridge_Project_Document.docx"
+ROOT = Path(__file__).parent.parent
+SRC  = ROOT / "docs" / "DroidBridge_Project_Document.md"
+DST  = ROOT / "docs" / "DroidBridge_Project_Document.docx"
+
+
+def _get_app_version() -> str:
+    """Read __version__ from droidbridge/__init__.py without importing the package."""
+    init = ROOT / "droidbridge" / "__init__.py"
+    m = re.search(r'^__version__\s*=\s*["\']([^"\']+)["\']', init.read_text(), re.MULTILINE)
+    return m.group(1) if m else "1.0.0"
+
+
+def _inject_version(md: str, version: str) -> str:
+    """Replace the Version line in the markdown preamble with the current app version."""
+    return re.sub(
+        r"^(Version\s+)\d+\.\d+\.\d+",
+        rf"\g<1>{version}",
+        md,
+        count=1,
+        flags=re.MULTILINE,
+    )
 
 # ── Colours ───────────────────────────────────────────────────────────────────
 BLUE_HDG  = RGBColor(0x2E, 0x75, 0xB6)   # section-heading blue
@@ -535,8 +554,11 @@ def build_docx(md_text: str) -> Document:
 
 
 if __name__ == "__main__":
+    version = _get_app_version()
     print(f"Reading  {SRC}")
     md = SRC.read_text(encoding="utf-8")
+    md = _inject_version(md, version)
+    SRC.write_text(md, encoding="utf-8")   # keep .md in sync
     print("Building docx…")
     doc = build_docx(md)
     doc.save(DST)

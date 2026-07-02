@@ -28,6 +28,22 @@ except ImportError:
 
 ROOT    = Path(__file__).parent.parent
 BLUE    = "#2E75B6"
+
+
+def _get_app_version() -> str:
+    init = ROOT / "droidbridge" / "__init__.py"
+    m = re.search(r'^__version__\s*=\s*["\']([^"\']+)["\']', init.read_text(), re.MULTILINE)
+    return m.group(1) if m else "1.0.0"
+
+
+def _inject_version(md: str, version: str) -> str:
+    return re.sub(
+        r"^(Version\s+)\d+\.\d+\.\d+",
+        rf"\g<1>{version}",
+        md,
+        count=1,
+        flags=re.MULTILINE,
+    )
 NAVY    = "#1F497D"
 CODE_BG = "#1E2D3D"
 CODE_FG = "#E8EFF5"
@@ -368,6 +384,10 @@ hr {{ border: none; border-top: 1pt solid #CCCCCC; margin: 12pt 0; }}
 
 def build(md_path: Path, pdf_path: Path) -> None:
     print(f"Reading  {md_path}")
+    version = _get_app_version()
+    text = md_path.read_text(encoding="utf-8")
+    text = _inject_version(text, version)
+    md_path.write_text(text, encoding="utf-8")
     doc = _parse_doc(md_path)
 
     body_html, toc_entries = _post_process(_md_to_html(doc.body))
