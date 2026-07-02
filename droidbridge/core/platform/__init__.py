@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Platform abstraction: picks the right SleepInhibitor for the current OS."""
 
 import platform

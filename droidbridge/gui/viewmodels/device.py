@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """ViewModel for the Device module screen (Phase 6.1).
 
 Owns Workers, formats DeviceInfo for display, and exposes Qt signals for the View.

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 from unittest.mock import MagicMock, patch
 
 from droidbridge.gui import phone_data_ops

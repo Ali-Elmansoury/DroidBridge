@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for droidbridge.modules.storage - Module 5: Storage Analyzer."""
 
 from datetime import datetime

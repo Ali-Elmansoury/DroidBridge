@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Module 2 - File Browser: directory listing, sorting, filtering."""
 
 import os

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Transfer module screen (Phase 6.2): pull/push mode toggle, conflict/verify options,
 live progress, verification result, and transfer history. Purely declarative - binds
 to TransferViewModel signals/slots, no ADB calls or business logic of its own.

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """ViewModel for the Transfer module screen (Phase 6.2).
 
 Owns Workers, plans/executes/verifies pull and push transfers via gui.transfer_ops,

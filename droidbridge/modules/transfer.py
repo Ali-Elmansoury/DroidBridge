@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Module 3 - Smart Transfer Engine: pull/push with progress, conflict
 resolution, resume support, and post-transfer verification.
 """

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for BreadcrumbBar widget."""
 import pytest
 from PyQt6.QtWidgets import QPushButton

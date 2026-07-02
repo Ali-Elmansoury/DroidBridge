@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for droidbridge.modules.device - Module 1: Device Manager."""
 
 from unittest.mock import MagicMock

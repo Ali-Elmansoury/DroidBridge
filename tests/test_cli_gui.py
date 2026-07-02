@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for `droidbridge gui` (Phase 6.1)."""
 
 import importlib.util

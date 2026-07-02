@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Plain-Python GUI device operations (Phase 6.1) — no Qt imports.
 
 These wrap the same droidbridge.modules.device functions the CLI uses, so the GUI never

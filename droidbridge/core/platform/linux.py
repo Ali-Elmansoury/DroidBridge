@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Linux sleep inhibitor: prevents suspend/idle during long-running transfers."""
 
 import shutil

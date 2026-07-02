@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Module 4 - WhatsApp Toolkit: analysis, backup, organization, cleanup, database."""
 
 import calendar

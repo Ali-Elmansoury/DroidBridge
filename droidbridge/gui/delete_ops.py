@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Plain-Python GUI delete/rename operations (Phase 6.3) — no Qt imports.
 
 These wrap the same droidbridge.modules.files functions the CLI's `files

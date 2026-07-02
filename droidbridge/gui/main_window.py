@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Main application window (Phase 6.1): sidebar nav, top bar device status, bottom
 status bar, collapsible log panel, and dark/light theme toggle.
 """

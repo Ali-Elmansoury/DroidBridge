@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for droidbridge.gui.workers.Worker (Phase 6.1)."""
 
 from droidbridge.gui.workers import Worker

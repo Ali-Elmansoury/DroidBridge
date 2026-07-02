@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for droidbridge.reports.storage_reports (spec §9.2)."""
 
 from datetime import datetime

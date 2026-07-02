@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Plain-Python Apps GUI operations (sub-phase 6.5 part 2) - no Qt imports."""
 
 import json

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Search module screen (Phase 6.2): search form (root/name/extensions/size/date/preset),
 results table, and pull-selected. Purely declarative - binds to SearchViewModel
 signals/slots, no ADB calls or business logic of its own.

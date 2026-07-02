@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for droidbridge.modules.whatsapp - Module 4: WhatsApp Toolkit (analysis)."""
 
 import shlex

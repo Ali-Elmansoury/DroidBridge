@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Pytest configuration and fixtures.
 
 Shared fixtures for the GUI test suite (pytest-qt setup, mock AdbClient/device

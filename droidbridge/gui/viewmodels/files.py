@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """ViewModel for the Files module screen (Phase 6.2).
 
 Owns Workers, formats FileEntry rows for display, tracks the current directory and

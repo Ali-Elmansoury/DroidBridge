@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for droidbridge.gui.pages.placeholder.PlaceholderPage (Phase 6.1)."""
 
 from droidbridge.gui.pages.placeholder import PlaceholderPage

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Plain-Python Storage Analyzer GUI operations (sub-phase 6.5 part 1) — no Qt imports."""
 
 from droidbridge.modules import storage as storage_module

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Backup Manager page coordinator (sub-phase 6.4)."""
 
 from PyQt6.QtCore import Qt

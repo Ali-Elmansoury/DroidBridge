@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for droidbridge.core.platform.macos - caffeinate sleep inhibitor."""
 
 from unittest.mock import MagicMock

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """WhatsApp analysis reports (spec §9.1)."""
 
 from droidbridge.modules.whatsapp import (

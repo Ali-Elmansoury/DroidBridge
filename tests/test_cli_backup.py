@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for `droidbridge backup` (Module 6 CLI)."""
 
 import os

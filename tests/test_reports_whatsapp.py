@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for droidbridge.reports.whatsapp_reports (spec §9.1)."""
 
 from datetime import date, datetime

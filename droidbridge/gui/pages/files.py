@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Files module screen (Phase 6.2): directory browser with a sort/filter/hidden-files
 toolbar, multi-select table, and an on-demand preview panel. Purely declarative -
 binds to FilesViewModel signals/slots, no ADB calls or business logic of its own.

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for droidbridge.reports.files_reports."""
 
 from droidbridge.reports import files_reports

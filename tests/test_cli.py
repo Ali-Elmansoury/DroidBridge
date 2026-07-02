@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for droidbridge.cli.main - the Click CLI entry point."""
 
 from unittest.mock import MagicMock

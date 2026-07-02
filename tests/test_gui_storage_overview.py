@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 from unittest.mock import MagicMock
 from droidbridge.gui.device_context import DeviceContext
 from droidbridge.gui.viewmodels.storage.overview import OverviewViewModel

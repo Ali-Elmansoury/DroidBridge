@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 from droidbridge.gui.viewmodels.backup.verify import VerifyViewModel
 from tests.test_gui_viewmodels_device import FakeWorker
 

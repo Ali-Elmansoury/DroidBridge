@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 import pytest
 from pytestqt.qt_compat import qt_api
 from unittest.mock import MagicMock

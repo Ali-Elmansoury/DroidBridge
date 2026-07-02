@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """File rename and delete reports."""
 
 from droidbridge.reports.generators import Report, ReportSection

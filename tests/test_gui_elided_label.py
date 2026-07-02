@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for droidbridge.gui.widgets.elided_label.ElidedLabel (Phase 6.2 follow-up)."""
 
 from droidbridge.gui.widgets.elided_label import ElidedLabel

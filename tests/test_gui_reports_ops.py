@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 from pathlib import Path
 
 from droidbridge.gui import reports_ops

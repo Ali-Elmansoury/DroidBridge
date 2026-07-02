@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Deletion reports (spec §9.4)."""
 
 from collections import Counter

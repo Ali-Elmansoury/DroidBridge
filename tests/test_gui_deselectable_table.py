@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for droidbridge.gui.widgets.deselectable_table.DeselectableTableWidget."""
 
 from PyQt6.QtCore import Qt

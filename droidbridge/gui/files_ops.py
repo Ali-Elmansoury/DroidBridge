@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Plain-Python GUI file-browser operations (Phase 6.2) — no Qt imports.
 
 These wrap the same droidbridge.modules.files functions the CLI's `files browse`

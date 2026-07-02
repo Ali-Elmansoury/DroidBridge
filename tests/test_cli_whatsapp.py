@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for `droidbridge whatsapp scan` (Module 4 CLI, analysis sub-phase)."""
 
 from contextlib import contextmanager

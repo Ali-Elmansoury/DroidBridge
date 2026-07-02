@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for droidbridge.modules.apps - Module 8: App Manager."""
 
 from datetime import datetime

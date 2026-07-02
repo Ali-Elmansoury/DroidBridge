@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 from PyQt6.QtWidgets import (
     QFormLayout, QHBoxLayout, QLabel, QProgressBar,
     QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,

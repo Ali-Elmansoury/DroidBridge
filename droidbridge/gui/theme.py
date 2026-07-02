@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Dark/light theming via Fusion style + QPalette, with a persisted preference
 (Phase 6.1).
 """

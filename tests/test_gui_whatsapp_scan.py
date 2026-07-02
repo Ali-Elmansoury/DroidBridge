@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 # tests/test_gui_whatsapp_scan.py
 from unittest.mock import MagicMock, patch
 import pytest

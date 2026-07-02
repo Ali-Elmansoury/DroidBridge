@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 import functools
 from PyQt6.QtCore import QObject, pyqtSignal
 from droidbridge.gui import whatsapp_ops

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """ViewModel for the Search module screen (Phase 6.2).
 
 Owns Workers, parses the search form's size fields, runs gui.search_ops.run_search,

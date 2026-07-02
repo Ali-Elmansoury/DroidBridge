@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 from unittest.mock import MagicMock
 
 from PyQt6.QtCore import QDate, Qt

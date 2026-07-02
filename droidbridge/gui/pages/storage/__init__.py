@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Storage Analyzer page coordinator (sub-phase 6.5 part 1, Task 7)."""
 
 from PyQt6.QtWidgets import QHBoxLayout, QListWidget, QStackedWidget, QWidget

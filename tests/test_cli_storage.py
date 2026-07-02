@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for `droidbridge storage` (Module 5 CLI)."""
 
 from unittest.mock import MagicMock

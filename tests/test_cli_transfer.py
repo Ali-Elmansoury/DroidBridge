@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for `droidbridge transfer pull/push` (Module 3 CLI)."""
 
 from contextlib import contextmanager

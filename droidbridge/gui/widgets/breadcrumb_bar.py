@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Clickable breadcrumb bar for filesystem path navigation."""
 
 from PyQt6.QtCore import Qt, pyqtSignal

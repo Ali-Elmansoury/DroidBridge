@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 import json
 from datetime import datetime, timezone
 from unittest.mock import MagicMock

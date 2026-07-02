@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Module 1 - Device Manager: detection, info, storage breakdown, connection health."""
 
 import re

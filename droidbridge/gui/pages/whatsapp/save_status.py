@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 import os
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap

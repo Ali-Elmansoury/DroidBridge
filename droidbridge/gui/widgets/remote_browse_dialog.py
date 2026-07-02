@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Modal dialog for picking a path on the connected Android device, reusing
 the same listing logic as the Files page browser."""
 

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for droidbridge.modules.transfer - Module 3: Smart Transfer Engine."""
 
 from unittest.mock import MagicMock

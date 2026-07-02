@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Placeholder page (Phase 6.1) for modules not yet implemented in the GUI."""
 
 from PyQt6.QtCore import Qt

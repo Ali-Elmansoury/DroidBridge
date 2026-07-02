@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 import json
 from pathlib import Path
 from datetime import datetime

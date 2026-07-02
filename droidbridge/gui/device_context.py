@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Shared connection state for the GUI (Phase 6.1): the current AdbClient/serial/model,
 plus a signal so any page can react to connection changes.
 """

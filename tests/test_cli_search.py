@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for `droidbridge files search` (Module 7 CLI)."""
 
 import csv as _csv

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Contacts and Call Log export via adb content-provider queries (sub-phase 6.4)."""
 
 import csv

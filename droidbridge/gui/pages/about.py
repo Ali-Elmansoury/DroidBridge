@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """About page — project info and developer contact details."""
 
 from PyQt6.QtCore import Qt

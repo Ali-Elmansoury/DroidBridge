@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 from PyQt6.QtCore import QObject, pyqtSignal
 from droidbridge.gui import storage_ops
 from droidbridge.gui.workers import Worker

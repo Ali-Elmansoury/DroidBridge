@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """QTableWidget that lets the user click an already-selected single row to
 deselect it (Qt's default click-to-select has no toggle-off)."""
 

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 # tests/test_gui_whatsapp_organize.py
 from unittest.mock import MagicMock, patch
 from PyQt6.QtCore import Qt

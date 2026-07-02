@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 import datetime
 from PyQt6.QtCore import QDate
 from PyQt6.QtWidgets import (

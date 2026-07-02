@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for droidbridge.gui.viewmodels.search.SearchViewModel (Phase 6.2)."""
 
 from datetime import datetime

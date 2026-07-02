@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 from droidbridge.gui.viewmodels.backup.history import HistoryViewModel
 from droidbridge.modules.backup_manager import BackupRecord
 from PyQt6.QtCore import Qt

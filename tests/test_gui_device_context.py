@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for droidbridge.gui.device_context.DeviceContext (Phase 6.1)."""
 
 from unittest.mock import MagicMock

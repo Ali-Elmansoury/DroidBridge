@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for `droidbridge files browse` (Module 2 CLI)."""
 
 from unittest.mock import MagicMock

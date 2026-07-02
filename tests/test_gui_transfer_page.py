@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for droidbridge.gui.pages.transfer.TransferPage (Phase 6.2)."""
 
 from unittest.mock import MagicMock

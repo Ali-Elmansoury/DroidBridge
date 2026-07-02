@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for droidbridge.gui.search_ops (Phase 6.2) — plain functions, no Qt."""
 
 from datetime import datetime

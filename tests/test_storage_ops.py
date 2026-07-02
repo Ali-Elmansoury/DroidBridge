@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 from unittest.mock import MagicMock
 from droidbridge.gui import storage_ops
 from droidbridge.modules.storage import StorageOverview, AppStorageInfo, MediaBreakdown, CleanupSuggestion

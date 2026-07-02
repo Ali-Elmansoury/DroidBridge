@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 from datetime import date
 from unittest.mock import MagicMock, patch, call
 import pytest

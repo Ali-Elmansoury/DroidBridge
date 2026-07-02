@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Plain-Python GUI transfer operations (Phase 6.2) — no Qt imports.
 
 Multi-path wrappers around droidbridge.modules.transfer: build one plan per path,

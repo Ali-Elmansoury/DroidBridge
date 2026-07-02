@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 from PyQt6.QtWidgets import (
     QGroupBox, QHBoxLayout, QInputDialog, QLabel,
     QProgressBar, QPushButton, QVBoxLayout, QWidget,

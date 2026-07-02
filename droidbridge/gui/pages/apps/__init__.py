@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Apps GUI page coordinator (sub-phase 6.5 part 2, Module 8)."""
 
 from PyQt6.QtWidgets import QHBoxLayout, QListWidget, QStackedWidget, QWidget

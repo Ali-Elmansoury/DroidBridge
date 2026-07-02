@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Plain-Python GUI image-preview operations (Phase 6.2) — no Qt imports.
 
 Fetches and caches a local copy of a previewable file from the device so the Files

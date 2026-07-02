@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 from droidbridge.gui import backup_ops
 from droidbridge.modules.backup_manager import BackupProfile
 

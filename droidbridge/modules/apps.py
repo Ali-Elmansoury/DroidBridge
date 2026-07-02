@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Module 8 - App Manager: app listing, cache management, uninstall, APK extraction, bloatware."""
 
 import glob

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for droidbridge.reports.backup_reports (spec §9.3)."""
 
 from droidbridge.core.session import SessionLogger

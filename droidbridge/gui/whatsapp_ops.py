@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Plain-Python WhatsApp GUI operations (sub-phase 6.3) — no Qt imports."""
 
 import os

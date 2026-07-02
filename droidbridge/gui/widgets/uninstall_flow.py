@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Uninstall confirmation flow for the Apps Uninstall tab (sub-phase 6.5 part 2):
 backup-the-APK-or-not, then a typed confirm, then uninstall. Mirrors
 droidbridge/gui/widgets/delete_flow.py's run_delete_flow.

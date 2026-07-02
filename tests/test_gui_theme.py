@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for droidbridge.gui.theme (Phase 6.1)."""
 
 from PyQt6.QtGui import QColor, QPalette

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Real-time, color-coded operation log panel (Phase 6.1)."""
 
 from datetime import datetime

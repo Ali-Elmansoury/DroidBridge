@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Plain-Python GUI search operations (Phase 6.2) — no Qt imports.
 
 These wrap droidbridge.modules.search the same way the CLI's `files search` command

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Backup reports (spec §9.3): summary, verification, history log, session summary."""
 
 from droidbridge.reports.generators import Report, ReportSection

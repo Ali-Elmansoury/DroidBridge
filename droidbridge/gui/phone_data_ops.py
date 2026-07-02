@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Plain-Python Contacts/Call Log GUI operations (sub-phase 6.4) — no Qt imports."""
 
 import os

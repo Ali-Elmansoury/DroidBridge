@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """ADB wrapper: locate the adb binary and run devices/shell/pull/push commands."""
 
 import platform

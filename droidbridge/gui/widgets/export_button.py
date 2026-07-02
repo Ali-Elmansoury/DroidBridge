@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 from pathlib import Path
 
 from PyQt6.QtWidgets import QFileDialog, QMessageBox

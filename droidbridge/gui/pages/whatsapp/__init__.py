@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """WhatsApp Toolkit page coordinator (sub-phase 6.3)."""
 
 from PyQt6.QtCore import Qt

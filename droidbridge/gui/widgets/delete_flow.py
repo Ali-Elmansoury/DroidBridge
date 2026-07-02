@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Shared rename/delete dialog flows for FilesPage and SearchPage (Phase 6.3).
 
 Both pages need the same "scan -> confirm -> delete -> verify" and "rename"

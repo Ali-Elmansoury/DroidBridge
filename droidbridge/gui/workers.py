@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Generic background worker (Phase 6.1): runs a plain function on a QThread and reports
 the result or exception back to the calling thread via Qt signals.
 """

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for droidbridge.core.platform.get_sleep_inhibitor - per-OS dispatch."""
 
 from droidbridge.core import platform as platform_module

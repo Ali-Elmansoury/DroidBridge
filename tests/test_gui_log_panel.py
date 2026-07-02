@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for droidbridge.gui.widgets.log_panel.LogPanel (Phase 6.1)."""
 
 from droidbridge.gui.widgets.log_panel import LogPanel

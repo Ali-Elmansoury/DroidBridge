@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Module 5 - Storage Analyzer: full breakdown, app storage, media, large files, cleanup suggestions."""
 
 import json

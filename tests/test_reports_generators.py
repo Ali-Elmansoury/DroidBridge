@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for droidbridge.reports.generators - generic Report/ReportSection model
 and TXT/HTML/CSV/JSON generators (spec §9.5)."""
 

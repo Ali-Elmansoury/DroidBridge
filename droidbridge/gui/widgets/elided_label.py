@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """A QLabel that elides long text to fit its width (Phase 6.2 follow-up)."""
 
 from PyQt6.QtCore import Qt

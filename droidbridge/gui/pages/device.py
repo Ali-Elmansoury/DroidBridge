@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Device module screen (Phase 6.1): connect + info, mirroring `device connect`/`device
 info`. Purely declarative — binds to DeviceViewModel signals/slots, no formatting or
 AdbClient calls of its own.

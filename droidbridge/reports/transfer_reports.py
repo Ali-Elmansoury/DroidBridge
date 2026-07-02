@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Transfer reports (spec §9.5/§3.5): success/failure summary for pull, push, and mirror operations."""
 
 from droidbridge.reports.generators import Report, ReportSection

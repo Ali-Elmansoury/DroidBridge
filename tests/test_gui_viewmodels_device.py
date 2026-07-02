@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for droidbridge.gui.viewmodels.device.DeviceViewModel (Phase 6.1).
 
 Uses a synchronous FakeWorker (no real QThread) so these tests are fast and

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Integration tests for CLI session logging (sub-project #9)."""
 
 import json

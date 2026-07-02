@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for droidbridge.gui.delete_ops (Phase 6.3) — plain functions, no Qt."""
 
 from unittest.mock import MagicMock

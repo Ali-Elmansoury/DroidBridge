@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Plain-Python Backup Manager GUI operations (sub-phase 6.4) — no Qt imports."""
 
 import time

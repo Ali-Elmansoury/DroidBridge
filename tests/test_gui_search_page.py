@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for droidbridge.gui.pages.search.SearchPage (Phase 6.2)."""
 
 from datetime import date, datetime

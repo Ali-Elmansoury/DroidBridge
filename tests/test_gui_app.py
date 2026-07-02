@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for droidbridge.gui.app.main (Phase 6.1)."""
 
 from PyQt6.QtWidgets import QApplication

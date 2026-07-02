@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Session logging framework: session_logs/ directory structure and logging."""
 
 import json

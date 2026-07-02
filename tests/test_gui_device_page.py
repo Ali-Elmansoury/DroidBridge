@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for droidbridge.gui.pages.device.DevicePage (Phase 6.1)."""
 
 from unittest.mock import MagicMock

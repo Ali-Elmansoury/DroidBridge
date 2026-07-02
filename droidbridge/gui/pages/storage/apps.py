@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 from PyQt6.QtWidgets import (
     QCheckBox, QComboBox, QHBoxLayout, QLabel, QProgressBar, QPushButton,
     QSpinBox, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,

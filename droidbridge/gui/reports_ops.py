@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Plain-Python Reports GUI operations (sub-phase 6.5 part 3) — no Qt imports.
 
 Wraps the same logic as `droidbridge.cli.main`'s `report generate` command:

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for `droidbridge apps` (Module 8 CLI)."""
 
 from unittest.mock import MagicMock

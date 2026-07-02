@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Tests for droidbridge.gui.widgets.delete_flow (Phase 6.3)."""
 
 from types import SimpleNamespace

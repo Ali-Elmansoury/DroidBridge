@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """GUI entry point (Phase 6.1): QApplication setup, theming, session logging, MainWindow."""
 
 import sys

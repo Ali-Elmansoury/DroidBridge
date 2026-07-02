@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 # tests/test_gui_whatsapp_analyze.py
 import datetime
 from unittest.mock import MagicMock

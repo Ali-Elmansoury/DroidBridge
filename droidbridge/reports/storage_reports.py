@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Storage reports (spec §9.2): breakdown, top apps, large files, storage trend."""
 
 import json

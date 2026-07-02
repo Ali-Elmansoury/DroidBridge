@@ -1,3 +1,4 @@
+# Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Click-based CLI entry point for DroidBridge."""
 
 import csv
@@ -24,6 +25,7 @@ from droidbridge.modules import transfer as transfer_module
 from droidbridge.modules import whatsapp as whatsapp_module
 from droidbridge.reports import backup_reports, deletion_reports, files_reports, storage_reports, transfer_reports, whatsapp_reports
 from droidbridge.reports.generators import Report, to_csv, to_html, to_json, to_txt
+from droidbridge import __version__
 from droidbridge.utils.format import format_bar, format_bytes, format_duration, format_size_kb, parse_size
 
 
@@ -51,6 +53,11 @@ def _get_session_logger():
 
 
 @click.group()
+@click.version_option(
+    version=__version__,
+    prog_name="DroidBridge",
+    message="%(prog)s %(version)s  © 2026 Ali Elmansoury. All rights reserved.",
+)
 @click.pass_context
 def cli(ctx):
     """DroidBridge - ADB-powered Android device management tool."""
