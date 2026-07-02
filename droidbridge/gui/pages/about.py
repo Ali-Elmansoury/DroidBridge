@@ -8,7 +8,6 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QScrollArea,
-    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -22,9 +21,18 @@ _EMAIL   = "ali.elmansoury21@gmail.com"
 _REPO    = "https://github.com/Ali-Elmansoury/DroidBridge"
 
 
+def _font(size_pt: int, bold: bool = False) -> QFont:
+    f = QFont()
+    f.setPointSize(size_pt)
+    if bold:
+        f.setBold(True)
+    return f
+
+
 def _section_label(text: str) -> QLabel:
     lbl = QLabel(text)
-    lbl.setStyleSheet("font-size: 15px; font-weight: bold; color: #2E75B6; margin-top: 12px;")
+    lbl.setFont(_font(12, bold=True))
+    lbl.setStyleSheet("color: #2E75B6; margin-top: 12px;")
     return lbl
 
 
@@ -32,7 +40,6 @@ def _divider() -> QFrame:
     line = QFrame()
     line.setFrameShape(QFrame.Shape.HLine)
     line.setFrameShadow(QFrame.Shadow.Sunken)
-    line.setStyleSheet("color: #CCCCCC;")
     return line
 
 
@@ -44,7 +51,7 @@ def _row(label_text: str, value_text: str, is_link: bool = False) -> QWidget:
 
     lbl = QLabel(label_text + ":")
     lbl.setFixedWidth(100)
-    lbl.setStyleSheet("font-size: 14px; font-weight: bold;")
+    lbl.setFont(_font(11, bold=True))
     lbl.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
     if is_link:
@@ -52,7 +59,7 @@ def _row(label_text: str, value_text: str, is_link: bool = False) -> QWidget:
         val.setOpenExternalLinks(True)
     else:
         val = QLabel(value_text)
-    val.setStyleSheet("font-size: 14px;")
+    val.setFont(_font(11))
     val.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
     val.setWordWrap(True)
 
@@ -87,28 +94,29 @@ class AboutPage(QWidget):
 
         # ── Title ──────────────────────────────────────────────────────
         title = QLabel("DroidBridge")
-        f = QFont()
-        f.setPointSize(28)
-        f.setBold(True)
-        title.setFont(f)
+        title.setFont(_font(28, bold=True))
         title.setStyleSheet("color: #2E75B6;")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         lay.addWidget(title)
 
         tagline = QLabel("ADB-Powered Android Device Management Tool")
+        tagline.setFont(_font(12))
         tagline.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        tagline.setStyleSheet("font-size: 15px; margin-bottom: 4px;")
         lay.addWidget(tagline)
 
+        lay.addSpacing(2)
+
         ver_lbl = QLabel(f"Version {_VERSION}  ·  {_LICENSE}")
+        ver_lbl.setFont(_font(10))
         ver_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        ver_lbl.setStyleSheet("font-size: 13px; margin-bottom: 8px;")
         lay.addWidget(ver_lbl)
 
+        lay.addSpacing(6)
         lay.addWidget(_divider())
 
         # ── Description ────────────────────────────────────────────────
         lay.addWidget(_section_label("About"))
+        lay.addSpacing(4)
         desc = QLabel(
             "DroidBridge is a source-available, cross-platform desktop tool for managing "
             "Android devices via ADB. It provides significantly faster file transfers "
@@ -116,10 +124,11 @@ class AboutPage(QWidget):
             "WhatsApp backup and cleanup toolkit, app management, and rich report "
             "generation — all without requiring internet access or cloud services."
         )
+        desc.setFont(_font(11))
         desc.setWordWrap(True)
-        desc.setStyleSheet("font-size: 14px; margin-top: 4px;")
         lay.addWidget(desc)
 
+        lay.addSpacing(4)
         lay.addWidget(_divider())
 
         # ── Project links ──────────────────────────────────────────────
@@ -142,13 +151,13 @@ class AboutPage(QWidget):
 
         # ── Tech stack quick-ref ───────────────────────────────────────
         lay.addWidget(_section_label("Built With"))
-        stack_text = (
+        lay.addSpacing(4)
+        stack_lbl = QLabel(
             "Python 3.10+ · PyQt6 · Click · ADB (Google platform-tools v37) · "
             "PyInstaller · SQLite · Jinja2"
         )
-        stack_lbl = QLabel(stack_text)
+        stack_lbl.setFont(_font(11))
         stack_lbl.setWordWrap(True)
-        stack_lbl.setStyleSheet("font-size: 14px; margin-top: 4px;")
         lay.addWidget(stack_lbl)
 
         lay.addStretch()
