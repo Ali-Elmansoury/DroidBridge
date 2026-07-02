@@ -20,7 +20,17 @@ DST  = ROOT / "docs" / "DroidBridge_Project_Document.docx"
 
 
 def _get_app_version() -> str:
-    """Read __version__ from droidbridge/__init__.py without importing the package."""
+    """Return the latest git tag (vX.Y.Z → X.Y.Z), falling back to __init__.py."""
+    import subprocess
+    try:
+        tag = subprocess.check_output(
+            ["git", "describe", "--tags", "--abbrev=0"],
+            cwd=ROOT, stderr=subprocess.DEVNULL,
+        ).decode().strip().lstrip("v")
+        if re.match(r"^\d+\.\d+\.\d+", tag):
+            return tag
+    except Exception:
+        pass
     init = ROOT / "droidbridge" / "__init__.py"
     m = re.search(r'^__version__\s*=\s*["\']([^"\']+)["\']', init.read_text(), re.MULTILINE)
     return m.group(1) if m else "1.0.0"

@@ -1,7 +1,7 @@
 # DroidBridge — ADB-Powered Android Device Management Tool
 
 **Project Requirements, Feature Specification & Implementation Record**
-Version 1.0.0 | Released June 2026 | Proprietary Source-Available License
+Version 1.0.3 | Released June 2026 | Proprietary Source-Available License
 
 > **Status:** All 6 phases complete. Version 1.0.0 shipped. See §19 for implementation
 > notes, §20 for deferred/future work.
