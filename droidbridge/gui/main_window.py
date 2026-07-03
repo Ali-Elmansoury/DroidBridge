@@ -26,6 +26,7 @@ from droidbridge.gui.pages.search import SearchPage
 from droidbridge.gui.pages.transfer import TransferPage
 from droidbridge.gui.pages.apps import AppsPage
 from droidbridge.gui.pages.backup import BackupManagerPage
+from droidbridge.gui.pages.recovery import RecoveryPage
 from droidbridge.gui.pages.whatsapp import WhatsAppPage
 from droidbridge.gui.pages.storage import StoragePage
 from droidbridge.gui.pages.reports import ReportsPage
@@ -48,6 +49,7 @@ MODULES = [
     "WhatsApp",
     "Storage",
     "Backup",
+    "Recovery",
     "Apps",
     "Reports",
     "About",
@@ -63,8 +65,9 @@ _SIDEBAR_TOOLTIPS = {
     "WhatsApp": "WhatsApp Toolkit: scan, backup, restore, organize, delete, and more. Shortcut: Ctrl+5.",
     "Storage": "Storage Analyzer: usage breakdown, app storage, media, large files, and cleanup suggestions. Shortcut: Ctrl+6.",
     "Backup": "Backup Manager: profiles, run, verify, history, restore, and Contacts/Call Log export. Shortcut: Ctrl+7.",
-    "Apps": "App Manager: listing, cache management, uninstall, APK extraction, bloatware manager, and APK backup/restore. Shortcut: Ctrl+8.",
-    "Reports": "Reports: generate storage, WhatsApp, backup, and full reports, then preview and save them. Shortcut: Ctrl+9.",
+    "Recovery": "Recovery: scan soft-deleted files and restore from DroidBridge backups. Shortcut: Ctrl+8.",
+    "Apps": "App Manager: listing, cache management, uninstall, APK extraction, bloatware manager, and APK backup/restore. Shortcut: Ctrl+9.",
+    "Reports": "Reports: generate storage, WhatsApp, backup, and full reports, then preview and save them.",
     "About": "About DroidBridge — project info, developer contact, and links.",
 }
 
@@ -104,6 +107,8 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.storage_page)
         self.backup_page = BackupManagerPage(self.context)
         self.stack.addWidget(self.backup_page)
+        self.recovery_page = RecoveryPage(self.context)
+        self.stack.addWidget(self.recovery_page)
         self.apps_page = AppsPage(self.context)
         self.stack.addWidget(self.apps_page)
         self.reports_page = ReportsPage(self.reports_viewmodel)
@@ -209,6 +214,11 @@ class MainWindow(QMainWindow):
                 vm.busyChanged.connect(lambda busy, vm=vm: self._on_busy_changed(vm, busy))
             if hasattr(vm, "logMessage"):
                 vm.logMessage.connect(self._on_log_message)
+
+        for vm in self.recovery_page.viewmodels:
+            vm.statusChanged.connect(self._on_status_changed)
+            vm.busyChanged.connect(lambda busy, vm=vm: self._on_busy_changed(vm, busy))
+            vm.logMessage.connect(self._on_log_message)
 
         for vm in self.apps_page.viewmodels:
             vm.statusChanged.connect(self._on_status_changed)

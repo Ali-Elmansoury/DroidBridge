@@ -17,12 +17,12 @@ from droidbridge.gui.pages.whatsapp import WhatsAppPage
 
 
 class TestMainWindow:
-    def test_sidebar_lists_all_9_modules(self, qtbot):
+    def test_sidebar_lists_all_11_modules(self, qtbot):
         window = MainWindow()
         qtbot.addWidget(window)
 
-        assert window.sidebar.count() == 9
-        labels = [window.sidebar.item(i).text() for i in range(9)]
+        assert window.sidebar.count() == 11
+        labels = [window.sidebar.item(i).text() for i in range(11)]
         assert labels == MODULES
 
     def test_selecting_sidebar_entry_switches_stack(self, qtbot):
@@ -152,7 +152,7 @@ class TestNewPages:
         window = MainWindow()
         qtbot.addWidget(window)
 
-        assert isinstance(window.stack.widget(8), ReportsPage)
+        assert isinstance(window.stack.widget(9), ReportsPage)
 
     def test_backup_index_is_backup_manager_page(self, qtbot):
         window = MainWindow()
@@ -338,7 +338,7 @@ class TestMainWindowShortcuts:
 
         assert window.sidebar.currentRow() == 6
 
-    def test_ctrl_8_switches_to_apps_page(self, qtbot):
+    def test_ctrl_8_switches_to_recovery_page(self, qtbot):
         window = MainWindow()
         qtbot.addWidget(window)
         window.show()
@@ -347,7 +347,7 @@ class TestMainWindowShortcuts:
 
         assert window.sidebar.currentRow() == 7
 
-    def test_ctrl_9_switches_to_reports_page(self, qtbot):
+    def test_ctrl_9_switches_to_apps_page(self, qtbot):
         window = MainWindow()
         qtbot.addWidget(window)
         window.show()
@@ -428,11 +428,11 @@ class TestAppsPageWiring:
 
         assert _SIDEBAR_TOOLTIPS["Apps"] != "Coming in Phase 6.3."
 
-    def test_sidebar_row_seven_shows_apps_page(self, qtbot):
+    def test_sidebar_row_eight_shows_apps_page(self, qtbot):
         window = MainWindow()
         qtbot.addWidget(window)
 
-        window.sidebar.setCurrentRow(7)
+        window.sidebar.setCurrentRow(8)
 
         assert window.stack.currentWidget() is window.apps_page
 
