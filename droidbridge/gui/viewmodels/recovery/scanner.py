@@ -53,7 +53,8 @@ class ScannerViewModel(QObject):
     def _push_all(self, client, serial, files):
         succeeded = failed = 0
         for f in files:
-            ok = self._scanner.push_back_to_phone(client, serial, f.remote_path, f.remote_path)
+            dest_path = f"/sdcard/Recovered/{f.filename}"
+            ok = self._scanner.push_back_to_phone(client, serial, f.remote_path, dest_path)
             if ok:
                 succeeded += 1
             else:
@@ -71,7 +72,7 @@ class ScannerViewModel(QObject):
         self.logMessage.emit(msg, "INFO")
 
     def _on_push_done(self, summary):
-        msg = f"Restored {summary['succeeded']}/{summary['total']} file(s) to phone, {summary['failed']} failed."
+        msg = f"Restored {summary['succeeded']}/{summary['total']} file(s) to /sdcard/Recovered/ on device, {summary['failed']} failed."
         self.statusChanged.emit(msg)
         self.logMessage.emit(msg, "INFO")
 

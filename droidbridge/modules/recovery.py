@@ -293,6 +293,10 @@ class BackupRestorer:
             number = row.get("number", "")
             timestamp = row.get("timestamp", "")
             duration = row.get("duration_seconds", "0")
+            try:
+                duration_int = int(duration or 0)
+            except (ValueError, TypeError):
+                duration_int = 0
             call_type_str = row.get("call_type", "incoming")
             call_type_code = _CALL_TYPE_CODES.get(call_type_str, "1")
             try:
@@ -303,7 +307,7 @@ class BackupRestorer:
                 f"content insert --uri content://call_log/calls"
                 f" --bind number:s:{shlex.quote(number)}"
                 f" --bind date:l:{epoch_ms}"
-                f" --bind duration:l:{duration}"
+                f" --bind duration:l:{duration_int}"
                 f" --bind type:i:{call_type_code}"
                 " 2>/dev/null"
             )
