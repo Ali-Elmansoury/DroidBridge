@@ -6,6 +6,7 @@ import re
 import shlex
 import shutil
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 
 from droidbridge.core.adb import AdbError
@@ -161,15 +162,94 @@ class SoftDeleteScanner:
                 pass
 
 
+# Matches Android content-provider output rows: "Row: 0 ..."
+_ROW_RE = re.compile(r"^Row:\s+\d+")
+
+
+def _count_vcf_contacts(vcf_path: Path) -> int:
+    try:
+        text = vcf_path.read_text(encoding="utf-8", errors="replace")
+        return text.count("BEGIN:VCARD")
+    except OSError:
+        return 0
+
+
+def _count_csv_rows(csv_path: Path) -> int:
+    try:
+        with open(csv_path, newline="", encoding="utf-8") as f:
+            return max(0, sum(1 for _ in f) - 1)  # subtract header
+    except OSError:
+        return 0
+
+
+def _count_rows_in_shell_output(output: str) -> int:
+    return sum(1 for line in output.splitlines() if _ROW_RE.match(line.strip()))
+
+
+def _mtime_date(path: Path) -> str:
+    try:
+        ts = path.stat().st_mtime
+        return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d")
+    except OSError:
+        return "unknown"
+
+
+def _backup_info_for_dir(directory: Path) -> "BackupInfo | None":
+    vcf_files = list(directory.glob("contacts_*.vcf"))
+    csv_path = directory / "call_log.csv"
+    if not vcf_files and not csv_path.exists():
+        return None
+    contacts_count = sum(_count_vcf_contacts(v) for v in vcf_files)
+    calls_count = _count_csv_rows(csv_path) if csv_path.exists() else 0
+    ref_file = vcf_files[0] if vcf_files else csv_path
+    return BackupInfo(
+        path=directory,
+        date=_mtime_date(ref_file),
+        contacts_count=contacts_count,
+        calls_count=calls_count,
+    )
+
+
 class BackupRestorer:
     def list_backups(self, backup_dir: Path) -> list:
-        raise NotImplementedError  # implemented in Task 3
+        backup_dir = Path(backup_dir)
+        results = []
+        info = _backup_info_for_dir(backup_dir)
+        if info:
+            results.append(info)
+        for child in sorted(backup_dir.iterdir()):
+            if child.is_dir():
+                child_info = _backup_info_for_dir(child)
+                if child_info:
+                    results.append(child_info)
+        return results
 
     def diff_contacts(self, client, serial, vcf_path: Path) -> "DiffResult":
-        raise NotImplementedError  # implemented in Task 3
+        backup_count = _count_vcf_contacts(Path(vcf_path))
+        output = client.shell(
+            serial,
+            "content query --uri content://com.android.contacts/raw_contacts"
+            " --projection _id:account_type 2>/dev/null",
+        )
+        phone_count = _count_rows_in_shell_output(output)
+        return DiffResult(
+            backup_count=backup_count,
+            phone_count=phone_count,
+            estimated_missing=max(0, backup_count - phone_count),
+        )
 
     def diff_calls(self, client, serial, csv_path: Path) -> "DiffResult":
-        raise NotImplementedError  # implemented in Task 3
+        backup_count = _count_csv_rows(Path(csv_path))
+        output = client.shell(
+            serial,
+            "content query --uri content://call_log/calls --projection _id 2>/dev/null",
+        )
+        phone_count = _count_rows_in_shell_output(output)
+        return DiffResult(
+            backup_count=backup_count,
+            phone_count=phone_count,
+            estimated_missing=max(0, backup_count - phone_count),
+        )
 
     def restore_contacts(self, client, serial, vcf_path: Path, dest: str) -> "RestoreResult":
         raise NotImplementedError  # implemented in Task 4

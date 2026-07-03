@@ -1,6 +1,8 @@
 # Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """Unit tests for droidbridge.modules.recovery — Module 10."""
 
+import csv as _csv
+from pathlib import Path
 from unittest.mock import MagicMock
 
 from droidbridge.core.adb import AdbError
@@ -10,6 +12,7 @@ from droidbridge.modules.recovery import (
     DiffResult,
     RestoreResult,
     SoftDeleteScanner,
+    BackupRestorer,
 )
 
 
@@ -179,3 +182,92 @@ class TestSoftDeleteScannerTransfer:
             "/sdcard/DCIM/Camera/photo.jpg",
         )
         assert result is False
+
+
+# ---------------------------------------------------------------------------
+# Task 3: BackupRestorer — list_backups, diff_contacts, diff_calls
+# ---------------------------------------------------------------------------
+
+def _write_vcf(path: Path, count: int):
+    lines = []
+    for i in range(count):
+        lines += ["BEGIN:VCARD", "VERSION:3.0", f"FN:Person {i}", f"TEL:555-{i:04d}", "END:VCARD"]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _write_call_log_csv(path: Path, count: int):
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = _csv.writer(f)
+        writer.writerow(["name", "number", "timestamp", "duration_seconds", "call_type"])
+        for i in range(count):
+            writer.writerow([f"Person {i}", f"555-{i:04d}", "2026-06-01T10:00:00+00:00", "30", "incoming"])
+
+
+class TestBackupRestorerListBackups:
+    def test_finds_vcf_and_csv_in_flat_dir(self, tmp_path):
+        _write_vcf(tmp_path / "contacts_phone.vcf", 5)
+        _write_call_log_csv(tmp_path / "call_log.csv", 10)
+        restorer = BackupRestorer()
+        results = restorer.list_backups(tmp_path)
+        assert len(results) == 1
+        assert results[0].contacts_count == 5
+        assert results[0].calls_count == 10
+        assert results[0].path == tmp_path
+
+    def test_finds_backups_in_subdirectory(self, tmp_path):
+        sub = tmp_path / "2026-06-14_backup"
+        sub.mkdir()
+        _write_vcf(sub / "contacts_phone.vcf", 3)
+        restorer = BackupRestorer()
+        results = restorer.list_backups(tmp_path)
+        assert any(r.path == sub for r in results)
+        assert results[0].contacts_count == 3
+
+    def test_returns_empty_for_dir_with_no_backup_files(self, tmp_path):
+        restorer = BackupRestorer()
+        results = restorer.list_backups(tmp_path)
+        assert results == []
+
+    def test_contacts_count_sums_all_vcf_files(self, tmp_path):
+        _write_vcf(tmp_path / "contacts_phone.vcf", 4)
+        _write_vcf(tmp_path / "contacts_accounts.vcf", 6)
+        restorer = BackupRestorer()
+        results = restorer.list_backups(tmp_path)
+        assert results[0].contacts_count == 10
+
+    def test_calls_count_excludes_header_row(self, tmp_path):
+        _write_call_log_csv(tmp_path / "call_log.csv", 8)
+        restorer = BackupRestorer()
+        results = restorer.list_backups(tmp_path)
+        assert results[0].calls_count == 8
+
+
+class TestBackupRestorerDiff:
+    def test_diff_contacts_returns_correct_counts(self, tmp_path):
+        vcf = tmp_path / "contacts_phone.vcf"
+        _write_vcf(vcf, 50)
+        # Phone returns 40 contacts (raw_contacts query)
+        client = MagicMock()
+        client.shell.return_value = "\n".join(
+            f"Row: {i} _id={i}, account_type=NULL" for i in range(40)
+        )
+        restorer = BackupRestorer()
+        result = restorer.diff_contacts(client, "SERIAL", vcf)
+        assert result.backup_count == 50
+        assert result.phone_count == 40
+        assert result.estimated_missing == 10
+
+    def test_diff_calls_returns_correct_counts(self, tmp_path):
+        csv_path = tmp_path / "call_log.csv"
+        _write_call_log_csv(csv_path, 100)
+        # Phone returns 80 call entries
+        client = MagicMock()
+        client.shell.return_value = "\n".join(
+            f"Row: {i} number=555-{i:04d}, date=1718123456000, duration=30, type=1, name="
+            for i in range(80)
+        )
+        restorer = BackupRestorer()
+        result = restorer.diff_calls(client, "SERIAL", csv_path)
+        assert result.backup_count == 100
+        assert result.phone_count == 80
+        assert result.estimated_missing == 20
