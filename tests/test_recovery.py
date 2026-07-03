@@ -271,3 +271,72 @@ class TestBackupRestorerDiff:
         assert result.backup_count == 100
         assert result.phone_count == 80
         assert result.estimated_missing == 20
+
+
+# ---------------------------------------------------------------------------
+# Task 4: BackupRestorer — restore_contacts, restore_calls
+# ---------------------------------------------------------------------------
+
+class TestBackupRestorerRestoreContacts:
+    def test_restore_contacts_to_pc_copies_vcf(self, tmp_path):
+        vcf = tmp_path / "contacts_phone.vcf"
+        _write_vcf(vcf, 3)
+        dest_dir = tmp_path / "output"
+        dest_dir.mkdir()
+        restorer = BackupRestorer()
+        result = restorer.restore_contacts(MagicMock(), "SERIAL", vcf, str(dest_dir))
+        assert (dest_dir / "contacts_phone.vcf").exists()
+        assert result.succeeded == 3
+        assert result.failed == 0
+
+    def test_restore_contacts_to_phone_pushes_vcf_and_launches_intent(self, tmp_path):
+        vcf = tmp_path / "contacts_phone.vcf"
+        _write_vcf(vcf, 5)
+        client = MagicMock()
+        restorer = BackupRestorer()
+        result = restorer.restore_contacts(client, "SERIAL", vcf, "phone")
+        client.push.assert_called_once()
+        push_args = client.push.call_args[0]
+        assert push_args[2] == "/sdcard/droidbridge_restore.vcf"
+        # am start called
+        assert client.shell.call_count >= 1
+        am_call = any(
+            "am start" in str(call) for call in client.shell.call_args_list
+        )
+        assert am_call
+        assert result.total == 5
+
+
+class TestBackupRestorerRestoreCalls:
+    def test_restore_calls_to_pc_copies_csv(self, tmp_path):
+        csv_path = tmp_path / "call_log.csv"
+        _write_call_log_csv(csv_path, 10)
+        dest_dir = tmp_path / "output"
+        dest_dir.mkdir()
+        restorer = BackupRestorer()
+        result = restorer.restore_calls(MagicMock(), "SERIAL", csv_path, str(dest_dir))
+        assert (dest_dir / "call_log.csv").exists()
+        assert result.succeeded == 10
+        assert result.failed == 0
+
+    def test_restore_calls_to_phone_inserts_rows(self, tmp_path):
+        csv_path = tmp_path / "call_log.csv"
+        _write_call_log_csv(csv_path, 3)
+        client = MagicMock()
+        restorer = BackupRestorer()
+        result = restorer.restore_calls(client, "SERIAL", csv_path, "phone")
+        # 3 content insert calls
+        assert client.shell.call_count == 3
+        assert result.total == 3
+        assert result.succeeded == 3
+
+    def test_restore_calls_to_phone_counts_failed_inserts(self, tmp_path):
+        csv_path = tmp_path / "call_log.csv"
+        _write_call_log_csv(csv_path, 2)
+        client = MagicMock()
+        client.shell.side_effect = [AdbError("denied"), ""]
+        restorer = BackupRestorer()
+        result = restorer.restore_calls(client, "SERIAL", csv_path, "phone")
+        assert result.failed == 1
+        assert result.succeeded == 1
+        assert len(result.errors) == 1

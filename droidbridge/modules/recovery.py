@@ -252,7 +252,68 @@ class BackupRestorer:
         )
 
     def restore_contacts(self, client, serial, vcf_path: Path, dest: str) -> "RestoreResult":
-        raise NotImplementedError  # implemented in Task 4
+        vcf_path = Path(vcf_path)
+        count = _count_vcf_contacts(vcf_path)
+        if dest != "phone":
+            dest_dir = Path(dest)
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(vcf_path, dest_dir / vcf_path.name)
+            return RestoreResult(total=count, succeeded=count, failed=0, skipped=0)
+        # Push VCF to device then launch import intent
+        remote_vcf = "/sdcard/droidbridge_restore.vcf"
+        client.push(serial, str(vcf_path), remote_vcf)
+        client.shell(
+            serial,
+            "am start -a android.intent.action.VIEW"
+            " -t text/vcard"
+            f" -d file://{remote_vcf}"
+            " --activity-brought-to-front 2>/dev/null",
+        )
+        return RestoreResult(total=count, succeeded=count, failed=0, skipped=0)
 
     def restore_calls(self, client, serial, csv_path: Path, dest: str) -> "RestoreResult":
-        raise NotImplementedError  # implemented in Task 4
+        csv_path = Path(csv_path)
+        if dest != "phone":
+            dest_dir = Path(dest)
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(csv_path, dest_dir / csv_path.name)
+            count = _count_csv_rows(csv_path)
+            return RestoreResult(total=count, succeeded=count, failed=0, skipped=0)
+        # Insert each CSV row via content provider
+        _CALL_TYPE_CODES = {
+            "incoming": "1", "outgoing": "2", "missed": "3",
+            "voicemail": "4", "rejected": "5", "blocked": "6",
+        }
+        succeeded = failed = skipped = 0
+        errors = []
+        with open(csv_path, newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+        for row in rows:
+            number = row.get("number", "")
+            timestamp = row.get("timestamp", "")
+            duration = row.get("duration_seconds", "0")
+            call_type_str = row.get("call_type", "incoming")
+            call_type_code = _CALL_TYPE_CODES.get(call_type_str, "1")
+            try:
+                epoch_ms = int(datetime.fromisoformat(timestamp).timestamp() * 1000)
+            except (ValueError, TypeError):
+                epoch_ms = 0
+            cmd = (
+                f"content insert --uri content://call_log/calls"
+                f" --bind number:s:{shlex.quote(number)}"
+                f" --bind date:l:{epoch_ms}"
+                f" --bind duration:l:{duration}"
+                f" --bind type:i:{call_type_code}"
+                " 2>/dev/null"
+            )
+            try:
+                client.shell(serial, cmd)
+                succeeded += 1
+            except AdbError as exc:
+                failed += 1
+                errors.append(str(exc))
+        return RestoreResult(
+            total=len(rows), succeeded=succeeded, failed=failed,
+            skipped=skipped, errors=errors,
+        )
