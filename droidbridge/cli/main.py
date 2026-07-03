@@ -19,11 +19,12 @@ from droidbridge.modules import backup_manager as backup_module
 from droidbridge.modules import device as device_module
 from droidbridge.modules import files as files_module
 from droidbridge.modules import phone_data as phone_data_module
+from droidbridge.modules import recovery as recovery_module
 from droidbridge.modules import search as search_module
 from droidbridge.modules import storage as storage_module
 from droidbridge.modules import transfer as transfer_module
 from droidbridge.modules import whatsapp as whatsapp_module
-from droidbridge.reports import backup_reports, deletion_reports, files_reports, storage_reports, transfer_reports, whatsapp_reports
+from droidbridge.reports import backup_reports, deletion_reports, files_reports, recovery_reports, storage_reports, transfer_reports, whatsapp_reports
 from droidbridge.reports.generators import Report, to_csv, to_html, to_json, to_txt
 from droidbridge import __version__
 from droidbridge.utils.format import format_bar, format_bytes, format_duration, format_size_kb, parse_size
@@ -2832,6 +2833,101 @@ def gui_cmd():
     from droidbridge.gui.app import main as gui_main
 
     sys.exit(gui_main(sys.argv[:1]))
+
+
+_RECOVERY_DISCLAIMER = (
+    "NOTE: DroidBridge can only recover files that apps have soft-deleted\n"
+    "(moved to a trash folder) and data backed up by DroidBridge. Files\n"
+    "permanently deleted without root access cannot be recovered.\n"
+    "Results are not guaranteed.\n"
+)
+
+
+# ── recovery group ────────────────────────────────────────────────────────────
+@cli.group("recovery")
+def recovery_group():
+    """Data Recovery & Restoration (Module 10)."""
+
+
+@recovery_group.command("scan")
+@click.option("--serial", "-s", default=None, help="Device serial (omit for auto-detect).")
+@click.option("--output", "-o", default="./recovered", show_default=True, help="Directory to save recovered files.")
+def recovery_scan(serial, output):
+    """Scan soft-delete trash locations and optionally save found files to OUTPUT."""
+    click.echo(_RECOVERY_DISCLAIMER)
+    client = _build_client()
+    serial = _resolve_serial(client, serial)
+    scanner = recovery_module.SoftDeleteScanner()
+    click.echo("Scanning soft-delete locations...")
+    results = scanner.scan(client, serial)
+    if not results:
+        click.echo("No recoverable files found.")
+        return
+    click.echo(f"\nFound {len(results)} file(s):\n")
+    for f in results:
+        restorable = "restorable" if f.is_true_trash else "copy only"
+        click.echo(f"  {f.filename}  ({format_bytes(f.size_bytes)})  [{f.source_app}]  [{restorable}]")
+    click.echo(f"\nSaving to {output} ...")
+    pulled = failed = 0
+    for f in results:
+        ok = scanner.pull_to_pc(client, serial, f.remote_path, output)
+        if ok:
+            pulled += 1
+        else:
+            failed += 1
+    click.echo(f"\nDone: {pulled} saved, {failed} failed.")
+    report = recovery_reports.build_scan_report(results, pulled_count=pulled, restored_count=0, failed_count=failed)
+    _write_report(report, "recovery_scan")
+
+
+@recovery_group.command("restore")
+@click.option("--backup", required=True, type=click.Path(exists=True, file_okay=False), help="Path to DroidBridge backup directory.")
+@click.option("--contacts", is_flag=True, default=False, help="Restore contacts.")
+@click.option("--calls", is_flag=True, default=False, help="Restore call log.")
+@click.option("--dest", default="pc", show_default=True, type=click.Choice(["phone", "pc"]), help="Destination: phone or pc.")
+@click.option("--output", "-o", default="./restored", show_default=True, help="If --dest pc, local directory to save restored files.")
+@click.option("--serial", "-s", default=None, help="Device serial (omit for auto-detect).")
+def recovery_restore(backup, contacts, calls, dest, output, serial):
+    """Restore contacts/call log from a DroidBridge backup."""
+    click.echo(_RECOVERY_DISCLAIMER)
+    if not contacts and not calls:
+        raise click.UsageError("Specify at least one of --contacts or --calls.")
+    client = _build_client()
+    serial = _resolve_serial(client, serial)
+    restorer = recovery_module.BackupRestorer()
+    backup_path = Path(backup)
+    contacts_result = None
+    calls_result = None
+    if contacts:
+        vcf_files = list(backup_path.glob("contacts_*.vcf"))
+        if not vcf_files:
+            click.echo("No contacts VCF found in backup directory.", err=True)
+        else:
+            vcf = vcf_files[0]
+            diff = restorer.diff_contacts(client, serial, vcf)
+            click.echo(f"Contacts: backup={diff.backup_count}, phone={diff.phone_count}, ~{diff.estimated_missing} may be missing.")
+            if dest == "phone":
+                click.echo("Your phone's Contacts app will open to confirm the import. Please accept it on your device.")
+            contacts_result = restorer.restore_contacts(client, serial, vcf, dest if dest == "phone" else output)
+            click.echo(f"Contacts restore: {contacts_result.succeeded}/{contacts_result.total} succeeded, {contacts_result.failed} failed.")
+    if calls:
+        csv_path = backup_path / "call_log.csv"
+        if not csv_path.exists():
+            click.echo("No call_log.csv found in backup directory.", err=True)
+        else:
+            diff = restorer.diff_calls(client, serial, csv_path)
+            click.echo(f"Call log: backup={diff.backup_count}, phone={diff.phone_count}, ~{diff.estimated_missing} may be missing.")
+            calls_result = restorer.restore_calls(client, serial, csv_path, dest if dest == "phone" else output)
+            click.echo(f"Call log restore: {calls_result.succeeded}/{calls_result.total} succeeded, {calls_result.failed} failed.")
+    if contacts_result or calls_result:
+        backup_info = recovery_module.BackupInfo(
+            path=backup_path,
+            date=backup_path.name[:10] if len(backup_path.name) >= 10 else "unknown",
+            contacts_count=contacts_result.total if contacts_result else 0,
+            calls_count=calls_result.total if calls_result else 0,
+        )
+        report = recovery_reports.build_restore_report(backup_info, contacts_result, calls_result)
+        _write_report(report, "recovery_restore")
 
 
 if __name__ == "__main__":
