@@ -131,10 +131,34 @@ class SoftDeleteScanner:
         return results
 
     def pull_to_pc(self, client, serial, remote_path, dest_dir) -> bool:
-        raise NotImplementedError  # implemented in Task 2
+        dest = Path(dest_dir)
+        dest.mkdir(parents=True, exist_ok=True)
+        filename = remote_path.rsplit("/", 1)[-1]
+        local_path = dest / filename
+        try:
+            client.pull(serial, remote_path, str(local_path))
+            return True
+        except AdbError:
+            return False
 
     def push_back_to_phone(self, client, serial, remote_path, original_path) -> bool:
-        raise NotImplementedError  # implemented in Task 2
+        # Pull to a temp file locally, then push to the original location.
+        # This avoids needing shell `mv` which may fail on cross-partition moves.
+        import tempfile
+        suffix = Path(remote_path).suffix
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            tmp_path = tmp.name
+        try:
+            client.pull(serial, remote_path, tmp_path)
+            client.push(serial, tmp_path, original_path)
+            return True
+        except AdbError:
+            return False
+        finally:
+            try:
+                Path(tmp_path).unlink(missing_ok=True)
+            except OSError:
+                pass
 
 
 class BackupRestorer:

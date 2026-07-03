@@ -131,3 +131,51 @@ class TestSoftDeleteScannerScan:
             "/sdcard/.trash/", "Generic", True,
         )
         assert results[0].file_type == "other"
+
+
+class TestSoftDeleteScannerTransfer:
+    def test_pull_to_pc_returns_true_on_success(self, tmp_path):
+        client = MagicMock()
+        scanner = SoftDeleteScanner()
+        result = scanner.pull_to_pc(client, "SERIAL", "/sdcard/.trash/photo.jpg", str(tmp_path))
+        assert result is True
+        client.pull.assert_called_once_with(
+            "SERIAL", "/sdcard/.trash/photo.jpg",
+            str(tmp_path / "photo.jpg"),
+        )
+
+    def test_pull_to_pc_returns_false_on_adb_error(self, tmp_path):
+        client = MagicMock()
+        client.pull.side_effect = AdbError("failed")
+        scanner = SoftDeleteScanner()
+        result = scanner.pull_to_pc(client, "SERIAL", "/sdcard/.trash/photo.jpg", str(tmp_path))
+        assert result is False
+
+    def test_pull_to_pc_creates_dest_dir_if_missing(self, tmp_path):
+        client = MagicMock()
+        dest = tmp_path / "new_dir"
+        scanner = SoftDeleteScanner()
+        scanner.pull_to_pc(client, "SERIAL", "/sdcard/.trash/photo.jpg", str(dest))
+        assert dest.exists()
+
+    def test_push_back_to_phone_returns_true_on_success(self):
+        client = MagicMock()
+        scanner = SoftDeleteScanner()
+        result = scanner.push_back_to_phone(
+            client, "SERIAL",
+            "/sdcard/.trash/photo.jpg",
+            "/sdcard/DCIM/Camera/photo.jpg",
+        )
+        assert result is True
+        client.push.assert_called_once()
+
+    def test_push_back_to_phone_returns_false_on_adb_error(self):
+        client = MagicMock()
+        client.push.side_effect = AdbError("failed")
+        scanner = SoftDeleteScanner()
+        result = scanner.push_back_to_phone(
+            client, "SERIAL",
+            "/sdcard/.trash/photo.jpg",
+            "/sdcard/DCIM/Camera/photo.jpg",
+        )
+        assert result is False
