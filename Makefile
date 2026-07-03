@@ -6,7 +6,7 @@
 #   make package          — only package an existing dist/ into releases/
 #   make clean            — remove build/ dist/ artefacts (keeps releases/)
 
-VERSION ?= 1.0.0
+VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "1.0.0")
 
 .PHONY: release docs build package clean
 
