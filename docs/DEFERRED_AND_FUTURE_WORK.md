@@ -356,19 +356,21 @@ disabling them) requires root and carries a high risk of breaking the device.
 
 ### 3.5 Contacts/Call Log Restore (Import)
 
-The Backup Manager's Contacts & Call Log export is pull-only (backup only).
-Restoring contacts or call log entries from a backup file back to the device
-was considered and scoped out:
-- Contacts import: `adb shell content insert` into the contacts provider is
-  unreliable across Android versions; vCard import via the Contacts app is
-  interactive and not automatable via ADB.
-- Call log import: Android provides no ADB-accessible content provider for
-  writing call log entries across all supported versions.
+~~Scoped out at v1.0.0.~~ **Implemented in v1.0.5 as part of Module 10
+(Recovery Module).**
 
-**Decision:** Export (backup) only. Restore is the user's responsibility via
-the Contacts app (vCard import).
+- Contacts: VCF pushed to `/sdcard/droidbridge_restore.vcf` → Contacts app
+  import intent launched via `adb shell am start` (user confirms on device).
+- Call log: row-by-row `content insert --uri content://call_log/calls` via
+  ADB shell; each row from the backup CSV is inserted individually with
+  per-row error tracking.
 
-**Reference:** Project doc §6.6; PROGRESS.md 2026-06-19 Backup Manager entry.
+Both are accessible via `droidbridge recovery restore --backup PATH
+[--contacts] [--calls] [--dest phone|pc]` and via the Recovery GUI tab
+(Backup Restore panel). **No longer deferred.**
+
+**Reference:** `droidbridge/modules/recovery.py` (`BackupRestorer.restore_contacts`,
+`BackupRestorer.restore_calls`); PROGRESS.md 2026-07-03 entry.
 
 ---
 
@@ -546,7 +548,7 @@ Cross-check of every spec module against the current codebase.
 | §6.4 Backup history | Log, browse, compare runs | ✅ |
 | §6.4 Outdated detection | Alert when last backup > N days | ❌ Deferred (§1.8) |
 | §6.5 Restore | Push backup back to device | ✅ |
-| §6.6 Contacts & Call Log | Export vCard/CSV (backup only) | ✅; restore out of scope (§3.5) |
+| §6.6 Contacts & Call Log | Export vCard/CSV (backup only) | ✅; restore now in Module 10 (§3.5) |
 | §7.1 Search | Name/ext/size/date/MIME/regex/presets | ✅ CLI; GUI missing date+size (§1.3) |
 | §7.2 Pull found files | --pull-to with transfer plan | ✅ |
 | §8.1 App listing | All packages, versions, sizes, kind, status | ✅ |
@@ -574,3 +576,10 @@ Cross-check of every spec module against the current codebase.
 | §16 PyInstaller | Single executable per platform | ❌ Not yet done (§4.1) |
 | §16 README/user guide | Finalized documentation | ❌ Not yet done (§4.4) |
 | §17.1 WA cross-device | Android→Android/iOS chat transfer | ❌ Out of scope (§3.1/§3.2) |
+| Module 10 Soft-delete scan | Scan 9 trash paths + DCIM glob | ✅ v1.0.5 |
+| Module 10 Pull to PC | Save recovered files to computer | ✅ v1.0.5 |
+| Module 10 Restore to phone | Push to `/sdcard/Recovered/` | ✅ v1.0.5 |
+| Module 10 Contacts restore | VCF intent via Contacts app | ✅ v1.0.5 |
+| Module 10 Call log restore | Row-by-row content insert | ✅ v1.0.5 |
+| Module 10 Recovery reports | Scan + restore session reports | ✅ v1.0.5 |
+| Module 10 Recovery GUI | Scanner + Backup Restore tabs | ✅ v1.0.5 |
