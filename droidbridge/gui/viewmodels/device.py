@@ -1,3 +1,4 @@
+from droidbridge.utils.errors import friendly_error
 # Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """ViewModel for the Device module screen (Phase 6.1).
 
@@ -119,8 +120,8 @@ class DeviceViewModel(QObject):
         self.logMessage.emit("Device info refreshed.", "INFO")
 
     def _on_error(self, exc):
-        self.statusChanged.emit(str(exc))
-        self.logMessage.emit(str(exc), "ERROR")
+        self.statusChanged.emit(friendly_error(exc))
+        self.logMessage.emit(friendly_error(exc), "ERROR")
 
     def _on_refresh_error(self, exc):
         if not self._device_offline:

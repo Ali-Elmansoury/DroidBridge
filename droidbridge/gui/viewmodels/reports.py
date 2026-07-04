@@ -1,3 +1,4 @@
+from droidbridge.utils.errors import friendly_error
 # Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 from PyQt6.QtCore import QObject, pyqtSignal
 
@@ -41,7 +42,7 @@ class ReportsViewModel(QObject):
         try:
             reports_ops.save_report(content, path)
         except Exception as exc:
-            self.logMessage.emit(str(exc), "ERROR")
+            self.logMessage.emit(friendly_error(exc), "ERROR")
             return
         self.statusChanged.emit(f"Saved to {path}")
 
@@ -61,5 +62,5 @@ class ReportsViewModel(QObject):
             self.busyChanged.emit(False)
 
     def _on_error(self, exc):
-        self.statusChanged.emit(str(exc))
-        self.logMessage.emit(str(exc), "ERROR")
+        self.statusChanged.emit(friendly_error(exc))
+        self.logMessage.emit(friendly_error(exc), "ERROR")

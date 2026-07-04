@@ -66,7 +66,7 @@ class TestDeviceConnect:
         result = CliRunner().invoke(main.cli, ["device", "connect"])
 
         assert result.exit_code == 1
-        assert "adb not found" in result.output.lower()
+        assert "adb binary not found" in result.output.lower()
 
     def test_offline_device_triggers_restart_and_recheck(self, monkeypatch):
         offline_device = Device(serial="SERIAL123", state="offline")

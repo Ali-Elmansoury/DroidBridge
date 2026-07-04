@@ -1,3 +1,4 @@
+from droidbridge.utils.errors import friendly_error
 # Copyright (c) 2026 Ali Elmansoury. All rights reserved.
 """ScannerViewModel for soft-delete scan (Module 10)."""
 
@@ -92,5 +93,5 @@ class ScannerViewModel(QObject):
             self.busyChanged.emit(False)
 
     def _on_error(self, exc):
-        self.statusChanged.emit(str(exc))
-        self.logMessage.emit(str(exc), "ERROR")
+        self.statusChanged.emit(friendly_error(exc))
+        self.logMessage.emit(friendly_error(exc), "ERROR")

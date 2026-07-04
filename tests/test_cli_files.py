@@ -114,7 +114,7 @@ class TestFilesBrowse:
         result = CliRunner().invoke(main.cli, ["files", "browse", "/sdcard/Nope"])
 
         assert result.exit_code == 1
-        assert "no such file or directory" in result.output.lower()
+        assert "path not found on the device" in result.output.lower()
 
 
 class TestFilesRename:

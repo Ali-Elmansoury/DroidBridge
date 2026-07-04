@@ -12,6 +12,7 @@ from pathlib import Path
 import click
 
 from droidbridge.core.adb import AdbClient, AdbError, AdbTimeoutError
+from droidbridge.utils.errors import friendly_error
 from droidbridge.core.session import SessionLogger
 from droidbridge.core.platform import get_sleep_inhibitor
 from droidbridge.modules import apps as apps_module
@@ -79,7 +80,7 @@ def device_connect():
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     device_module.ensure_adb_server_running(client)
@@ -115,7 +116,7 @@ def device_info(serial):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -161,7 +162,7 @@ def device_wait(serial, timeout):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     click.echo("Waiting for device...")
@@ -232,7 +233,7 @@ def files_browse(path, serial, sort_by, reverse, show_hidden, extensions):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -240,7 +241,7 @@ def files_browse(path, serial, sort_by, reverse, show_hidden, extensions):
     try:
         entries = files_module.list_directory(client, serial, path)
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     extensions_filter = [e.lower().lstrip(".") for e in extensions] or None
@@ -380,7 +381,7 @@ def files_search(path, serial, name, extensions, min_size, max_size, after, befo
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -422,7 +423,7 @@ def files_search(path, serial, name, extensions, min_size, max_size, after, befo
         try:
             kwargs["extensions"] = search_module.mime_to_extensions(mime)
         except ValueError as exc:
-            click.echo(f"Error: {exc}", err=True)
+            click.echo(f"Error: {friendly_error(exc)}", err=True)
             sys.exit(1)
 
     if min_size:
@@ -440,7 +441,7 @@ def files_search(path, serial, name, extensions, min_size, max_size, after, befo
     try:
         results = search_module.search_files(client, serial, root, **kwargs)
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     results = search_module.sort_results(results, by=sort_by, reverse=reverse)
@@ -460,7 +461,7 @@ def files_search(path, serial, name, extensions, min_size, max_size, after, befo
             _write_search_export(results, output_format, output_path)
             click.echo(f"Results exported to {output_path}.")
         except OSError as exc:
-            click.echo(f"Error writing {output_path}: {exc}", err=True)
+            click.echo(f"Error writing {output_path}: {friendly_error(exc)}", err=True)
             sys.exit(1)
 
     if pull_to_dir:
@@ -480,7 +481,7 @@ def files_search(path, serial, name, extensions, min_size, max_size, after, befo
                     client, serial, plan, progress_callback=on_progress
                 )
         except AdbError as exc:
-            click.echo(f"\nError during pull: {exc}", err=True)
+            click.echo(f"\nError: {friendly_error(exc)}", err=True)
             sys.exit(1)
         click.echo()
         _report_failed_items(progress.failed)
@@ -518,7 +519,7 @@ def files_rename(old_path, new_path, serial):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -529,7 +530,7 @@ def files_rename(old_path, new_path, serial):
     try:
         files_module.rename_path(client, serial, old_path, new_path)
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     click.echo(f"Renamed {old_path} -> {new_path}")
@@ -559,7 +560,7 @@ def files_delete(paths, serial, backup_dir, yes):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -570,7 +571,7 @@ def files_delete(paths, serial, backup_dir, yes):
     try:
         plan = files_module.build_delete_plan(client, serial, list(paths))
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     if plan.file_count == 0:
@@ -785,7 +786,7 @@ def transfer_pull(remote_path, local_dir, serial, conflict, no_verify, retry):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -797,7 +798,7 @@ def transfer_pull(remote_path, local_dir, serial, conflict, no_verify, retry):
     try:
         plan = transfer_module.plan_pull(client, serial, remote_path, local_dir, conflict=conflict)
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     _print_plan_summary(plan)
@@ -849,7 +850,7 @@ def transfer_push(local_path, remote_dir, serial, conflict, no_verify, retry):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -861,7 +862,7 @@ def transfer_push(local_path, remote_dir, serial, conflict, no_verify, retry):
     try:
         plan = transfer_module.plan_push(client, serial, local_path, remote_dir, conflict=conflict)
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     _print_plan_summary(plan)
@@ -923,7 +924,7 @@ def transfer_mirror_pull(remote_path, local_dir, serial, retry, no_verify, delet
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -935,7 +936,7 @@ def transfer_mirror_pull(remote_path, local_dir, serial, retry, no_verify, delet
     try:
         plan = transfer_module.plan_mirror_pull(client, serial, remote_path, local_dir)
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     _print_plan_summary(plan)
@@ -1012,7 +1013,7 @@ def transfer_mirror_push(local_path, remote_dir, serial, retry, no_verify, delet
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -1024,7 +1025,7 @@ def transfer_mirror_push(local_path, remote_dir, serial, retry, no_verify, delet
     try:
         plan = transfer_module.plan_mirror_push(client, serial, local_path, remote_dir)
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     _print_plan_summary(plan)
@@ -1122,7 +1123,7 @@ def whatsapp_scan(serial, app, group_by):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -1217,7 +1218,7 @@ def whatsapp_analyze(serial, app, cutoff):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -1295,7 +1296,7 @@ def whatsapp_save_status(dest, serial, app, conflict, no_verify):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -1368,7 +1369,7 @@ def whatsapp_backup(dest, serial, app, types, conflict, no_verify):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -1443,7 +1444,7 @@ def whatsapp_restore(src, serial, app, conflict, no_verify):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -1596,7 +1597,7 @@ def whatsapp_delete(serial, app, before, keep_types, backup_dir):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -1723,7 +1724,7 @@ def whatsapp_backup_db(dest, serial, app, conflict, no_verify):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -1789,7 +1790,7 @@ def storage_analyze(serial):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -1818,7 +1819,7 @@ def storage_apps(serial, top_n, show_all, filter_kind):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -1861,7 +1862,7 @@ def storage_media(path, serial, before):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -1901,7 +1902,7 @@ def storage_large_files(path, serial, min_size):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -1926,7 +1927,7 @@ def storage_suggest_cleanup(serial):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -1973,7 +1974,7 @@ def apps_list(serial, sort_by, reverse, filter_kind, top_n, show_all):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -2011,7 +2012,7 @@ def apps_trim_cache(serial, target):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -2050,7 +2051,7 @@ def apps_clear_cache(serial, clear_all, target):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -2083,7 +2084,7 @@ def apps_reset(package, serial):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -2120,7 +2121,7 @@ def apps_uninstall(packages, serial, keep_data, yes):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -2162,7 +2163,7 @@ def apps_extract_apk(package, dest, serial):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -2192,7 +2193,7 @@ def apps_disable(package, serial, yes):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -2226,7 +2227,7 @@ def apps_enable(package, serial):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -2341,7 +2342,7 @@ def backup_run(profile_name, no_verify, serial):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -2440,7 +2441,7 @@ def backup_restore(profile_name, sources, after, before, conflict, no_verify, se
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -2578,7 +2579,7 @@ def backup_export_contacts(dest, sources, serial):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -2587,7 +2588,7 @@ def backup_export_contacts(dest, sources, serial):
     try:
         summary = phone_data_module.export_contacts(client, serial, list(sources), dest)
     except PermissionError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
     for source, counts in summary.items():
         click.echo(f"{source}: {counts['exported']} exported, {counts['skipped']} skipped.")
@@ -2601,7 +2602,7 @@ def backup_export_call_log(dest, serial):
     try:
         client = _build_client()
     except AdbError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
 
     serial = _resolve_serial(client, serial)
@@ -2610,7 +2611,7 @@ def backup_export_call_log(dest, serial):
     try:
         summary = phone_data_module.export_call_log(client, serial, dest)
     except PermissionError as exc:
-        click.echo(f"Error: {exc}", err=True)
+        click.echo(f"Error: {friendly_error(exc)}", err=True)
         sys.exit(1)
     click.echo(f"Call log: {summary['exported']} exported, {summary['skipped']} skipped.")
 
@@ -2730,7 +2731,7 @@ def report_generate(serial, app, report_type, report_format, output_path, top_n,
         try:
             client = _build_client()
         except AdbError as exc:
-            click.echo(f"Error: {exc}", err=True)
+            click.echo(f"Error: {friendly_error(exc)}", err=True)
             sys.exit(1)
 
         serial = _resolve_serial(client, serial)

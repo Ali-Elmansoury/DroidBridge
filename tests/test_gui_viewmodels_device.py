@@ -107,8 +107,8 @@ class TestConnectDevice:
 
         vm.connect_device()
 
-        assert statuses == ["no device message"]
-        assert ("no device message", "ERROR") in logs
+        assert "no device found" in statuses[0].lower()
+        assert any("no device found" in msg.lower() for msg, level in logs if level == "ERROR")
         assert context.is_connected is False
 
 
