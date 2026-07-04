@@ -59,7 +59,7 @@ def list_directory(client, serial, path):
     `/sdcard`).
     """
     dir_path = path if path.endswith("/") else f"{path}/"
-    output = client.shell(serial, f"ls -la {shlex.quote(dir_path)}")
+    output = client.shell(serial, f"ls -la {shlex.quote(dir_path)} 2>/dev/null")
 
     entries = []
     for line in output.splitlines():
@@ -188,7 +188,7 @@ def _stat_path(client, serial, path):
     """Return ('dir', None), ('file', size_bytes), or ('missing', None) for `path`."""
     cmd = (
         f"if [ -d {shlex.quote(path)} ]; then echo DIR; "
-        f"elif [ -e {shlex.quote(path)} ]; then find -L {shlex.quote(path)} -maxdepth 0 -printf '%s'; "
+        f"elif [ -e {shlex.quote(path)} ]; then stat -c '%s' {shlex.quote(path)}; "
         f"else echo MISSING; fi"
     )
     output = client.shell(serial, cmd).strip()

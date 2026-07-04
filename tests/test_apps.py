@@ -274,7 +274,7 @@ class TestGetApkInfo:
         def fake_shell(serial, command, timeout=None):
             if command == ["pm", "path", "com.whatsapp"]:
                 return "package:/data/app/x/base.apk\n"
-            if isinstance(command, str) and command.startswith("find -L"):
+            if isinstance(command, str) and command.startswith("stat -c"):
                 return "68039298"
             raise AssertionError(command)
 

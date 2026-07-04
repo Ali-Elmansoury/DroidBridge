@@ -52,7 +52,7 @@ class TestFilesBrowse:
 
         CliRunner().invoke(main.cli, ["files", "browse"])
 
-        client.shell.assert_called_once_with("SERIAL123", "ls -la /sdcard/")
+        client.shell.assert_called_once_with("SERIAL123", "ls -la /sdcard/ 2>/dev/null")
 
     def test_all_flag_includes_hidden(self, monkeypatch):
         client = make_fake_client(READY_DEVICE)

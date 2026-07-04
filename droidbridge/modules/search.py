@@ -69,10 +69,15 @@ def _build_find_command(root_path, name_pattern=None, name_regex=None):
     # which a recursive search from /sdcard returns nothing.
     # name_regex is intentionally NOT passed to find: BusyBox find (Android)
     # doesn't support -regextype/-iregex. Regex filtering is done in Python.
+    # -printf is a GNU find extension not available on older Android toybox
+    # (e.g. Android 9 on Honor 10 Lite). Use -exec stat instead, which is
+    # universally supported. stat -c '%n\t%s\t%Y' gives path, size, mtime
+    # as integer seconds (vs -printf's fractional %T@, but close enough for
+    # our date-comparison use case).
     cmd = f"find -L {shlex.quote(root_path)} -type f"
     if name_pattern:
         cmd += f" -iname {shlex.quote(name_pattern)}"
-    cmd += r" -printf '%p\t%s\t%T@\n'"
+    cmd += r" -exec stat -c '%n\t%s\t%Y' {} + 2>/dev/null"
     return cmd
 
 
@@ -81,10 +86,16 @@ def _parse_find_output(output):
     for line in output.splitlines():
         if not line.strip():
             continue
-        path, size, mtime = line.split("\t")
-        results.append(
-            SearchResult(path=path, size=int(size), mtime=datetime.fromtimestamp(float(mtime)))
-        )
+        parts = line.split("\t")
+        if len(parts) != 3:
+            continue
+        path, size, mtime = parts
+        try:
+            results.append(
+                SearchResult(path=path, size=int(size), mtime=datetime.fromtimestamp(float(mtime)))
+            )
+        except (ValueError, OSError):
+            continue
     return results
 
 

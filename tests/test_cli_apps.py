@@ -312,7 +312,7 @@ class TestAppsExtractApk:
         def fake_shell(serial, command, timeout=None):
             if command == ["pm", "path", "com.whatsapp"]:
                 return "package:/data/app/x/base.apk\npackage:/data/app/x/split_config.arm64_v8a.apk\n"
-            if isinstance(command, str) and command.startswith("find -L"):
+            if isinstance(command, str) and command.startswith("stat -c"):
                 return "1000"
             raise AssertionError(command)
 

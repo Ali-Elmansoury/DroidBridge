@@ -178,7 +178,7 @@ def _stat_remote_path(client, serial, path):
     """
     cmd = (
         f"if [ -d {shlex.quote(path)} ]; then echo DIR; "
-        f"else find -L {shlex.quote(path)} -maxdepth 0 -printf '%s'; fi"
+        f"else stat -c '%s' {shlex.quote(path)}; fi"
     )
     output = client.shell(serial, cmd).strip()
     if output == "DIR":

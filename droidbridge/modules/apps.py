@@ -306,7 +306,7 @@ def get_apk_info(client, serial, package):
     """Return [(path, size_bytes), ...] for `package`'s APK files (base + splits)."""
     info = []
     for path in get_apk_paths(client, serial, package):
-        size = int(client.shell(serial, f"find -L {shlex.quote(path)} -maxdepth 0 -printf %s"))
+        size = int(client.shell(serial, f"stat -c '%s' {shlex.quote(path)}"))
         info.append((path, size))
     return info
 
