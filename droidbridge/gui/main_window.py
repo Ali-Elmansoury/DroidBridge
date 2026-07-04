@@ -236,6 +236,8 @@ class MainWindow(QMainWindow):
         color = "green" if connected else "red"
         self.status_dot.setStyleSheet(f"background-color: {color}; border-radius: 6px;")
         self.status_text.setText(f"{model} ({serial})" if connected else "Disconnected")
+        if connected:
+            self.files_viewmodel.load_volumes()
 
     def _on_busy_changed(self, vm, busy):
         """Show the busy bar while *any* viewmodel is busy.

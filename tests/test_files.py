@@ -435,3 +435,42 @@ class TestVerifyBackup:
         missing = files.verify_backup(client, "SERIAL", ["/sdcard/nope.txt"], str(tmp_path))
 
         assert missing == []
+
+
+class TestListStorageVolumes:
+    def test_no_sd_card_returns_internal_only(self):
+        client = make_fake_client("emulated\nself\n")
+
+        volumes = files.list_storage_volumes(client, "SERIAL")
+
+        assert len(volumes) == 1
+        assert volumes[0]["label"] == "Internal Storage"
+        assert volumes[0]["path"] == "/sdcard"
+        assert volumes[0]["removable"] is False
+
+    def test_sd_card_label_pattern_is_detected(self):
+        client = make_fake_client("emulated\nself\n1A2B-3C4D\n")
+
+        volumes = files.list_storage_volumes(client, "SERIAL")
+
+        assert len(volumes) == 2
+        sd = volumes[1]
+        assert sd["label"] == "SD Card (1A2B-3C4D)"
+        assert sd["path"] == "/storage/1A2B-3C4D"
+        assert sd["removable"] is True
+
+    def test_multiple_sd_cards_all_detected(self):
+        client = make_fake_client("emulated\n1A2B-3C4D\nAABB-CCDD\n")
+
+        volumes = files.list_storage_volumes(client, "SERIAL")
+
+        assert len(volumes) == 3
+
+    def test_shell_error_returns_internal_only(self):
+        client = MagicMock()
+        client.shell.side_effect = Exception("connection lost")
+
+        volumes = files.list_storage_volumes(client, "SERIAL")
+
+        assert len(volumes) == 1
+        assert volumes[0]["path"] == "/sdcard"

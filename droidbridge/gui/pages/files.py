@@ -58,8 +58,18 @@ class FilesPage(QWidget):
         path_bar.addWidget(self.go_button)
         path_bar.addWidget(self.up_button)
 
+        self.storage_combo = QComboBox()
+        self.storage_combo.setToolTip(
+            "Switch between Internal Storage and external SD card."
+        )
+        self.storage_combo.addItem("Internal Storage", "/sdcard")
+        self._storage_volumes = []
+
         self.quick_jump_buttons = {}
         quick_jump_bar = QHBoxLayout()
+        quick_jump_bar.addWidget(QLabel("Storage:"))
+        quick_jump_bar.addWidget(self.storage_combo)
+        quick_jump_bar.addSpacing(8)
         for label, path in files_ops.QUICK_JUMP_PATHS.items():
             button = QPushButton(label)
             button.setToolTip(f"Jump to {path}.")
@@ -180,9 +190,12 @@ class FilesPage(QWidget):
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._on_context_menu)
 
+        self.storage_combo.currentIndexChanged.connect(self._on_storage_selected)
+
         self.viewmodel.entriesChanged.connect(self._on_entries_changed)
         self.viewmodel.pathChanged.connect(self._on_path_changed)
         self.viewmodel.previewChanged.connect(self._on_preview_changed)
+        self.viewmodel.volumesChanged.connect(self._on_volumes_changed)
 
         # QShortcut registrations (for real app when child widgets have focus)
         def _sc(key, slot, *, target=None, ctx=Qt.ShortcutContext.WidgetWithChildrenShortcut):
@@ -200,6 +213,22 @@ class FilesPage(QWidget):
 
         # Event filter on table for test harness (qtbot.keyClick doesn't trigger QShortcut)
         self.table.installEventFilter(self)
+
+    def _on_volumes_changed(self, volumes):
+        """Repopulate the Storage combo when volumes are (re)detected."""
+        self._storage_volumes = volumes
+        self.storage_combo.blockSignals(True)
+        self.storage_combo.clear()
+        for vol in volumes:
+            self.storage_combo.addItem(vol["label"], vol["path"])
+        self.storage_combo.blockSignals(False)
+
+    def _on_storage_selected(self, index):
+        if index < 0:
+            return
+        path = self.storage_combo.itemData(index)
+        if path:
+            self.viewmodel.navigate(path)
 
     def _on_path_entered(self):
         self.viewmodel.navigate(self.path_edit.text())

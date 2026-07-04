@@ -201,6 +201,35 @@ def _stat_path(client, serial, path):
     return "file", int(output)
 
 
+_SD_CARD_RE = re.compile(r"^[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}$")
+
+
+def list_storage_volumes(client, serial):
+    """Return available storage volumes on the device.
+
+    Returns a list of dicts:
+        {'label': str, 'path': str, 'removable': bool}
+
+    Always includes at least Internal Storage (/sdcard).  External SD cards
+    appear as entries whose name matches the Android volume label pattern
+    XXXX-XXXX (e.g. '1A2B-3C4D') under /storage/.
+    """
+    volumes = [{"label": "Internal Storage", "path": "/sdcard", "removable": False}]
+    try:
+        output = client.shell(serial, "ls /storage/ 2>/dev/null; true")
+        for name in output.split():
+            name = name.strip()
+            if _SD_CARD_RE.match(name):
+                volumes.append({
+                    "label": f"SD Card ({name})",
+                    "path": f"/storage/{name}",
+                    "removable": True,
+                })
+    except Exception:
+        pass
+    return volumes
+
+
 def build_delete_plan(client, serial, paths):
     """Stat each of `paths` (file or directory) and total up file count + size
     for the delete confirmation preview. Directories are recursively scanned

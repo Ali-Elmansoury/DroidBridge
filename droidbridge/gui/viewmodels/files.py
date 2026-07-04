@@ -37,6 +37,7 @@ class FilesViewModel(QObject):
     busyChanged = pyqtSignal(bool)
     statusChanged = pyqtSignal(str)
     logMessage = pyqtSignal(str, str)
+    volumesChanged = pyqtSignal(list)  # list of {'label', 'path', 'removable'}
 
     def __init__(self, context, worker_factory=Worker):
         super().__init__()
@@ -52,6 +53,14 @@ class FilesViewModel(QObject):
         self._extensions = None
         self._dirs_pass_extension_filter = True
         self._preview_generation = 0
+
+    def load_volumes(self):
+        """Detect internal + external storage volumes and emit volumesChanged."""
+        client, serial = self.context.client, self.context.serial
+        self._run(
+            lambda: files_module.list_storage_volumes(client, serial),
+            lambda vols: self.volumesChanged.emit(vols),
+        )
 
     def navigate(self, path):
         """Load `path`'s full directory listing and make it current."""

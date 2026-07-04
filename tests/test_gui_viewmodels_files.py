@@ -10,6 +10,7 @@ from unittest.mock import MagicMock
 from droidbridge.gui import files_ops, preview_ops
 from droidbridge.gui.device_context import DeviceContext
 from droidbridge.gui.viewmodels.files import FilesViewModel
+from droidbridge.modules import files as files_module
 from droidbridge.modules.files import FileEntry
 from tests.test_gui_viewmodels_device import FakeWorker
 
@@ -194,3 +195,34 @@ class TestSelectEntry:
         vm._on_preview_fetched(generation=3, local_path="/tmp/stale.jpg", entry=None)
 
         assert events == []
+
+
+class TestLoadVolumes:
+    def test_emits_volumes_from_module(self, qtbot, monkeypatch):
+        vm = FilesViewModel(_connected_context(), worker_factory=FakeWorker)
+        fake_volumes = [
+            {"label": "Internal Storage", "path": "/sdcard", "removable": False},
+            {"label": "SD Card (1A2B-3C4D)", "path": "/storage/1A2B-3C4D", "removable": True},
+        ]
+        monkeypatch.setattr(files_module, "list_storage_volumes", lambda c, s: fake_volumes)
+
+        events = []
+        vm.volumesChanged.connect(events.append)
+
+        vm.load_volumes()
+
+        assert events == [fake_volumes]
+
+    def test_error_does_not_crash(self, qtbot, monkeypatch):
+        vm = FilesViewModel(_connected_context(), worker_factory=FakeWorker)
+        monkeypatch.setattr(
+            files_module, "list_storage_volumes",
+            lambda c, s: (_ for _ in ()).throw(Exception("adb error")),
+        )
+
+        status_events = []
+        vm.statusChanged.connect(status_events.append)
+
+        vm.load_volumes()
+
+        assert status_events  # friendly error emitted, no crash
