@@ -37,7 +37,8 @@ class FilesViewModel(QObject):
     busyChanged = pyqtSignal(bool)
     statusChanged = pyqtSignal(str)
     logMessage = pyqtSignal(str, str)
-    volumesChanged = pyqtSignal(list)  # list of {'label', 'path', 'removable'}
+    volumesChanged = pyqtSignal(list)   # list of {'label', 'path', 'removable'}
+    dirSizesChanged = pyqtSignal(dict)  # {path: int} — background directory sizes
 
     def __init__(self, context, worker_factory=Worker):
         super().__init__()
@@ -53,6 +54,8 @@ class FilesViewModel(QObject):
         self._extensions = None
         self._dirs_pass_extension_filter = True
         self._preview_generation = 0
+        self._dir_size_generation = 0
+        self._size_workers = []
 
     def load_volumes(self):
         """Detect internal + external storage volumes and emit volumesChanged."""
@@ -121,6 +124,38 @@ class FilesViewModel(QObject):
         self.pathChanged.emit(path)
         self._refilter_and_resort()
         self.logMessage.emit(f"Listed {len(entries)} entr{'y' if len(entries) == 1 else 'ies'}.", "INFO")
+        dir_entries = [e for e in entries if e.is_dir and not e.is_symlink]
+        if dir_entries:
+            self._load_dir_sizes(dir_entries)
+
+    def _load_dir_sizes(self, dir_entries):
+        """Calculate directory sizes in the background; emits dirSizesChanged when done."""
+        self._dir_size_generation += 1
+        generation = self._dir_size_generation
+        client, serial = self.context.client, self.context.serial
+
+        def calculate():
+            sizes = {}
+            for entry in dir_entries:
+                if generation != self._dir_size_generation:
+                    break  # user navigated away
+                size = files_module.get_directory_size(client, serial, entry.path)
+                if size is not None:
+                    sizes[entry.path] = size
+            return sizes
+
+        worker = self._worker_factory(calculate)
+        self._size_workers.append(worker)
+        worker.finished.connect(lambda sizes: self._finish_sizes(worker, generation, sizes))
+        worker.error.connect(lambda _: self._finish_sizes(worker, generation, {}))
+        worker.start()
+
+    def _finish_sizes(self, worker, generation, sizes):
+        worker.wait()
+        if worker in self._size_workers:
+            self._size_workers.remove(worker)
+        if generation == self._dir_size_generation:
+            self.dirSizesChanged.emit(sizes)
 
     def _on_preview_fetched(self, generation, local_path, entry):
         if generation != self._preview_generation:

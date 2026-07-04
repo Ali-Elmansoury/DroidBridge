@@ -437,6 +437,29 @@ class TestVerifyBackup:
         assert missing == []
 
 
+class TestGetDirectorySize:
+    def test_returns_summed_size(self):
+        client = make_fake_client("2621440000\n")
+        size = files.get_directory_size(client, "SERIAL", "/sdcard/Movies")
+        assert size == 2621440000
+
+    def test_empty_directory_returns_zero(self):
+        client = make_fake_client("0\n")
+        size = files.get_directory_size(client, "SERIAL", "/sdcard/Empty")
+        assert size == 0
+
+    def test_error_returns_none(self):
+        client = MagicMock()
+        client.shell.side_effect = Exception("timeout")
+        size = files.get_directory_size(client, "SERIAL", "/sdcard/Movies")
+        assert size is None
+
+    def test_non_numeric_output_returns_none(self):
+        client = make_fake_client("bad output\n")
+        size = files.get_directory_size(client, "SERIAL", "/sdcard/Movies")
+        assert size is None
+
+
 class TestListStorageVolumes:
     def test_no_sd_card_returns_internal_only(self):
         client = make_fake_client("emulated\nself\n")

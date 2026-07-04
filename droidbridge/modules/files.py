@@ -101,6 +101,25 @@ def make_directory(client, serial, path):
     client.shell(serial, f"mkdir -p {shlex.quote(path)}")
 
 
+def get_directory_size(client, serial, path):
+    """Return total byte size of all files under `path`, or None on timeout/error.
+
+    Sums file sizes on the device with awk so only a single number is returned
+    over ADB. Returns 0 for empty directories.
+    """
+    # Double braces escape awk's {} inside the Python f-string.
+    cmd = (
+        f"find -L {shlex.quote(path)} -type f"
+        r" -exec stat -c '%s' {} + 2>/dev/null"
+        r" | awk '{s+=$1} END{print s+0}'"
+    )
+    try:
+        out = client.shell(serial, cmd, timeout=15).strip()
+        return int(out) if out.isdigit() else None
+    except Exception:
+        return None
+
+
 def sort_entries(entries, by="name", reverse=False):
     """Return entries sorted by 'name', 'size', 'date', or 'type'.
 

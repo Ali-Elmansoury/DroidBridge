@@ -190,12 +190,15 @@ class FilesPage(QWidget):
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._on_context_menu)
 
+        self._dir_sizes: dict = {}
+
         self.storage_combo.currentIndexChanged.connect(self._on_storage_selected)
 
         self.viewmodel.entriesChanged.connect(self._on_entries_changed)
         self.viewmodel.pathChanged.connect(self._on_path_changed)
         self.viewmodel.previewChanged.connect(self._on_preview_changed)
         self.viewmodel.volumesChanged.connect(self._on_volumes_changed)
+        self.viewmodel.dirSizesChanged.connect(self._on_dir_sizes_changed)
 
         # QShortcut registrations (for real app when child widgets have focus)
         def _sc(key, slot, *, target=None, ctx=Qt.ShortcutContext.WidgetWithChildrenShortcut):
@@ -242,6 +245,7 @@ class FilesPage(QWidget):
         self.viewmodel.set_extension_filter(extensions)
 
     def _on_entries_changed(self, rows):
+        self._dir_sizes = {}  # clear stale sizes; background scan will repopulate
         self._rows = rows
         self.table.setRowCount(len(rows))
         for i, row in enumerate(rows):
@@ -250,6 +254,12 @@ class FilesPage(QWidget):
             size_text = "—" if row["is_dir"] else format_bytes(row["size"])
             self.table.setItem(i, 2, QTableWidgetItem(size_text))
             self.table.setItem(i, 3, QTableWidgetItem(row["mtime"].strftime("%Y-%m-%d %H:%M")))
+
+    def _on_dir_sizes_changed(self, sizes):
+        self._dir_sizes.update(sizes)
+        for i, row in enumerate(self._rows):
+            if row["is_dir"] and row["path"] in sizes:
+                self.table.setItem(i, 2, QTableWidgetItem(format_bytes(sizes[row["path"]])))
 
     def _on_path_changed(self, path):
         self.path_edit.setText(path)

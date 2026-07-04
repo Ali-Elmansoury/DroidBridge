@@ -226,3 +226,43 @@ class TestLoadVolumes:
         vm.load_volumes()
 
         assert status_events  # friendly error emitted, no crash
+
+
+class TestDirSizes:
+    def test_emits_sizes_after_navigate(self, qtbot, monkeypatch):
+        vm = FilesViewModel(_connected_context(), worker_factory=FakeWorker)
+        monkeypatch.setattr(files_ops, "list_path", lambda *a, **kw: SAMPLE_ENTRIES)
+        monkeypatch.setattr(files_module, "get_directory_size", lambda c, s, p: 4096)
+
+        events = []
+        vm.dirSizesChanged.connect(events.append)
+
+        vm.navigate("/sdcard")
+
+        # Camera directory entry should get a size
+        assert events
+        assert SAMPLE_ENTRIES[0].path in events[0]  # Camera
+        assert events[0][SAMPLE_ENTRIES[0].path] == 4096
+
+    def test_stale_generation_discarded_on_navigate(self, qtbot, monkeypatch):
+        vm = FilesViewModel(_connected_context(), worker_factory=FakeWorker)
+        monkeypatch.setattr(files_ops, "list_path", lambda *a, **kw: SAMPLE_ENTRIES)
+
+        call_count = {"n": 0}
+
+        def slow_get_size(c, s, p):
+            call_count["n"] += 1
+            if call_count["n"] == 1:
+                # Simulate navigation away before first size returns
+                vm._dir_size_generation += 1
+            return 4096
+
+        monkeypatch.setattr(files_module, "get_directory_size", slow_get_size)
+
+        events = []
+        vm.dirSizesChanged.connect(events.append)
+
+        vm.navigate("/sdcard")
+
+        # dirSizesChanged should NOT be emitted for the stale generation
+        assert events == []
