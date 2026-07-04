@@ -173,8 +173,9 @@ class TestExecutePlanRetry:
             progress_callback=callbacks.append,
         )
 
-        assert len(callbacks) == 1
-        assert len(callbacks[0].failed) == 1
+        # callback fires once before the file starts (current_file set) and once after failure
+        assert len(callbacks) == 2
+        assert len(callbacks[-1].failed) == 1
 
 
 class TestPlanPull:
@@ -448,7 +449,8 @@ class TestExecutePlan:
         seen = []
         transfer.execute_plan(client, "SERIAL", plan, progress_callback=lambda p: seen.append(p.done_bytes))
 
-        assert seen == [10, 30]
+        # each file fires callback twice: once before (done_bytes unchanged) and once after
+        assert seen == [0, 10, 10, 30]
 
 
 class TestVerifyPull:

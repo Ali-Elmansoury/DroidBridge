@@ -107,6 +107,7 @@ class TransferProgress:
     done_bytes: int = 0
     start_time: float = field(default_factory=time.monotonic)
     failed: list["FailedTransferItem"] = field(default_factory=list)
+    current_file: str = ""
 
     @property
     def percent(self):
@@ -415,6 +416,11 @@ def execute_plan(
     for item in to_transfer:
         if should_cancel is not None and should_cancel():
             break
+
+        # Emit before the file starts so the UI shows which file is in flight.
+        progress.current_file = os.path.basename(item.source)
+        if progress_callback:
+            progress_callback(progress)
 
         attempt = 0
         while True:

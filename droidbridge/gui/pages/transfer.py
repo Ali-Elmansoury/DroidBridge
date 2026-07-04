@@ -68,6 +68,12 @@ class TransferPage(QWidget):
         self.local_dir_browse_button = QPushButton("Browse...")
         self.local_dir_browse_button.setToolTip("Browse your computer for a destination folder.")
 
+        self.pull_storage_combo = QComboBox()
+        self.pull_storage_combo.setToolTip(
+            "Pick a storage volume to browse from — select, then use Browse to navigate."
+        )
+        self.pull_storage_combo.addItem("Internal Storage", "/sdcard")
+
         remote_path_row = QHBoxLayout()
         remote_path_row.addWidget(self.remote_path_edit)
         remote_path_row.addWidget(self.remote_path_browse_button)
@@ -76,8 +82,14 @@ class TransferPage(QWidget):
         local_dir_row.addWidget(self.local_dir_edit)
         local_dir_row.addWidget(self.local_dir_browse_button)
 
+        pull_storage_row = QHBoxLayout()
+        pull_storage_row.addWidget(QLabel("Storage:"))
+        pull_storage_row.addWidget(self.pull_storage_combo)
+        pull_storage_row.addStretch()
+
         self.pull_group = QWidget()
         pull_layout = QFormLayout(self.pull_group)
+        pull_layout.addRow("", pull_storage_row)
         pull_layout.addRow("Remote path:", remote_path_row)
         pull_layout.addRow("Local folder:", local_dir_row)
 
@@ -105,13 +117,25 @@ class TransferPage(QWidget):
         local_path_row.addWidget(self.local_file_browse_button)
         local_path_row.addWidget(self.local_folder_browse_button)
 
+        self.push_storage_combo = QComboBox()
+        self.push_storage_combo.setToolTip(
+            "Pick a storage volume as the push destination root — select, then Browse or type a subfolder."
+        )
+        self.push_storage_combo.addItem("Internal Storage", "/sdcard")
+
         remote_dir_row = QHBoxLayout()
         remote_dir_row.addWidget(self.remote_dir_edit)
         remote_dir_row.addWidget(self.remote_dir_browse_button)
         remote_dir_row.addWidget(self.remote_dir_new_folder_button)
 
+        push_storage_row = QHBoxLayout()
+        push_storage_row.addWidget(QLabel("Storage:"))
+        push_storage_row.addWidget(self.push_storage_combo)
+        push_storage_row.addStretch()
+
         self.push_group = QWidget()
         push_layout = QFormLayout(self.push_group)
+        push_layout.addRow("", push_storage_row)
         push_layout.addRow("Local path:", local_path_row)
         push_layout.addRow("Remote folder:", remote_dir_row)
 
@@ -208,6 +232,8 @@ class TransferPage(QWidget):
 
         self.pull_radio.toggled.connect(self.pull_group.setVisible)
         self.push_radio.toggled.connect(self.push_group.setVisible)
+        self.pull_storage_combo.currentIndexChanged.connect(self._on_pull_storage_selected)
+        self.push_storage_combo.currentIndexChanged.connect(self._on_push_storage_selected)
         self.local_dir_browse_button.clicked.connect(self._on_browse_local_dir)
         self.local_file_browse_button.clicked.connect(self._on_browse_local_file)
         self.local_folder_browse_button.clicked.connect(self._on_browse_local_folder)
@@ -241,6 +267,29 @@ class TransferPage(QWidget):
             event.accept()
             return
         super().keyPressEvent(event)
+
+    def set_volumes(self, volumes):
+        """Repopulate the storage combos for both pull and push sections."""
+        for combo in (self.pull_storage_combo, self.push_storage_combo):
+            combo.blockSignals(True)
+            combo.clear()
+            for vol in volumes:
+                combo.addItem(vol["label"], vol["path"])
+            combo.blockSignals(False)
+
+    def _on_pull_storage_selected(self, index):
+        if index < 0:
+            return
+        path = self.pull_storage_combo.itemData(index)
+        if path:
+            self.remote_path_edit.setText(path)
+
+    def _on_push_storage_selected(self, index):
+        if index < 0:
+            return
+        path = self.push_storage_combo.itemData(index)
+        if path:
+            self.remote_dir_edit.setText(path)
 
     def _on_browse_local_dir(self):
         path = QFileDialog.getExistingDirectory(self, "Select destination folder")
@@ -370,11 +419,13 @@ class TransferPage(QWidget):
 
     def _on_progress_changed(self, progress):
         self.progress_bar.setValue(int(progress["percent"]))
-        self.progress_label.setText(
+        current = progress.get("current_file", "")
+        stats = (
             f"{progress['done_files']}/{progress['total_files']} files | "
             f"{progress['done_bytes_str']} / {progress['total_bytes_str']} | "
             f"{progress['speed_str']} | ETA {progress['eta_str']}"
         )
+        self.progress_label.setText(f"{stats}\n{current}" if current else stats)
 
     def _on_verification_changed(self, verification):
         self.verification_label.setText(verification["message"])

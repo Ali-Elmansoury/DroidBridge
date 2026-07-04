@@ -80,8 +80,11 @@ class TestExecutePlans:
         assert result.total_bytes == 300
         assert result.done_files == 2
         assert result.done_bytes == 300
-        assert [p.done_files for p in progress_events] == [1, 2]
-        assert [p.done_bytes for p in progress_events] == [100, 300]
+        # each file fires callback twice: before (current_file set) and after (done incremented)
+        done_files_seq = [p.done_files for p in progress_events]
+        done_bytes_seq = [p.done_bytes for p in progress_events]
+        assert done_files_seq == [0, 1, 1, 2]
+        assert done_bytes_seq == [0, 100, 100, 300]
 
     def test_should_cancel_stops_between_plans(self, tmp_path):
         plan1 = transfer_module.TransferPlan(

@@ -35,6 +35,7 @@ def _format_progress(progress):
         "speed_str": f"{format_utils.format_bytes(progress.speed_bps)}/s",
         "eta_str": format_utils.format_duration(progress.eta_seconds),
         "percent": progress.percent,
+        "current_file": getattr(progress, "current_file", ""),
     }
 
 
@@ -261,6 +262,12 @@ class TransferViewModel(QObject):
             f"{format_utils.format_bytes(result.done_bytes)}.",
             "INFO",
         )
+        if result.failed:
+            for f in result.failed[:5]:
+                name = f.item.source.rsplit("/", 1)[-1]
+                self.logMessage.emit(f"Failed: {name} — {friendly_error(Exception(f.error))}", "ERROR")
+            if len(result.failed) > 5:
+                self.logMessage.emit(f"…and {len(result.failed) - 5} more failure(s).", "ERROR")
 
     def _run(self, fn, on_finished, report_progress=False, on_progress=None):
         self.busyChanged.emit(True)

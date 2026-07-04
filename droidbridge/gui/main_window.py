@@ -191,6 +191,7 @@ class MainWindow(QMainWindow):
 
         self.files_page.pullRequested.connect(self._on_pull_requested)
         self.search_page.pullRequested.connect(self._on_pull_requested)
+        self.files_viewmodel.volumesChanged.connect(self.transfer_page.set_volumes)
 
         for vm in (self.files_viewmodel, self.transfer_viewmodel, self.search_viewmodel, self.reports_viewmodel):
             vm.statusChanged.connect(self._on_status_changed)
