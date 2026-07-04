@@ -91,7 +91,7 @@ class TestListDirectory:
         files.list_directory(client, "SERIAL", "/sdcard/DCIM/Auto Background Changer")
 
         client.shell.assert_called_once_with(
-            "SERIAL", "ls -la '/sdcard/DCIM/Auto Background Changer/' 2>/dev/null"
+            "SERIAL", "ls -la '/sdcard/DCIM/Auto Background Changer/' 2>/dev/null; true"
         )
 
     def test_root_path_does_not_get_double_slash(self):
@@ -99,7 +99,7 @@ class TestListDirectory:
 
         files.list_directory(client, "SERIAL", "/")
 
-        client.shell.assert_called_once_with("SERIAL", "ls -la / 2>/dev/null")
+        client.shell.assert_called_once_with("SERIAL", "ls -la / 2>/dev/null; true")
 
 
 class TestMakeDirectory:

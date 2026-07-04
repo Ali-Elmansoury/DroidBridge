@@ -59,7 +59,9 @@ def list_directory(client, serial, path):
     `/sdcard`).
     """
     dir_path = path if path.endswith("/") else f"{path}/"
-    output = client.shell(serial, f"ls -la {shlex.quote(dir_path)} 2>/dev/null")
+    # 2>/dev/null suppresses permission-denied text; '; true' forces exit 0 so
+    # AdbClient.shell() doesn't raise on root dirs that have restricted entries.
+    output = client.shell(serial, f"ls -la {shlex.quote(dir_path)} 2>/dev/null; true")
 
     entries = []
     for line in output.splitlines():
