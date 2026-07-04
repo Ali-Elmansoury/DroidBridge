@@ -469,17 +469,30 @@ def verify_pull(plan):
 
 
 def verify_push(client, serial, plan, remote_dir):
-    """Compare a push plan's transferred + already-present files against the device."""
+    """Compare a push plan's transferred + already-present files against the device.
+
+    Checks each destination file individually via stat rather than using find,
+    so the result is reliable across all Android versions.
+    """
     relevant = [i for i in plan.items if i.action != ACTION_SKIP_CONFLICT]
     expected_files = len(relevant)
     expected_bytes = sum(i.size for i in relevant)
 
-    existing = _remote_manifest(client, serial, remote_dir)
     actual_files = 0
     actual_bytes = 0
     for item in relevant:
-        if existing.get(item.dest) == item.size:
-            actual_files += 1
-            actual_bytes += item.size
+        cmd = (
+            f"if [ -f {shlex.quote(item.dest)} ]; "
+            f"then stat -c '%s' {shlex.quote(item.dest)}; "
+            f"else echo MISSING; fi"
+        )
+        try:
+            out = client.shell(serial, cmd).strip()
+            if out not in ("", "MISSING"):
+                if int(out) == item.size:
+                    actual_files += 1
+                    actual_bytes += item.size
+        except (ValueError, AdbError):
+            pass
 
     return VerificationResult(expected_files, expected_bytes, actual_files, actual_bytes)

@@ -429,10 +429,9 @@ class TestWhatsAppRestore:
 
         shell_outputs = [
             DETECT_WA_ONLY,
-            "NO\n",  # plan_push: _remote_manifest -> _remote_dir_exists (media path doesn't exist yet)
+            "NO\n",  # plan_push: _remote_dir_exists (media path doesn't exist yet)
             "",  # execute_plan: mkdir -p remote_dir
-            "DIR\n",  # verify_push: _remote_manifest -> _remote_dir_exists
-            f"{WA_MEDIA}/WhatsApp Images/IMG-20230101-WA0001.jpg\t1000\t1672531200.0\n",  # verify_push: search_files
+            "1000\n",  # verify_push: per-file stat (file present, size matches)
         ]
         client = make_fake_client(READY_DEVICE, shell_side_effect=shell_outputs)
         monkeypatch.setattr(main, "_build_client", lambda: client)

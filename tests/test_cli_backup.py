@@ -348,8 +348,8 @@ class TestBackupRestore:
                 return "DIR" if dir_checks["count"] > 1 else "NO"
             if command.startswith("mkdir -p"):
                 return ""
-            if command.startswith("find -L"):
-                return "/sdcard/a.jpg\t1000\t1700000000\n"
+            if command.startswith("if [ -f"):
+                return "1000"  # per-file stat for verify_push
             raise AssertionError(command)
 
         client = make_fake_client(READY_DEVICE, fake_shell)

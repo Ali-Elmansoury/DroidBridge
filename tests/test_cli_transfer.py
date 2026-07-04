@@ -170,10 +170,11 @@ class TestTransferPush:
         local_file = tmp_path / "report.pdf"
         local_file.write_bytes(b"x" * 100)
 
-        existing_after_push = "/sdcard/Download/report.pdf\t100\t1700000000.0\n"
+        # shell calls: (1) _remote_dir_exists for planning → NO, (2) mkdir -p → "",
+        # (3) per-file stat for verify_push → "100" (file present, size matches)
         client = make_fake_client(
             READY_DEVICE,
-            shell_side_effect=["NO\n", "", "DIR\n", existing_after_push],
+            shell_side_effect=["NO\n", "", "100\n"],
         )
         monkeypatch.setattr(main, "_build_client", lambda: client)
         monkeypatch.setattr(main, "get_sleep_inhibitor", _noop_inhibitor)

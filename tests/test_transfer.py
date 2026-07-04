@@ -518,11 +518,8 @@ class TestVerifyPull:
 
 class TestVerifyPush:
     def test_ok_when_remote_files_match(self):
-        existing_output = (
-            "/sdcard/Backup/a.txt\t100\t1700000000.0\n"
-            "/sdcard/Backup/b.txt\t200\t1700000000.0\n"
-        )
-        client = make_client("DIR\n", existing_output)
+        # New implementation: per-file stat call — "100\n" for a.txt, "200\n" for b.txt
+        client = make_client("100\n", "200\n")
         plan = transfer.TransferPlan(
             direction="push",
             items=[
@@ -538,8 +535,8 @@ class TestVerifyPush:
         assert result.actual_files == 2
 
     def test_not_ok_when_remote_file_missing(self):
-        existing_output = "/sdcard/Backup/a.txt\t100\t1700000000.0\n"
-        client = make_client("DIR\n", existing_output)
+        # a.txt present (100), b.txt missing (MISSING)
+        client = make_client("100\n", "MISSING\n")
         plan = transfer.TransferPlan(
             direction="push",
             items=[

@@ -234,9 +234,10 @@ class TransferViewModel(QObject):
         self.historyEntryAdded.emit(
             _format_history_entry(direction, result.progress, verification, mirror_result=result)
         )
+        elapsed = format_utils.format_duration(result.progress.elapsed)
         self.logMessage.emit(
             f"{direction.capitalize()} complete: {result.progress.done_files} file(s), "
-            f"{format_utils.format_bytes(result.progress.done_bytes)}; "
+            f"{format_utils.format_bytes(result.progress.done_bytes)} in {elapsed}; "
             f"{result.deleted_files} extra file(s) removed.",
             "INFO",
         )
@@ -257,9 +258,10 @@ class TransferViewModel(QObject):
         if verification is not None:
             self.verificationChanged.emit(_format_verification(verification))
         self.historyEntryAdded.emit(_format_history_entry(direction, result, verification))
+        elapsed = format_utils.format_duration(result.elapsed)
         self.logMessage.emit(
             f"{direction.capitalize()} complete: {result.done_files} file(s), "
-            f"{format_utils.format_bytes(result.done_bytes)}.",
+            f"{format_utils.format_bytes(result.done_bytes)} in {elapsed}.",
             "INFO",
         )
         if result.failed:
