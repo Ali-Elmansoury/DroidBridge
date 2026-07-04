@@ -247,7 +247,8 @@ class FilesPage(QWidget):
         for i, row in enumerate(rows):
             self.table.setItem(i, 0, QTableWidgetItem(row["name"]))
             self.table.setItem(i, 1, QTableWidgetItem(row["type"]))
-            self.table.setItem(i, 2, QTableWidgetItem(format_bytes(row["size"])))
+            size_text = "—" if row["is_dir"] else format_bytes(row["size"])
+            self.table.setItem(i, 2, QTableWidgetItem(size_text))
             self.table.setItem(i, 3, QTableWidgetItem(row["mtime"].strftime("%Y-%m-%d %H:%M")))
 
     def _on_path_changed(self, path):
