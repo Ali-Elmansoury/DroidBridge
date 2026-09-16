@@ -148,6 +148,27 @@ class TestRunErrorHandling:
         assert exc_info.value.returncode == 1
         assert "no devices/emulators found" in str(exc_info.value)
 
+    def test_truncates_huge_stdout_in_message(self):
+        # Regression: a failing command with empty stderr but massive stdout
+        # (e.g. `find ... | xargs stat` hitting E2BIG after already printing
+        # tens of thousands of lines) previously embedded the ENTIRE stdout
+        # verbatim into the exception message. The GUI logs str(exception)
+        # to a QTextEdit, and a single multi-megabyte log line froze the GUI
+        # (observed on a Xiaomi Mi 11 Lite backing up WhatsApp Media, 62,780
+        # files). The message must be capped to a reasonable length; the full
+        # stdout/stderr must remain available on the exception's attributes
+        # for any caller that needs it.
+        huge_stdout = "line\n" * 100_000
+        client = adb.AdbClient(adb_path="/fake/adb")
+        with patch.object(adb.subprocess, "run") as mock_run:
+            mock_run.return_value = _completed(stdout=huge_stdout, stderr="", returncode=1)
+
+            with pytest.raises(adb.AdbCommandError) as exc_info:
+                client.shell("SERIAL", "echo hi")
+
+        assert len(str(exc_info.value)) < 4000
+        assert exc_info.value.stdout == huge_stdout
+
     def test_raises_adb_timeout_error_on_timeout(self):
         client = adb.AdbClient(adb_path="/fake/adb")
         with patch.object(adb.subprocess, "run") as mock_run:

@@ -24,6 +24,9 @@ class AdbNotFoundError(AdbError):
     """Raised when no adb binary can be located (bundled or on PATH)."""
 
 
+_ERROR_MESSAGE_MAX_CHARS = 2000
+
+
 class AdbCommandError(AdbError):
     """Raised when an adb command exits with a non-zero status."""
 
@@ -33,6 +36,9 @@ class AdbCommandError(AdbError):
         self.stdout = stdout
         self.stderr = stderr
         message = stderr.strip() or stdout.strip() or f"exit code {returncode}"
+        if len(message) > _ERROR_MESSAGE_MAX_CHARS:
+            omitted = len(message) - _ERROR_MESSAGE_MAX_CHARS
+            message = f"{message[:_ERROR_MESSAGE_MAX_CHARS]}... ({omitted} more chars truncated)"
         super().__init__(f"adb command failed ({' '.join(command)}): {message}")
 
 
