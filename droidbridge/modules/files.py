@@ -108,13 +108,18 @@ def get_directory_size(client, serial, path):
     over ADB. Returns 0 for empty directories.
     """
     # Double braces escape awk's {} inside the Python f-string.
+    # `-print0 | xargs -0 stat ...` instead of `-exec stat ... {} +`: toybox
+    # find's `{} +` batching doesn't correctly respect the device's ARG_MAX,
+    # failing with "Argument list too long" (E2BIG) on large directories
+    # (confirmed: WhatsApp Media folder, 62,780 files). xargs -0 chunks
+    # batches to the real ARG_MAX correctly (verified on-device).
     cmd = (
         f"find -L {shlex.quote(path)} -type f"
-        r" -exec stat -c '%s' {} + 2>/dev/null"
+        r" -print0 2>/dev/null | xargs -0 stat -c '%s' 2>/dev/null"
         r" | awk '{s+=$1} END{print s+0}'"
     )
     try:
-        out = client.shell(serial, cmd, timeout=15).strip()
+        out = client.shell(serial, cmd, timeout=60).strip()
         return int(out) if out.isdigit() else None
     except Exception:
         return None

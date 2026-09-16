@@ -70,14 +70,30 @@ def _build_find_command(root_path, name_pattern=None, name_regex=None):
     # name_regex is intentionally NOT passed to find: BusyBox find (Android)
     # doesn't support -regextype/-iregex. Regex filtering is done in Python.
     # -printf is a GNU find extension not available on older Android toybox
-    # (e.g. Android 9 on Honor 10 Lite). Use -exec stat instead, which is
-    # universally supported. stat -c '%n\t%s\t%Y' gives path, size, mtime
-    # as integer seconds (vs -printf's fractional %T@, but close enough for
-    # our date-comparison use case).
+    # (e.g. Android 9 on Honor 10 Lite). Use stat instead, which is
+    # universally supported. stat -c '%n<TAB>%s<TAB>%Y' gives path, size,
+    # mtime as integer seconds (vs -printf's fractional %T@, but close
+    # enough for our date-comparison use case).
+    #
+    # The separator must be a REAL tab byte, not the two characters "\t":
+    # Android toybox `stat -c` does not interpret backslash escapes in its
+    # format string (unlike GNU coreutils --printf), so a literal "\t"
+    # comes out as "\t" verbatim, breaking _parse_find_output's tab-split
+    # and silently dropping every result (confirmed on a Xiaomi Mi 11 Lite /
+    # MIUI, Android 13). A real tab byte passes through `stat` unchanged
+    # either way, since it isn't a format specifier.
+    #
+    # `-print0 | xargs -0 stat ...` instead of `-exec stat ... {} +`:
+    # toybox find's `{} +` batching doesn't correctly respect the device's
+    # ARG_MAX, so it fails with "Argument list too long" (E2BIG, exit 126)
+    # on large directories (confirmed: WhatsApp Media folder, 62,780 files,
+    # on a Xiaomi Mi 11 Lite). xargs -0 chunks batches to the real ARG_MAX
+    # correctly (verified on-device: exit 0, all files returned intact) and
+    # -print0/-0 are NUL-delimited so filenames with spaces/newlines are safe.
     cmd = f"find -L {shlex.quote(root_path)} -type f"
     if name_pattern:
         cmd += f" -iname {shlex.quote(name_pattern)}"
-    cmd += r" -exec stat -c '%n\t%s\t%Y' {} + 2>/dev/null"
+    cmd += " -print0 2>/dev/null | xargs -0 stat -c '%n\t%s\t%Y' 2>/dev/null"
     return cmd
 
 

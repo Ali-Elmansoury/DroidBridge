@@ -210,7 +210,36 @@ class TestPresetFilters:
             pass
 
 
-class TestRegexSearch:
+class TestBuildFindCommandSeparator:
+    def test_uses_real_tab_byte_not_backslash_t(self):
+        # Regression: a literal two-character "\t" in a `stat -c` format
+        # string is NOT interpreted as a tab by Android toybox stat (unlike
+        # GNU coreutils --printf) - it is printed verbatim as "\t", which
+        # breaks _parse_find_output's tab-split and silently drops every
+        # result (confirmed on a Xiaomi Mi 11 Lite / MIUI, Android 13:
+        # `stat -c '%n\t%s\t%Y'` printed literal backslash-t characters).
+        # The command must embed a real tab byte so it passes through
+        # `stat` unchanged regardless of escape-interpretation support.
+        cmd = _build_find_command("/sdcard")
+        assert "\t" in cmd
+        assert "\\t" not in cmd
+
+    def test_does_not_use_exec_plus_batching(self):
+        # Regression: `find -exec stat ... {} +` batches ALL matched paths into
+        # as few `stat` invocations as possible. Android toybox `find` doesn't
+        # correctly respect the device's ARG_MAX when building these batches,
+        # so a large directory (confirmed: WhatsApp Media folder, 62,780 files
+        # on a Xiaomi Mi 11 Lite) fails with "Argument list too long" (E2BIG,
+        # exit 126), silently truncating results and raising an AdbCommandError
+        # whose huge stdout dump then floods/freezes the GUI log panel.
+        # `-print0 | xargs -0 stat ...` lets xargs chunk batches to the real
+        # ARG_MAX correctly (verified on-device: exit 0, all 62780 files
+        # returned intact).
+        cmd = _build_find_command("/sdcard")
+        assert "-exec" not in cmd
+        assert "-print0" in cmd
+        assert "xargs -0" in cmd
+
     def test_build_find_command_with_regex_has_no_regextype(self):
         # BusyBox find (Android) doesn't support -regextype; regex filtering
         # is done in Python, so the find command must not include these flags.

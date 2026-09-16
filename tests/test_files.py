@@ -459,6 +459,21 @@ class TestGetDirectorySize:
         size = files.get_directory_size(client, "SERIAL", "/sdcard/Movies")
         assert size is None
 
+    def test_does_not_use_exec_plus_batching(self):
+        # Regression: `find -exec stat ... {} +` batches ALL matched paths
+        # into as few `stat` invocations as possible; Android toybox `find`
+        # doesn't respect the device's real ARG_MAX when doing this, so a
+        # large directory (e.g. WhatsApp Media, /sdcard/Android) fails with
+        # "Argument list too long" (E2BIG). `-print0 | xargs -0 stat ...`
+        # lets xargs chunk correctly (verified on-device: same command
+        # pattern returned all 62780 files intact vs exit 126 before).
+        client = make_fake_client("123\n")
+        files.get_directory_size(client, "SERIAL", "/sdcard/Movies")
+        cmd = client.shell.call_args[0][1]
+        assert "-exec" not in cmd
+        assert "-print0" in cmd
+        assert "xargs -0" in cmd
+
 
 class TestListStorageVolumes:
     def test_no_sd_card_returns_internal_only(self):
