@@ -293,18 +293,56 @@ class TestBackupRestorerRestoreContacts:
         vcf = tmp_path / "contacts_phone.vcf"
         _write_vcf(vcf, 5)
         client = MagicMock()
+        client.shell.side_effect = ["", "", "Row: 0 _id=1000000037\n", ""]
         restorer = BackupRestorer()
         result = restorer.restore_contacts(client, "SERIAL", vcf, "phone")
         client.push.assert_called_once()
         push_args = client.push.call_args[0]
         assert push_args[2] == "/sdcard/droidbridge_restore.vcf"
         # am start called
-        assert client.shell.call_count >= 1
         am_call = any(
             "am start" in str(call) for call in client.shell.call_args_list
         )
         assert am_call
         assert result.total == 5
+
+    def test_restore_contacts_to_phone_uses_content_uri_not_file_uri(self, tmp_path):
+        # Regression: a raw `file://` intent fails under Android scoped
+        # storage (10+) - the Contacts app doesn't own the pushed file and
+        # gets EACCES trying to open() it directly (confirmed via logcat on
+        # a Xiaomi Mi 11 Lite, Android 13: "couldn't import vCard, I/O
+        # error" on-screen, "Cannot load uri to local storage" in logcat).
+        # Registering the file with MediaStore and opening it via a
+        # content:// URI with --grant-read-uri-permission lets the Contacts
+        # app read it through ContentResolver instead (verified on-device:
+        # this reaches SelectAccountActivity with no error).
+        vcf = tmp_path / "contacts_phone.vcf"
+        _write_vcf(vcf, 5)
+        client = MagicMock()
+        client.shell.side_effect = ["", "", "Row: 0 _id=1000000037\n", ""]
+        restorer = BackupRestorer()
+        restorer.restore_contacts(client, "SERIAL", vcf, "phone")
+        am_calls = [c for c in client.shell.call_args_list if "am start" in str(c)]
+        assert len(am_calls) == 1
+        am_cmd = am_calls[0][0][1]
+        assert "file://" not in am_cmd
+        assert "content://media/external/file/1000000037" in am_cmd
+        assert "--grant-read-uri-permission" in am_cmd
+
+    def test_restore_contacts_to_phone_falls_back_to_file_uri_if_registration_fails(self, tmp_path):
+        # If MediaStore registration fails for any reason (e.g. content
+        # provider unavailable), fall back to the old file:// URI rather
+        # than raising and blocking the restore entirely.
+        vcf = tmp_path / "contacts_phone.vcf"
+        _write_vcf(vcf, 5)
+        client = MagicMock()
+        client.shell.side_effect = ["", "", "No result found.\n", ""]
+        restorer = BackupRestorer()
+        restorer.restore_contacts(client, "SERIAL", vcf, "phone")
+        am_calls = [c for c in client.shell.call_args_list if "am start" in str(c)]
+        assert len(am_calls) == 1
+        am_cmd = am_calls[0][0][1]
+        assert "file:///sdcard/droidbridge_restore.vcf" in am_cmd
 
 
 class TestBackupRestorerRestoreCalls:

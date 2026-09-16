@@ -165,6 +165,10 @@ class SoftDeleteScanner:
 # Matches Android content-provider output rows: "Row: 0 ..."
 _ROW_RE = re.compile(r"^Row:\s+\d+")
 
+# Extracts the numeric id from a `content query --projection _id` row, e.g.
+# "Row: 0 _id=1000000037"
+_CONTENT_ID_RE = re.compile(r"_id=(\d+)")
+
 
 def _count_vcf_contacts(vcf_path: Path) -> int:
     try:
@@ -259,17 +263,63 @@ class BackupRestorer:
             dest_dir.mkdir(parents=True, exist_ok=True)
             shutil.copy2(vcf_path, dest_dir / vcf_path.name)
             return RestoreResult(total=count, succeeded=count, failed=0, skipped=0)
-        # Push VCF to device then launch import intent
+        # Push VCF to device, register it with MediaStore, and open it via a
+        # content:// URI. A raw file:// URI fails under Android scoped
+        # storage (10+): the Contacts app doesn't own the pushed file and
+        # gets EACCES trying to open() it directly (confirmed via logcat on
+        # a Xiaomi Mi 11 Lite, Android 13 - "Cannot load uri to local
+        # storage", surfaced on-screen as "couldn't import vCard, I/O
+        # error"). Granting read access via --grant-read-uri-permission lets
+        # the Contacts app read it through ContentResolver instead (verified
+        # on-device: reaches SelectAccountActivity with no error).
         remote_vcf = "/sdcard/droidbridge_restore.vcf"
         client.push(serial, str(vcf_path), remote_vcf)
+        content_uri = self._register_with_media_store(client, serial, remote_vcf, "text/x-vcard")
         client.shell(
             serial,
             "am start -a android.intent.action.VIEW"
-            " -t text/vcard"
-            f" -d file://{remote_vcf}"
+            " -t text/x-vcard"
+            f" -d {content_uri}"
+            " --grant-read-uri-permission"
             " --activity-brought-to-front 2>/dev/null",
         )
         return RestoreResult(total=count, succeeded=count, failed=0, skipped=0)
+
+    def _register_with_media_store(self, client, serial, remote_path: str, mime_type: str) -> str:
+        """Register `remote_path` with MediaStore and return its content:// URI.
+
+        Deletes any stale row first (re-inserting an already-indexed path
+        raises SQLiteConstraintException: UNIQUE constraint failed on
+        `files._data`, confirmed on-device), then inserts a fresh row and
+        queries back its numeric id. MediaStore stores the canonical
+        resolved path (/storage/emulated/0/...), not the /sdcard/... symlink
+        path we pushed to, so the lookup matches by filename via LIKE rather
+        than the exact push path (also confirmed on-device).
+
+        Falls back to a raw file:// URI if registration fails for any
+        reason, rather than raising and blocking the restore entirely.
+        """
+        filename = remote_path.rsplit("/", 1)[-1]
+        where = shlex.quote(f"_data LIKE '%{filename}'")
+        client.shell(
+            serial,
+            f"content delete --uri content://media/external/file --where {where} 2>/dev/null",
+        )
+        client.shell(
+            serial,
+            "content insert --uri content://media/external/file"
+            f" --bind _data:s:{remote_path}"
+            f" --bind mime_type:s:{mime_type} 2>/dev/null",
+        )
+        output = client.shell(
+            serial,
+            "content query --uri content://media/external/file"
+            f" --projection _id --where {where} 2>/dev/null",
+        )
+        match = _CONTENT_ID_RE.search(output)
+        if not match:
+            return f"file://{remote_path}"
+        return f"content://media/external/file/{match.group(1)}"
 
     def restore_calls(self, client, serial, csv_path: Path, dest: str) -> "RestoreResult":
         csv_path = Path(csv_path)
