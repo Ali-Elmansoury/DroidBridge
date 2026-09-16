@@ -38,7 +38,8 @@ class FilesViewModel(QObject):
     statusChanged = pyqtSignal(str)
     logMessage = pyqtSignal(str, str)
     volumesChanged = pyqtSignal(list)   # list of {'label', 'path', 'removable'}
-    dirSizesChanged = pyqtSignal(dict)  # {path: int} — background directory sizes
+    dirSizesChanged = pyqtSignal(dict)  # {path: int|None} — per-directory as each scan completes
+    dirScanProgress = pyqtSignal(int, int)  # (done, total) — updated after each directory
 
     def __init__(self, context, worker_factory=Worker):
         super().__init__()
@@ -129,33 +130,39 @@ class FilesViewModel(QObject):
             self._load_dir_sizes(dir_entries)
 
     def _load_dir_sizes(self, dir_entries):
-        """Calculate directory sizes in the background; emits dirSizesChanged when done."""
+        """Calculate directory sizes in the background; emits dirSizesChanged + dirScanProgress
+        after each directory as it completes."""
         self._dir_size_generation += 1
         generation = self._dir_size_generation
         client, serial = self.context.client, self.context.serial
+        total = len(dir_entries)
 
-        def calculate():
-            sizes = {}
-            for entry in dir_entries:
+        def calculate(progress_callback=None):
+            for i, entry in enumerate(dir_entries):
                 if generation != self._dir_size_generation:
-                    break  # user navigated away
+                    return  # user navigated away
                 size = files_module.get_directory_size(client, serial, entry.path)
-                if size is not None:
-                    sizes[entry.path] = size
-            return sizes
+                if progress_callback:
+                    progress_callback((i + 1, total, entry.path, size))
 
-        worker = self._worker_factory(calculate)
+        worker = self._worker_factory(calculate, report_progress=True)
         self._size_workers.append(worker)
-        worker.finished.connect(lambda sizes: self._finish_sizes(worker, generation, sizes))
-        worker.error.connect(lambda _: self._finish_sizes(worker, generation, {}))
+        worker.progress.connect(lambda p: self._on_dir_size_progress(generation, p))
+        worker.finished.connect(lambda _: self._cleanup_size_worker(worker))
+        worker.error.connect(lambda _: self._cleanup_size_worker(worker))
         worker.start()
 
-    def _finish_sizes(self, worker, generation, sizes):
+    def _on_dir_size_progress(self, generation, progress_tuple):
+        done, total, path, size = progress_tuple
+        if generation != self._dir_size_generation:
+            return
+        self.dirSizesChanged.emit({path: size})
+        self.dirScanProgress.emit(done, total)
+
+    def _cleanup_size_worker(self, worker):
         worker.wait()
         if worker in self._size_workers:
             self._size_workers.remove(worker)
-        if generation == self._dir_size_generation:
-            self.dirSizesChanged.emit(sizes)
 
     def _on_preview_fetched(self, generation, local_path, entry):
         if generation != self._preview_generation:

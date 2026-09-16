@@ -239,7 +239,7 @@ class TestDirSizes:
 
         vm.navigate("/sdcard")
 
-        # Camera directory entry should get a size
+        # Camera directory entry should get a size (emitted per-directory)
         assert events
         assert SAMPLE_ENTRIES[0].path in events[0]  # Camera
         assert events[0][SAMPLE_ENTRIES[0].path] == 4096
@@ -266,3 +266,30 @@ class TestDirSizes:
 
         # dirSizesChanged should NOT be emitted for the stale generation
         assert events == []
+
+    def test_emits_scan_progress(self, qtbot, monkeypatch):
+        vm = FilesViewModel(_connected_context(), worker_factory=FakeWorker)
+        monkeypatch.setattr(files_ops, "list_path", lambda *a, **kw: SAMPLE_ENTRIES)
+        monkeypatch.setattr(files_module, "get_directory_size", lambda c, s, p: 4096)
+
+        progress_events = []
+        vm.dirScanProgress.connect(lambda done, total: progress_events.append((done, total)))
+
+        vm.navigate("/sdcard")
+
+        # SAMPLE_ENTRIES has one directory (Camera), so one progress event: (1, 1)
+        assert progress_events == [(1, 1)]
+
+    def test_none_size_does_not_crash(self, qtbot, monkeypatch):
+        vm = FilesViewModel(_connected_context(), worker_factory=FakeWorker)
+        monkeypatch.setattr(files_ops, "list_path", lambda *a, **kw: SAMPLE_ENTRIES)
+        monkeypatch.setattr(files_module, "get_directory_size", lambda c, s, p: None)
+
+        events = []
+        vm.dirSizesChanged.connect(events.append)
+
+        vm.navigate("/sdcard")
+
+        # Signal fires with {path: None} — page handles None → "—"
+        assert events
+        assert events[0][SAMPLE_ENTRIES[0].path] is None

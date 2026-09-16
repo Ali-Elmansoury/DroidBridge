@@ -106,6 +106,8 @@ class FilesPage(QWidget):
             "When an extension filter is active, also show folders alongside matching files."
         )
 
+        self._scan_label = QLabel()
+
         toolbar = QHBoxLayout()
         toolbar.addWidget(QLabel("Sort by:"))
         toolbar.addWidget(self.sort_combo)
@@ -113,6 +115,8 @@ class FilesPage(QWidget):
         toolbar.addWidget(self.show_hidden_checkbox)
         toolbar.addWidget(self.extension_edit, 1)
         toolbar.addWidget(self.dirs_pass_filter_checkbox)
+        toolbar.addSpacing(8)
+        toolbar.addWidget(self._scan_label)
 
         self.table = DeselectableTableWidget(0, len(_COLUMNS))
         self.table.setHorizontalHeaderLabels(_COLUMNS)
@@ -199,6 +203,7 @@ class FilesPage(QWidget):
         self.viewmodel.previewChanged.connect(self._on_preview_changed)
         self.viewmodel.volumesChanged.connect(self._on_volumes_changed)
         self.viewmodel.dirSizesChanged.connect(self._on_dir_sizes_changed)
+        self.viewmodel.dirScanProgress.connect(self._on_scan_progress)
 
         # QShortcut registrations (for real app when child widgets have focus)
         def _sc(key, slot, *, target=None, ctx=Qt.ShortcutContext.WidgetWithChildrenShortcut):
@@ -251,15 +256,30 @@ class FilesPage(QWidget):
         for i, row in enumerate(rows):
             self.table.setItem(i, 0, QTableWidgetItem(row["name"]))
             self.table.setItem(i, 1, QTableWidgetItem(row["type"]))
-            size_text = "—" if row["is_dir"] else format_bytes(row["size"])
+            size_text = "..." if row["is_dir"] else format_bytes(row["size"])
             self.table.setItem(i, 2, QTableWidgetItem(size_text))
             self.table.setItem(i, 3, QTableWidgetItem(row["mtime"].strftime("%Y-%m-%d %H:%M")))
+        dir_count = sum(1 for r in rows if r["is_dir"])
+        if dir_count > 0:
+            self._scan_label.setText(f"Calculating folder sizes (0/{dir_count})...")
+        else:
+            self._scan_label.setText("")
 
     def _on_dir_sizes_changed(self, sizes):
-        self._dir_sizes.update(sizes)
+        for path, size in sizes.items():
+            if size is not None:
+                self._dir_sizes[path] = size
         for i, row in enumerate(self._rows):
             if row["is_dir"] and row["path"] in sizes:
-                self.table.setItem(i, 2, QTableWidgetItem(format_bytes(sizes[row["path"]])))
+                size_val = sizes[row["path"]]
+                text = format_bytes(size_val) if size_val is not None else "—"
+                self.table.setItem(i, 2, QTableWidgetItem(text))
+
+    def _on_scan_progress(self, done, total):
+        if done >= total:
+            self._scan_label.setText("")
+        else:
+            self._scan_label.setText(f"Calculating folder sizes ({done}/{total})...")
 
     def _on_path_changed(self, path):
         self.path_edit.setText(path)
