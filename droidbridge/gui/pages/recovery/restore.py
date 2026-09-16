@@ -103,8 +103,13 @@ class RestorePanel(QWidget):
 
         self.phone_note = QLabel(
             "Your phone's Contacts app will open to confirm the import.\n"
-            "Please accept it on your device."
+            "Please accept it on your device.\n"
+            "Warning: import adds contacts as new entries and does not merge "
+            "with existing ones — if the phone already has some of these "
+            "contacts, you will get duplicates. Use your Contacts app's "
+            "\"Merge duplicates\" feature afterward if needed."
         )
+        self.phone_note.setWordWrap(True)
         self.phone_note.setVisible(False)
         root.addWidget(self.phone_note)
 

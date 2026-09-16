@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from droidbridge.gui.device_context import DeviceContext
+from droidbridge.gui.pages.recovery.restore import RestorePanel
 from droidbridge.gui.viewmodels.recovery.restore import RestoreViewModel
 from droidbridge.modules.recovery import BackupInfo, BackupRestorer, DiffResult, RestoreResult
 from tests.test_gui_viewmodels_device import FakeWorker
@@ -80,3 +81,28 @@ class TestRestoreViewModelRestore:
         vm.busyChanged.connect(busy.append)
         vm.restore(info, restore_contacts=True, restore_calls=False, dest="pc", output_dir=str(tmp_path))
         assert busy == [True, False]
+
+
+class TestRestorePanelPhoneNote:
+    def test_phone_note_warns_about_duplicate_contacts(self, qtbot):
+        # Regression: vCard import always adds contacts as *new* entries -
+        # it never merges against what's already on the phone/Google
+        # account, so restoring a backup of contacts the phone already has
+        # creates duplicates (confirmed on a Xiaomi Mi 11 Lite: a 486-contact
+        # restore onto a phone that already had most of them went from
+        # ~114 to 600 contacts). The panel must warn about this before the
+        # user accepts the import on-device.
+        vm = RestoreViewModel(_connected_ctx(), worker_factory=FakeWorker)
+        panel = RestorePanel(vm)
+        qtbot.addWidget(panel)
+        assert "duplicate" in panel.phone_note.text().lower()
+
+    def test_phone_note_shown_only_for_phone_dest_with_contacts_checked(self, qtbot):
+        vm = RestoreViewModel(_connected_ctx(), worker_factory=FakeWorker)
+        panel = RestorePanel(vm)
+        qtbot.addWidget(panel)
+        panel.show()
+        assert not panel.phone_note.isVisible()
+        panel.contacts_check.setChecked(True)
+        panel.dest_phone_radio.setChecked(True)
+        assert panel.phone_note.isVisible()
