@@ -4,7 +4,7 @@
 import csv
 import json
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -24,10 +24,10 @@ _CALL_TYPES = {
 
 @dataclass
 class Contact:
-    """One exported contact: display name + phone number."""
+    """One exported contact: display name + one or more phone numbers."""
 
     display_name: str
-    number: str
+    numbers: list = field(default_factory=list)
 
 
 @dataclass
@@ -88,7 +88,7 @@ def _contacts_by_account(client, serial, want_local):
     phone_rows, skipped_a = _query(
         client, serial,
         "content://com.android.contacts/data/phones",
-        "display_name:data1:raw_contact_id",
+        "contact_id:display_name:data1:raw_contact_id",
     )
     account_rows, skipped_b = _query(
         client, serial,
@@ -97,8 +97,18 @@ def _contacts_by_account(client, serial, want_local):
     )
     account_by_id = {row.get("_id"): row.get("account_type") for row in account_rows}
 
-    contacts = []
+    # Android's data/phones view has one row per phone number per
+    # raw_contact - a contact with 2+ numbers, or one linked across
+    # multiple raw_contacts (e.g. synced to more than one account),
+    # produces multiple rows for what the Contacts app displays as a single
+    # merged contact. Group by the aggregate contact_id and collect all
+    # numbers into one Contact; otherwise export massively over-counts and
+    # each extra row becomes a duplicate on restore (confirmed on-device:
+    # 486 exported VCARDs for only 214 unique real contacts, and restoring
+    # that backup created hundreds of duplicate contacts).
     skipped = skipped_a + skipped_b
+    order = []
+    grouped = {}  # key -> [display_name, [numbers]]
     for row in phone_rows:
         raw_id = row.get("raw_contact_id")
         account_type = account_by_id.get(raw_id)
@@ -110,8 +120,14 @@ def _contacts_by_account(client, serial, want_local):
         if not name or not number:
             skipped += 1
             continue
-        contacts.append(Contact(display_name=name, number=number))
-    return contacts, skipped
+        key = row.get("contact_id") or raw_id or name
+        if key not in grouped:
+            grouped[key] = [name, []]
+            order.append(key)
+        if number not in grouped[key][1]:
+            grouped[key][1].append(number)
+
+    return [Contact(display_name=grouped[k][0], numbers=grouped[k][1]) for k in order], skipped
 
 
 def query_phone_contacts(client, serial):
@@ -141,7 +157,7 @@ def query_sim_contacts(client, serial):
         if not name or not number:
             skipped += 1
             continue
-        contacts.append(Contact(display_name=name, number=number))
+        contacts.append(Contact(display_name=name, numbers=[number]))
     return contacts, skipped
 
 
@@ -181,7 +197,8 @@ def _write_vcard(contacts, path):
         lines.append("BEGIN:VCARD")
         lines.append("VERSION:3.0")
         lines.append(f"FN:{contact.display_name}")
-        lines.append(f"TEL:{contact.number}")
+        for number in contact.numbers:
+            lines.append(f"TEL:{number}")
         lines.append("END:VCARD")
     Path(path).write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
 

@@ -23,8 +23,8 @@ def _client_with_shell_outputs(*outputs):
 
 
 _PHONES_OUTPUT = (
-    "Row: 0 display_name=John Doe, data1=+15551234567, raw_contact_id=3\n"
-    "Row: 1 display_name=Smith, John, data1=+15559876543, raw_contact_id=7\n"
+    "Row: 0 display_name=John Doe, data1=+15551234567, raw_contact_id=3, contact_id=100\n"
+    "Row: 1 display_name=Smith, John, data1=+15559876543, raw_contact_id=7, contact_id=200\n"
 )
 _RAW_CONTACTS_OUTPUT = (
     "Row: 0 _id=3, account_type=NULL\n"
@@ -67,7 +67,7 @@ class TestQueryPhoneContacts:
     def test_returns_only_local_contacts(self):
         client = _client_with_shell_outputs(_PHONES_OUTPUT, _RAW_CONTACTS_OUTPUT)
         contacts, skipped = query_phone_contacts(client, "SERIAL")
-        assert contacts == [Contact(display_name="John Doe", number="+15551234567")]
+        assert contacts == [Contact(display_name="John Doe", numbers=["+15551234567"])]
         assert skipped == 0
 
     def test_issues_expected_shell_commands(self):
@@ -84,23 +84,60 @@ class TestQueryAccountContacts:
     def test_returns_only_synced_contacts(self):
         client = _client_with_shell_outputs(_PHONES_OUTPUT, _RAW_CONTACTS_OUTPUT)
         contacts, skipped = query_account_contacts(client, "SERIAL")
-        assert contacts == [Contact(display_name="Smith, John", number="+15559876543")]
+        assert contacts == [Contact(display_name="Smith, John", numbers=["+15559876543"])]
         assert skipped == 0
 
     def test_missing_name_or_number_is_skipped(self):
-        phones_output = "Row: 0 display_name=No Number, data1=, raw_contact_id=9\n"
+        phones_output = "Row: 0 display_name=No Number, data1=, raw_contact_id=9, contact_id=900\n"
         raw_output = "Row: 0 _id=9, account_type=com.google\n"
         client = _client_with_shell_outputs(phones_output, raw_output)
         contacts, skipped = query_account_contacts(client, "SERIAL")
         assert contacts == []
         assert skipped == 1
 
+    def test_multiple_numbers_for_same_contact_id_merge_into_one_contact(self):
+        # Regression: Android's data/phones view has one row per phone
+        # number per raw_contact - a contact with 2 numbers produces 2 rows
+        # for what the Contacts app displays as a single merged contact.
+        # Without grouping by contact_id, export emits a separate VCARD per
+        # row, wildly inflating the count (confirmed on-device: 486
+        # exported VCARDs, only 214 unique real contacts - restoring that
+        # backup created hundreds of duplicates).
+        phones_output = (
+            "Row: 0 display_name=Jane Roe, data1=+15551112222, raw_contact_id=11, contact_id=500\n"
+            "Row: 1 display_name=Jane Roe, data1=+15553334444, raw_contact_id=11, contact_id=500\n"
+        )
+        raw_output = "Row: 0 _id=11, account_type=com.google\n"
+        client = _client_with_shell_outputs(phones_output, raw_output)
+        contacts, skipped = query_account_contacts(client, "SERIAL")
+        assert contacts == [
+            Contact(display_name="Jane Roe", numbers=["+15551112222", "+15553334444"])
+        ]
+        assert skipped == 0
+
+    def test_same_contact_id_across_different_raw_contacts_merges_too(self):
+        # A contact linked across multiple raw_contacts (e.g. synced to more
+        # than one account) but aggregated by Android into one contact_id
+        # must also collapse into a single exported Contact.
+        phones_output = (
+            "Row: 0 display_name=Alex Kim, data1=+15550001111, raw_contact_id=21, contact_id=700\n"
+            "Row: 1 display_name=Alex Kim, data1=+15550001111, raw_contact_id=22, contact_id=700\n"
+        )
+        raw_output = (
+            "Row: 0 _id=21, account_type=com.google\n"
+            "Row: 1 _id=22, account_type=com.google\n"
+        )
+        client = _client_with_shell_outputs(phones_output, raw_output)
+        contacts, skipped = query_account_contacts(client, "SERIAL")
+        assert contacts == [Contact(display_name="Alex Kim", numbers=["+15550001111"])]
+        assert skipped == 0
+
 
 class TestQuerySimContacts:
     def test_parses_sim_contacts(self):
         client = _client_with_shell_outputs("Row: 0 name=Sim Contact, number=+15550001111\n")
         contacts, skipped = query_sim_contacts(client, "SERIAL")
-        assert contacts == [Contact(display_name="Sim Contact", number="+15550001111")]
+        assert contacts == [Contact(display_name="Sim Contact", numbers=["+15550001111"])]
         assert skipped == 0
 
     def test_no_sim_returns_empty_not_error(self):
@@ -179,7 +216,7 @@ class TestExportContacts:
         assert "END:VCARD" in vcf_text
 
         json_data = json.loads((tmp_path / "contacts_phone.json").read_text(encoding="utf-8"))
-        assert json_data == [{"display_name": "John Doe", "number": "+15551234567"}]
+        assert json_data == [{"display_name": "John Doe", "numbers": ["+15551234567"]}]
 
     def test_vcard_preserves_comma_in_name(self, tmp_path):
         client = _client_with_shell_outputs(_PHONES_OUTPUT, _RAW_CONTACTS_OUTPUT)
